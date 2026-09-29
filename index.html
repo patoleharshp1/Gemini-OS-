@@ -1,55 +1,266 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Messages</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Gemini OS</title>
   <style>
-    body { font-family: sans-serif; background: #120000; color: #fff; margin: 0; padding: 15px; }
-    h2 { margin-top: 0; color: #ff8a8a; }
-    #chat-box { height: 350px; overflow-y: auto; border: 1px solid #444; padding: 10px; margin-bottom: 10px; border-radius: 8px; background: #1e0505; }
-    .message { margin-bottom: 10px; word-wrap: break-word; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0c0202; color: #fff; margin: 0; padding: 15px; }
+    
+    /* Status Header */
+    .status-bar { background: rgba(40, 10, 10, 0.8); border: 1px solid #3d1515; padding: 12px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; font-weight: bold; font-family: cursive, sans-serif; color: #e5b3b3; }
+    
+    /* App Grid matching screenshot */
+    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
+    .app-icon { background: rgba(30, 8, 8, 0.9); border: 1px solid #421818; border-radius: 16px; padding: 12px 5px; text-align: center; cursor: pointer; transition: transform 0.2s; }
+    .app-icon:active { transform: scale(0.95); }
+    .app-icon img { width: 42px; height: 42px; object-fit: contain; margin-bottom: 6px; }
+    .app-icon span { display: block; font-size: 11px; color: #e5b3b3; font-family: cursive, sans-serif; }
+
+    /* Modal Windows for Apps */
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0c0202; z-index: 100; flex-direction: column; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #220808; border-bottom: 1px solid #441515; }
+    .modal-header h3 { margin: 0; color: #ff8a8a; font-size: 16px; }
+    .close-btn { background: #e05656; border: none; color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+    .modal-body { flex: 1; position: relative; overflow: auto; padding: 10px; }
+    iframe { width: 100%; height: 100%; border: none; }
+
+    /* Chat Styling */
+    #chat-box { height: 320px; overflow-y: auto; border: 1px solid #3d1515; padding: 10px; margin-bottom: 10px; border-radius: 10px; background: #140404; }
+    .message { margin-bottom: 12px; font-size: 14px; }
     .user { font-weight: bold; color: #ff8a8a; }
-    .time { font-size: 0.75em; color: #888; margin-left: 6px; }
-    .input-container { display: flex; gap: 8px; }
-    input { flex: 1; padding: 12px; border-radius: 6px; border: 1px solid #444; background: #222; color: #fff; font-size: 16px; }
-    button { padding: 12px 18px; border: none; background: #e05656; color: white; border-radius: 6px; font-weight: bold; cursor: pointer; }
+    .time { font-size: 0.7em; color: #777; margin-left: 6px; }
+    .msg-img { max-width: 180px; border-radius: 8px; display: block; margin-top: 5px; }
+    .msg-audio { margin-top: 5px; width: 220px; height: 35px; }
+    
+    .chat-controls { display: flex; gap: 6px; align-items: center; }
+    .chat-controls input[type="text"] { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #441515; background: #1f0808; color: #fff; }
+    .btn { padding: 10px 12px; border: none; background: #e05656; color: white; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer; }
+    .btn-icon { background: #2b0b0b; border: 1px solid #441515; color: #ff8a8a; }
+
+    /* Camera View */
+    video, canvas { width: 100%; max-height: 280px; background: #000; border-radius: 8px; }
   </style>
 </head>
 <body>
 
-  <h2>Messages</h2>
-  <div id="chat-box"></div>
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <span>CPU: 12% | RAM: 42%</span>
+    <span id="display-username" style="cursor: pointer; text-decoration: underline;" onclick="changeUsername()">User: Setting...</span>
+  </div>
 
-  <div class="input-container">
-    <input type="text" id="messageInput" placeholder="Type a message..." />
-    <button onclick="sendMessage()">Send</button>
+  <!-- App Launcher Grid -->
+  <div class="grid">
+    <div class="app-icon" onclick="openModal('cameraApp')"><img src="https://img.icons8.com/color/96/camera.png"/><span>Camera</span></div>
+    <div class="app-icon" onclick="openModal('chatApp')"><img src="https://img.icons8.com/color/96/speech-bubble.png"/><span>Messages</span></div>
+    <div class="app-icon" onclick="openAppUrl('https://www.google.com/maps')"><img src="https://img.icons8.com/color/96/google-maps-new.png"/><span>GPS Maps</span></div>
+    <div class="app-icon" onclick="openModal('storageApp')"><img src="https://img.icons8.com/color/96/folder-invoiced.png"/><span>Storage</span></div>
+    <div class="app-icon" onclick="openAppUrl('https://www.youtube.com/embed')"><img src="https://img.icons8.com/color/96/television.png"/><span>YouTube</span></div>
+    <div class="app-icon" onclick="openAppUrl('https://gemini.google.com')"><img src="https://img.icons8.com/color/96/sparkling.png"/><span>Gemini</span></div>
+    <div class="app-icon" onclick="openAppUrl('https://play2048.co/')"><img src="https://img.icons8.com/color/96/puzzle.png"/><span>2048</span></div>
+    <div class="app-icon" onclick="openAppUrl('https://flappybird.io/')"><img src="https://img.icons8.com/color/96/twitter.png"/><span>Flappy</span></div>
+  </div>
+
+  <!-- App Viewer Modal -->
+  <div id="webModal" class="modal">
+    <div class="modal-header">
+      <h3 id="modalTitle">App</h3>
+      <button class="close-btn" onclick="closeModal('webModal')">X</button>
+    </div>
+    <div class="modal-body">
+      <iframe id="appFrame" src=""></iframe>
+    </div>
+  </div>
+
+  <!-- Messages App Modal -->
+  <div id="chatApp" class="modal">
+    <div class="modal-header">
+      <h3>Messages</h3>
+      <button class="close-btn" onclick="closeModal('chatApp')">X</button>
+    </div>
+    <div class="modal-body">
+      <div id="chat-box"></div>
+      <div class="chat-controls">
+        <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="sendImage(this)" />
+        <button class="btn btn-icon" onclick="document.getElementById('imageInput').click()">📷</button>
+        <button class="btn btn-icon" id="recordBtn" onclick="toggleRecord()">🎙️</button>
+        <input type="text" id="messageInput" placeholder="Type a message..." />
+        <button class="btn" onclick="sendMessage()">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Camera App Modal (Offline) -->
+  <div id="cameraApp" class="modal">
+    <div class="modal-header">
+      <h3>Camera</h3>
+      <button class="close-btn" onclick="closeCamera()">X</button>
+    </div>
+    <div class="modal-body" style="text-align: center;">
+      <video id="webcam" autoplay playsinline></video>
+      <button class="btn" style="margin-top: 10px;" onclick="takePhoto()">Snap Photo</button>
+      <canvas id="photoCanvas" style="display:none;"></canvas>
+    </div>
+  </div>
+
+  <!-- Storage App Modal (Offline File Viewer) -->
+  <div id="storageApp" class="modal">
+    <div class="modal-header">
+      <h3>Storage</h3>
+      <button class="close-btn" onclick="closeModal('storageApp')">X</button>
+    </div>
+    <div class="modal-body">
+      <p>Select a file from your device:</p>
+      <input type="file" id="localFileInput" onchange="previewFile(this)" />
+      <div id="filePreview" style="margin-top: 15px;"></div>
+    </div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
+    let currentUsername = localStorage.getItem('custom_username');
 
+    // 1. Username setup
+    function setupUsername() {
+      if (!currentUsername) {
+        currentUsername = prompt("Enter your custom name:", "User1") || ("User" + Math.floor(Math.random() * 100));
+        localStorage.setItem('custom_username', currentUsername);
+      }
+      document.getElementById('display-username').innerText = "User: " + currentUsername;
+    }
+    function changeUsername() {
+      const newName = prompt("Enter new custom name:", currentUsername);
+      if (newName) {
+        currentUsername = newName;
+        localStorage.setItem('custom_username', currentUsername);
+        document.getElementById('display-username').innerText = "User: " + currentUsername;
+      }
+    }
+    setupUsername();
+
+    // 2. Navigation / Modals
+    function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+    function openAppUrl(url) {
+      document.getElementById('appFrame').src = url;
+      document.getElementById('modalTitle').innerText = "Web App";
+      openModal('webModal');
+    }
+
+    // 3. Socket.io Messaging
     const chatBox = document.getElementById('chat-box');
-    const messageInput = document.getElementById('messageInput');
-
+    
     socket.on('receive_message', function(data) {
       const msgDiv = document.createElement('div');
       msgDiv.className = 'message';
-      msgDiv.innerHTML = '<span class="user">' + (data.user || 'User') + ':</span> ' + data.message + ' <span class="time">' + (data.timestamp || '') + '</span>';
+      let content = '<span class="user">' + data.user + ':</span> ';
+      
+      if (data.text) content += data.text;
+      if (data.image) content += '<br><img class="msg-img" src="' + data.image + '"/>';
+      if (data.audio) content += '<br><audio class="msg-audio" controls src="' + data.audio + '"></audio>';
+      content += '<span class="time">' + data.timestamp + '</span>';
+      
+      msgDiv.innerHTML = content;
       chatBox.appendChild(msgDiv);
       chatBox.scrollTop = chatBox.scrollHeight;
     });
 
     function sendMessage() {
-      const text = messageInput.value.trim();
-      if (text !== '') {
-        socket.emit('send_message', { 
-          user: 'Phone ' + Math.floor(Math.random() * 100), 
-          message: text,
+      const input = document.getElementById('messageInput');
+      if (input.value.trim() !== '') {
+        socket.emit('send_message', {
+          user: currentUsername,
+          text: input.value.trim(),
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         });
-        messageInput.value = '';
+        input.value = '';
+      }
+    }
+
+    // 4. Image Sharing
+    function sendImage(fileInput) {
+      const file = fileInput.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          socket.emit('send_message', {
+            user: currentUsername,
+            image: e.target.result,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          });
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    // 5. Voice Recording & Sharing
+    let mediaRecorder, audioChunks = [], isRecording = false;
+    async function toggleRecord() {
+      const btn = document.getElementById('recordBtn');
+      if (!isRecording) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mediaRecorder = new MediaRecorder(stream);
+          audioChunks = [];
+          mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+          mediaRecorder.onstop = () => {
+            const blob = new Blob(audioChunks, { type: 'audio/webm' });
+            const reader = new FileReader();
+            reader.onload = function(e) {
+              socket.emit('send_message', {
+                user: currentUsername,
+                audio: e.target.result,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              });
+            };
+            reader.readAsDataURL(blob);
+          };
+          mediaRecorder.start();
+          isRecording = true;
+          btn.style.background = '#ff0000';
+        } catch(err) { alert('Microphone access denied'); }
+      } else {
+        mediaRecorder.stop();
+        isRecording = false;
+        btn.style.background = '#2b0b0b';
+      }
+    }
+
+    // 6. Offline Camera Functionality
+    let videoStream;
+    function openCamera() {
+      openModal('cameraApp');
+      navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+        videoStream = stream;
+        document.getElementById('webcam').srcObject = stream;
+      }).catch(err => alert("Camera permission error."));
+    }
+    function closeCamera() {
+      if (videoStream) videoStream.getTracks().forEach(t => t.stop());
+      closeModal('cameraApp');
+    }
+    function takePhoto() {
+      const video = document.getElementById('webcam');
+      const canvas = document.getElementById('photoCanvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext('2d').drawImage(video, 0, 0);
+      const dataUrl = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = 'photo.png';
+      a.click();
+    }
+
+    // 7. Offline Storage Viewer
+    function previewFile(input) {
+      const file = input.files[0];
+      const preview = document.getElementById('filePreview');
+      if (file) {
+        preview.innerHTML = '<strong>Name:</strong> ' + file.name + '<br><strong>Size:</strong> ' + Math.round(file.size/1024) + ' KB';
       }
     }
   </script>
