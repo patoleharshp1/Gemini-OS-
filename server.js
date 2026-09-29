@@ -6,31 +6,19 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: {
-    origin: "*", // Adjust for specific production domains if necessary
-    methods: ["GET", "POST"]
-  }
+  cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
-// Serve frontend static files
-app.use(express.static(path.join(__dirname, 'public')));
+// This line tells the server to load index.html when you open the URL
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
 
-// Store active socket connections / real-time messaging events
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
-  // Handle incoming message
   socket.on('send_message', (data) => {
-    // Broadcast the message to all connected clients
-    io.emit('receive_message', {
-      user: data.user || 'Anonymous',
-      message: data.message,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    });
-  });
-
-  socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
+    io.emit('receive_message', data);
   });
 });
 
