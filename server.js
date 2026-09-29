@@ -5,18 +5,20 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
+
+// Increase JSON payload limit for image & voice data
+app.use(express.json({ limit: '10mb' }));
+
 const io = new Server(server, {
+  maxHttpBufferSize: 1e7, // 10 MB payload limit
   cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
-// This line tells the server to load index.html when you open the URL
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
-
   socket.on('send_message', (data) => {
     io.emit('receive_message', data);
   });
