@@ -1,41 +1,40 @@
-const { WebSocketServer } = require('ws');
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const path = require('path');
 
-// Use port assigned by host environment (e.g., Render, Railway, Glitch) or 8080 locally
-const PORT = process.env.PORT || 8080;
-const wss = new WebSocketServer({ port: PORT });
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*", // Adjust for specific production domains if necessary
+    methods: ["GET", "POST"]
+  }
+});
 
-console.log(`Web Relay Server running on port ${PORT}`);
+// Serve frontend static files
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Keep track of connected phone devices
-const clients = new Set();
+// Store active socket connections / real-time messaging events
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
 
-wss.on('connection', (ws) => {
-    clients.add(ws);
-    console.log(`Phone connected. Total active phones: ${clients.size}`);
-
-    // Send confirmation to the newly connected phone
-    ws.send(JSON.stringify({ type: 'status', message: 'Connected to web' }));
-
-    ws.on('message', (message) => {
-        let parsedData;
-        try {
-            parsedData = JSON.parse(message);
-        } catch (e) {
-            parsedData = { text: message.toString() };
-        }
-
-        console.log(`Received message: "${parsedData.text}". Broadcasting to ${clients.size - 1} other phones...`);
-
-        // Broadcast to EVERY connected phone EXCEPT the sender
-        clients.forEach((client) => {
-            if (client !== ws && client.readyState === 1) { // 1 = OPEN
-                client.send(JSON.stringify({ type: 'chat', text: parsedData.text }));
-            }
-        });
+  // Handle incoming message
+  socket.on('send_message', (data) => {
+    // Broadcast the message to all connected clients
+    io.emit('receive_message', {
+      user: data.user || 'Anonymous',
+      message: data.message,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     });
+  });
 
-    ws.on('close', () => {
-        clients.delete(ws);
-        console.log(`Phone disconnected. Remaining phones: ${clients.size}`);
-    });
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+  });
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
