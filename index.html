@@ -1,28 +1,57 @@
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-<script>
-  // Point directly to your live Render server URL
-  const socket = io("https://gemini-os.onrender.com");
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Messages</title>
+  <style>
+    body { font-family: sans-serif; background: #120000; color: #fff; margin: 0; padding: 15px; }
+    h2 { margin-top: 0; color: #ff8a8a; }
+    #chat-box { height: 350px; overflow-y: auto; border: 1px solid #444; padding: 10px; margin-bottom: 10px; border-radius: 8px; background: #1e0505; }
+    .message { margin-bottom: 10px; word-wrap: break-word; }
+    .user { font-weight: bold; color: #ff8a8a; }
+    .time { font-size: 0.75em; color: #888; margin-left: 6px; }
+    .input-container { display: flex; gap: 8px; }
+    input { flex: 1; padding: 12px; border-radius: 6px; border: 1px solid #444; background: #222; color: #fff; font-size: 16px; }
+    button { padding: 12px 18px; border: none; background: #e05656; color: white; border-radius: 6px; font-weight: bold; cursor: pointer; }
+  </style>
+</head>
+<body>
 
-  const chatBox = document.getElementById('chat-box');
-  const messageInput = document.getElementById('messageInput');
+  <h2>Messages</h2>
+  <div id="chat-box"></div>
 
-  // Receive message from server
-  socket.on('receive_message', (data) => {
-    const msgDiv = document.createElement('div');
-    msgDiv.className = 'message';
-    msgDiv.innerHTML = `<span class="user">${data.user}:</span> ${data.message} <span class="time">${data.timestamp}</span>`;
-    chatBox.appendChild(msgDiv);
-    chatBox.scrollTop = chatBox.scrollHeight;
-  });
+  <div class="input-container">
+    <input type="text" id="messageInput" placeholder="Type a message..." />
+    <button onclick="sendMessage()">Send</button>
+  </div>
 
-  // Send message to server
-  function sendMessage() {
-    const text = messageInput.value.trim();
-    if (text !== '') {
-      // Prompt for a username if you want to distinguish phones
-      const userName = localStorage.getItem('username') || 'Phone 1';
-      socket.emit('send_message', { user: userName, message: text });
-      messageInput.value = '';
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    const chatBox = document.getElementById('chat-box');
+    const messageInput = document.getElementById('messageInput');
+
+    socket.on('receive_message', function(data) {
+      const msgDiv = document.createElement('div');
+      msgDiv.className = 'message';
+      msgDiv.innerHTML = '<span class="user">' + (data.user || 'User') + ':</span> ' + data.message + ' <span class="time">' + (data.timestamp || '') + '</span>';
+      chatBox.appendChild(msgDiv);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    });
+
+    function sendMessage() {
+      const text = messageInput.value.trim();
+      if (text !== '') {
+        socket.emit('send_message', { 
+          user: 'Phone ' + Math.floor(Math.random() * 100), 
+          message: text,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        });
+        messageInput.value = '';
+      }
     }
-  }
-</script>
+  </script>
+</body>
+</html>
