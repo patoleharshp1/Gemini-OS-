@@ -1,0 +1,12 @@
+{
+  "name": "pixel-web-relay",
+  "version": "1.0.0",
+  "description": "WebSocket relay server for Pixel OS web apps",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  }
+}
