@@ -6,39 +6,62 @@
   <title>Gemini OS</title>
   <style>
     * { box-sizing: border-box; }
-    body { font-family: 'Segoe UI', sans-serif; background: #0c0202; color: #fff; margin: 0; padding: 15px; }
+    body { font-family: 'Roboto', 'Segoe UI', sans-serif; background: #0c0202; color: #fff; margin: 0; padding: 12px; }
 
-    .status-bar { background: rgba(40, 10, 10, 0.9); border: 1px solid #3d1515; padding: 12px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; font-weight: bold; color: #e5b3b3; }
+    .status-bar { background: rgba(35, 10, 10, 0.9); border: 1px solid #3d1515; padding: 10px 14px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-weight: bold; color: #e5b3b3; font-size: 13px; }
     
     .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
-    .app-icon { background: rgba(30, 8, 8, 0.9); border: 1px solid #421818; border-radius: 16px; padding: 10px 4px; text-align: center; cursor: pointer; transition: transform 0.2s; }
-    .app-icon:active { transform: scale(0.95); }
+    .app-icon { background: rgba(30, 8, 8, 0.9); border: 1px solid #421818; border-radius: 16px; padding: 10px 4px; text-align: center; cursor: pointer; transition: transform 0.15s; }
+    .app-icon:active { transform: scale(0.92); }
     .app-icon img { width: 38px; height: 38px; object-fit: contain; margin-bottom: 4px; }
     .app-icon span { display: block; font-size: 11px; color: #e5b3b3; font-family: cursive, sans-serif; }
 
     .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0c0202; z-index: 100; flex-direction: column; }
-    .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #220808; border-bottom: 1px solid #441515; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #1f0606; border-bottom: 1px solid #3d1515; }
     .modal-header h3 { margin: 0; color: #ff8a8a; font-size: 16px; }
     .close-btn { background: #e05656; border: none; color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; }
     .modal-body { flex: 1; position: relative; overflow-y: auto; padding: 12px; }
 
-    /* Chat Styling */
-    #chat-box { height: 300px; overflow-y: auto; border: 1px solid #3d1515; padding: 10px; margin-bottom: 10px; border-radius: 10px; background: #140404; }
-    .message { margin-bottom: 12px; font-size: 14px; }
-    .user { font-weight: bold; color: #ff8a8a; }
-    .time { font-size: 0.7em; color: #777; margin-left: 6px; }
-    .msg-img { max-width: 180px; border-radius: 8px; display: block; margin-top: 5px; }
-    .msg-audio { margin-top: 5px; width: 220px; height: 35px; }
+    /* CHAT ALIGNMENT & BUBBLES */
+    #chat-box { height: 360px; overflow-y: auto; border: 1px solid #3d1515; padding: 10px; margin-bottom: 10px; border-radius: 12px; background: #140404; display: flex; flex-direction: column; gap: 10px; }
+    
+    .msg-wrapper { display: flex; flex-direction: column; max-width: 80%; }
+    .msg-wrapper.my-msg { align-self: flex-end; align-items: flex-end; }
+    .msg-wrapper.other-msg { align-self: flex-start; align-items: flex-start; }
+
+    .msg-author { font-size: 11px; color: #ff8a8a; margin-bottom: 2px; font-weight: bold; padding: 0 4px; }
+    .bubble { padding: 8px 12px; border-radius: 14px; font-size: 14px; word-break: break-word; position: relative; }
+    .my-msg .bubble { background: #5c1818; color: #fff; border-bottom-right-radius: 2px; }
+    .other-msg .bubble { background: #260a0a; color: #e5b3b3; border: 1px solid #3d1515; border-bottom-left-radius: 2px; }
+
+    .msg-time { font-size: 9px; opacity: 0.6; margin-top: 4px; display: inline-block; float: right; margin-left: 8px; }
+    .delete-btn { background: transparent; border: none; color: #ff8a8a; font-size: 12px; cursor: pointer; margin-left: 6px; padding: 0; }
+
+    .msg-img { max-width: 180px; border-radius: 8px; display: block; margin-top: 4px; }
+    .msg-audio { margin-top: 4px; width: 200px; height: 35px; }
+
     .chat-controls { display: flex; gap: 6px; align-items: center; }
     .chat-controls input[type="text"] { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #441515; background: #1f0808; color: #fff; }
     .btn { padding: 10px 14px; border: none; background: #e05656; color: white; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer; }
     .btn-icon { background: #2b0b0b; border: 1px solid #441515; color: #ff8a8a; }
 
-    /* Video Call Overlay */
-    .call-view { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 10px; }
-    video { width: 90%; max-height: 220px; background: #000; border-radius: 8px; border: 1px solid #441515; }
-    
-    /* Audio Players */
+    /* GOOGLE PHONE CALL UI STYLING */
+    .dialer-screen { display: flex; flex-direction: column; align-items: center; justify-content: space-between; height: 100%; padding: 20px 10px; background: #121212; color: #fff; }
+    .caller-avatar { width: 90px; height: 90px; border-radius: 50%; background: #3c4043; display: flex; align-items: center; justify-content: center; font-size: 38px; color: #e8eaed; margin-bottom: 10px; }
+    .caller-name { font-size: 22px; font-weight: 500; margin-bottom: 4px; }
+    .call-status { font-size: 14px; color: #9aa0a6; }
+
+    .video-container { width: 100%; height: 220px; background: #000; border-radius: 12px; position: relative; overflow: hidden; display: none; }
+    #remoteVideo { width: 100%; height: 100%; object-fit: cover; }
+    #localVideo { width: 80px; height: 110px; object-fit: cover; position: absolute; bottom: 10px; right: 10px; border-radius: 8px; border: 2px solid #fff; }
+
+    .google-controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; width: 100%; max-width: 280px; margin-bottom: 20px; }
+    .g-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; background: #202124; border: none; border-radius: 50%; width: 60px; height: 60px; color: #fff; font-size: 20px; cursor: pointer; margin: 0 auto; }
+    .g-btn.active { background: #8ab4f8; color: #202124; }
+    .g-btn-label { font-size: 11px; color: #9aa0a6; margin-top: 6px; text-align: center; }
+
+    .end-call-btn { background: #ea4335; width: 68px; height: 68px; border-radius: 50%; border: none; color: white; font-size: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
     .song-item { display: flex; justify-content: space-between; align-items: center; background: #1e0808; padding: 8px; border-radius: 6px; margin-bottom: 8px; border: 1px solid #331010; }
   </style>
 </head>
@@ -57,18 +80,20 @@
     <div class="app-icon" onclick="openModal('phoneApp')"><img src="https://img.icons8.com/color/96/phone.png"/><span>Phone Call</span></div>
     <div class="app-icon" onclick="openModal('storageApp')"><img src="https://img.icons8.com/color/96/folder-invoiced.png"/><span>Storage</span></div>
     
-    <div class="app-icon" onclick="openExternal('https://m.youtube.com')"><img src="https://img.icons8.com/color/96/television.png"/><span>YouTube</span></div>
-    <div class="app-icon" onclick="openExternal('https://gemini.google.com')"><img src="https://img.icons8.com/color/96/sparkling.png"/><span>Gemini</span></div>
+    <!-- Youtube & Gemini Open Direct Web -->
+    <div class="app-icon" onclick="openWebLink('https://m.youtube.com')"><img src="https://img.icons8.com/color/96/television.png"/><span>YouTube</span></div>
+    <div class="app-icon" onclick="openWebLink('https://gemini.google.com')"><img src="https://img.icons8.com/color/96/sparkling.png"/><span>Gemini</span></div>
+    
     <div class="app-icon" onclick="openModal('onlineMusicApp')"><img src="https://img.icons8.com/color/96/musical-notes.png"/><span>Cloud MP3</span></div>
     <div class="app-icon" onclick="openModal('localMusicApp')"><img src="https://img.icons8.com/color/96/audio-wave.png"/><span>Local MP3</span></div>
 
     <div class="app-icon" onclick="openAppUrl('https://play2048.co/')"><img src="https://img.icons8.com/color/96/puzzle.png"/><span>2048</span></div>
     <div class="app-icon" onclick="openAppUrl('https://flappybird.io/')"><img src="https://img.icons8.com/color/96/twitter.png"/><span>Flappy</span></div>
     <div class="app-icon" onclick="openAppUrl('https://chromedino.com/')"><img src="https://img.icons8.com/color/96/dinosaur.png"/><span>Dino</span></div>
-    <div class="app-icon" onclick="openExternal('https://maps.google.com')"><img src="https://img.icons8.com/color/96/google-maps-new.png"/><span>GPS Maps</span></div>
+    <div class="app-icon" onclick="openWebLink('https://maps.google.com')"><img src="https://img.icons8.com/color/96/google-maps-new.png"/><span>GPS Maps</span></div>
   </div>
 
-  <!-- Web Frame Modal -->
+  <!-- Embedded Web Frame Modal -->
   <div id="webModal" class="modal">
     <div class="modal-header">
       <h3 id="modalTitle">App</h3>
@@ -97,37 +122,76 @@
     </div>
   </div>
 
-  <!-- Phone Call App Modal -->
+  <!-- Google Phone Call App Modal -->
   <div id="phoneApp" class="modal">
     <div class="modal-header">
-      <h3>Phone / Video Call</h3>
+      <h3>Google Dialer</h3>
       <button class="close-btn" onclick="endCall()">X</button>
     </div>
-    <div class="modal-body">
-      <div id="callSetup">
-        <p>Your Username: <strong id="myCallUser"></strong></p>
-        <input type="text" id="targetUser" placeholder="Enter target username..." style="width:100%; padding:10px; margin-bottom:10px; background:#1f0808; border:1px solid #441515; color:#fff; border-radius:6px;"/>
+    <div class="modal-body" style="padding:0; background:#121212;">
+      
+      <!-- Start Dial Screen -->
+      <div id="callSetup" style="padding:20px;">
+        <p style="font-size:14px; color:#aaa;">Your Username: <strong id="myCallUser" style="color:#fff;"></strong></p>
+        <input type="text" id="targetUser" placeholder="Enter target username..." style="width:100%; padding:12px; margin-bottom:15px; background:#1e1e1e; border:1px solid #333; color:#fff; border-radius:8px; font-size:15px;"/>
         <div style="display:flex; gap:10px;">
-          <button class="btn" style="flex:1;" onclick="startCall(false)">📞 Voice Call</button>
-          <button class="btn" style="flex:1;" onclick="startCall(true)">📹 Video Call</button>
+          <button class="btn" style="flex:1; background:#1a73e8;" onclick="startCall(false)">📞 Audio Call</button>
+          <button class="btn" style="flex:1; background:#34a853;" onclick="startCall(true)">📹 Video Call</button>
         </div>
-        <div id="incomingContainer" style="display:none; margin-top:20px; background:#220808; padding:15px; border-radius:8px; text-align:center;">
-          <p id="callerNameText">Incoming Call...</p>
-          <button class="btn" onclick="acceptCall()">Accept Call</button>
+
+        <div id="incomingContainer" style="display:none; margin-top:30px; background:#1e1e1e; padding:20px; border-radius:12px; text-align:center;">
+          <div class="caller-avatar" style="margin:0 auto 10px auto;">👤</div>
+          <p id="callerNameText" style="font-weight:bold; font-size:18px;">Incoming Call...</p>
+          <div style="display:flex; gap:15px; justify-content:center; margin-top:15px;">
+            <button class="btn" style="background:#34a853; border-radius:50%; width:55px; height:55px; font-size:20px;" onclick="acceptCall()">📞</button>
+            <button class="btn" style="background:#ea4335; border-radius:50%; width:55px; height:55px; font-size:20px;" onclick="endCall()">📵</button>
+          </div>
         </div>
       </div>
-      <div id="activeCallView" class="call-view" style="display:none;">
-        <video id="remoteVideo" autoplay playsinline></video>
-        <video id="localVideo" autoplay muted playsinline style="width:40%; max-height:100px;"></video>
-        <button class="btn" onclick="endCall()">Hang Up</button>
+
+      <!-- Active Google Dial Screen -->
+      <div id="activeCallView" class="dialer-screen" style="display:none;">
+        <div style="text-align:center; margin-top:20px; width:100%;">
+          <div id="avatarCircle" class="caller-avatar" style="margin:0 auto;">👤</div>
+          <div id="activeCallerName" class="caller-name">User</div>
+          <div id="callDuration" class="call-status">00:00</div>
+        </div>
+
+        <div id="videoArea" class="video-container">
+          <video id="remoteVideo" autoplay playsinline></video>
+          <video id="localVideo" autoplay muted playsinline></video>
+        </div>
+
+        <!-- Google Dialer Control Grid -->
+        <div style="width:100%; display:flex; flex-direction:column; align-items:center;">
+          <div class="google-controls">
+            <div>
+              <button class="g-btn" id="muteBtn" onclick="toggleMute()">🎙️</button>
+              <div class="g-btn-label">Mute</div>
+            </div>
+            <div>
+              <button class="g-btn" id="speakerBtn" onclick="toggleSpeaker()">🔊</button>
+              <div class="g-btn-label">Speaker</div>
+            </div>
+            <div>
+              <button class="g-btn" id="videoToggleBtn" onclick="toggleVideoMode()">📹</button>
+              <div class="g-btn-label">Video</div>
+            </div>
+          </div>
+
+          <button class="end-call-btn" onclick="endCall()">📵</button>
+        </div>
+
+        <audio id="remoteAudio" autoplay style="display:none;"></audio>
       </div>
+
     </div>
   </div>
 
-  <!-- Online Persistent MP3 Player -->
+  <!-- Cloud MP3 Player -->
   <div id="onlineMusicApp" class="modal">
     <div class="modal-header">
-      <h3>Cloud MP3 Player (Saved Online)</h3>
+      <h3>Cloud MP3 Player</h3>
       <button class="close-btn" onclick="closeModal('onlineMusicApp')">X</button>
     </div>
     <div class="modal-body">
@@ -137,10 +201,10 @@
     </div>
   </div>
 
-  <!-- Local Session MP3 Player -->
+  <!-- Local MP3 Player -->
   <div id="localMusicApp" class="modal">
     <div class="modal-header">
-      <h3>Local MP3 Player (Temporary)</h3>
+      <h3>Local MP3 Player</h3>
       <button class="close-btn" onclick="closeModal('localMusicApp')">X</button>
     </div>
     <div class="modal-body">
@@ -205,34 +269,67 @@
 
     function openModal(id) { document.getElementById(id).style.display = 'flex'; }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-    function openExternal(url) { window.open(url, '_blank'); }
+    function openWebLink(url) { window.open(url, '_blank'); }
     function openAppUrl(url) {
       document.getElementById('appFrame').src = url;
       document.getElementById('modalTitle').innerText = "App";
       openModal('webModal');
     }
 
-    // 1. MESSAGING SYSTEM
+    // 1. MESSAGES & DELETION (LEFT / RIGHT ALIGNMENT)
     const chatBox = document.getElementById('chat-box');
-    socket.on('receive_message', function(data) {
-      const msgDiv = document.createElement('div');
-      msgDiv.className = 'message';
-      let content = '<span class="user">' + data.user + ':</span> ';
-      if (data.text) content += data.text;
-      if (data.image) content += '<br><img class="msg-img" src="' + data.image + '"/>';
-      if (data.audio) content += '<br><audio class="msg-audio" controls src="' + data.audio + '"></audio>';
-      content += '<span class="time">' + data.timestamp + '</span>';
-      msgDiv.innerHTML = content;
-      chatBox.appendChild(msgDiv);
-      chatBox.scrollTop = chatBox.scrollHeight;
+
+    socket.on('load_all_messages', function(messages) {
+      chatBox.innerHTML = '';
+      messages.forEach(renderSingleMessage);
     });
+
+    socket.on('receive_message', function(msg) {
+      renderSingleMessage(msg);
+    });
+
+    socket.on('message_deleted', function(msgId) {
+      const el = document.getElementById('msg-' + msgId);
+      if (el) el.remove();
+    });
+
+    function renderSingleMessage(data) {
+      const isMe = (data.user === currentUsername);
+      const wrapper = document.createElement('div');
+      wrapper.id = 'msg-' + data.id;
+      wrapper.className = 'msg-wrapper ' + (isMe ? 'my-msg' : 'other-msg');
+
+      let inner = '<div class="msg-author">' + data.user + '</div>';
+      inner += '<div class="bubble">';
+      if (data.text) inner += data.text;
+      if (data.image) inner += '<br><img class="msg-img" src="' + data.image + '"/>';
+      if (data.audio) inner += '<br><audio class="msg-audio" controls src="' + data.audio + '"></audio>';
+      
+      inner += ' <span class="msg-time">' + data.timestamp + '</span>';
+      if (isMe) {
+        inner += ' <button class="delete-btn" onclick="deleteMessage(\'' + data.id + '\')">🗑️</button>';
+      }
+      inner += '</div>';
+
+      wrapper.innerHTML = inner;
+      chatBox.appendChild(wrapper);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
 
     function sendMessage() {
       const input = document.getElementById('messageInput');
       if (input.value.trim() !== '') {
-        socket.emit('send_message', { user: currentUsername, text: input.value.trim(), timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+        socket.emit('send_message', {
+          user: currentUsername,
+          text: input.value.trim(),
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        });
         input.value = '';
       }
+    }
+
+    function deleteMessage(msgId) {
+      socket.emit('delete_message', msgId);
     }
 
     function sendImage(fileInput) {
@@ -240,7 +337,11 @@
       if (file) {
         const reader = new FileReader();
         reader.onload = function(e) {
-          socket.emit('send_message', { user: currentUsername, image: e.target.result, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+          socket.emit('send_message', {
+            user: currentUsername,
+            image: e.target.result,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          });
         };
         reader.readAsDataURL(file);
       }
@@ -259,7 +360,11 @@
             const blob = new Blob(audioChunks, { type: 'audio/webm' });
             const reader = new FileReader();
             reader.onload = function(e) {
-              socket.emit('send_message', { user: currentUsername, audio: e.target.result, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+              socket.emit('send_message', {
+                user: currentUsername,
+                audio: e.target.result,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              });
             };
             reader.readAsDataURL(blob);
           };
@@ -274,16 +379,158 @@
       }
     }
 
-    // 2. CLOUD & LOCAL MP3 PLAYERS
+    // 2. GOOGLE PHONE DIALER CALL SCREEN
+    let peerConnection, localStream, incomingSignal, targetUserToCall, callTimerInterval, callSeconds = 0;
+    let isMuted = false, isSpeaker = false, isVideoActive = false;
+
+    async function startCall(isVideo) {
+      targetUserToCall = document.getElementById('targetUser').value.trim();
+      if (!targetUserToCall) return alert("Enter target username!");
+
+      isVideoActive = isVideo;
+      setupCallUI(targetUserToCall, isVideo);
+
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isVideo });
+        if (isVideo) document.getElementById('localVideo').srcObject = localStream;
+
+        peerConnection = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+        peerConnection.ontrack = e => {
+          if (isVideoActive) document.getElementById('remoteVideo').srcObject = e.streams[0];
+          else document.getElementById('remoteAudio').srcObject = e.streams[0];
+        };
+
+        peerConnection.onicecandidate = e => {
+          if (e.candidate) {
+            socket.emit('call_user', { userToCall: targetUserToCall, signalData: peerConnection.localDescription, from: currentUsername, isVideo });
+          }
+        };
+
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+        socket.emit('call_user', { userToCall: targetUserToCall, signalData: offer, from: currentUsername, isVideo });
+      } catch(err) { alert("Microphone/Camera permission denied."); endCall(); }
+    }
+
+    function setupCallUI(targetName, isVideo) {
+      document.getElementById('callSetup').style.display = 'none';
+      document.getElementById('activeCallView').style.display = 'flex';
+      document.getElementById('activeCallerName').innerText = targetName;
+      document.getElementById('callDuration').innerText = "Calling...";
+      
+      if (isVideo) {
+        document.getElementById('videoArea').style.display = 'block';
+        document.getElementById('avatarCircle').style.display = 'none';
+      } else {
+        document.getElementById('videoArea').style.display = 'none';
+        document.getElementById('avatarCircle').style.display = 'flex';
+      }
+    }
+
+    socket.on('incoming_call', function(data) {
+      incomingSignal = data.signalData;
+      targetUserToCall = data.from;
+      isVideoActive = data.isVideo;
+      document.getElementById('callerNameText').innerText = 'Incoming call from ' + data.from;
+      document.getElementById('incomingContainer').style.display = 'block';
+      openModal('phoneApp');
+    });
+
+    async function acceptCall() {
+      setupCallUI(targetUserToCall, isVideoActive);
+
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isVideoActive });
+        if (isVideoActive) document.getElementById('localVideo').srcObject = localStream;
+
+        peerConnection = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+        peerConnection.ontrack = e => {
+          if (isVideoActive) document.getElementById('remoteVideo').srcObject = e.streams[0];
+          else document.getElementById('remoteAudio').srcObject = e.streams[0];
+        };
+
+        peerConnection.onicecandidate = e => {
+          if (e.candidate) {
+            socket.emit('answer_call', { to: targetUserToCall, signal: peerConnection.localDescription });
+          }
+        };
+
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingSignal));
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+        socket.emit('answer_call', { to: targetUserToCall, signal: answer });
+        startTimer();
+      } catch(err) { alert("Call connection failed."); endCall(); }
+    }
+
+    socket.on('call_accepted', async function(signal) {
+      if (peerConnection) {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(signal));
+        startTimer();
+      }
+    });
+
+    function startTimer() {
+      callSeconds = 0;
+      clearInterval(callTimerInterval);
+      callTimerInterval = setInterval(() => {
+        callSeconds++;
+        const mins = String(Math.floor(callSeconds / 60)).padStart(2, '0');
+        const secs = String(callSeconds % 60).padStart(2, '0');
+        document.getElementById('callDuration').innerText = mins + ":" + secs;
+      }, 1000);
+    }
+
+    function toggleMute() {
+      if (localStream) {
+        isMuted = !isMuted;
+        localStream.getAudioTracks()[0].enabled = !isMuted;
+        document.getElementById('muteBtn').classList.toggle('active', isMuted);
+      }
+    }
+
+    function toggleSpeaker() {
+      isSpeaker = !isSpeaker;
+      document.getElementById('speakerBtn').classList.toggle('active', isSpeaker);
+    }
+
+    function toggleVideoMode() {
+      isVideoActive = !isVideoActive;
+      document.getElementById('videoToggleBtn').classList.toggle('active', isVideoActive);
+      if (isVideoActive) {
+        document.getElementById('videoArea').style.display = 'block';
+        document.getElementById('avatarCircle').style.display = 'none';
+      } else {
+        document.getElementById('videoArea').style.display = 'none';
+        document.getElementById('avatarCircle').style.display = 'flex';
+      }
+    }
+
+    socket.on('call_failed', function(data) { alert(data.reason); endCall(); });
+    socket.on('call_ended', function() { endCall(); });
+
+    function endCall() {
+      clearInterval(callTimerInterval);
+      if (peerConnection) { peerConnection.close(); peerConnection = null; }
+      if (localStream) { localStream.getTracks().forEach(t => t.stop()); }
+      document.getElementById('callSetup').style.display = 'block';
+      document.getElementById('activeCallView').style.display = 'none';
+      document.getElementById('incomingContainer').style.display = 'none';
+      closeModal('phoneApp');
+    }
+
+    // 3. MP3 PLAYERS
     socket.on('load_online_songs', function(songs) {
       const list = document.getElementById('onlineSongList');
       list.innerHTML = '';
       songs.forEach(renderOnlineSong);
     });
 
-    socket.on('new_online_song', function(songData) {
-      renderOnlineSong(songData);
-    });
+    socket.on('new_online_song', function(songData) { renderOnlineSong(songData); });
 
     function renderOnlineSong(songData) {
       const list = document.getElementById('onlineSongList');
@@ -313,83 +560,6 @@
         div.innerHTML = '<span>' + file.name + '</span><audio controls src="' + url + '"></audio>';
         list.appendChild(div);
       });
-    }
-
-    // 3. WEBRTC PHONE & VIDEO CALLING
-    let peerConnection, localStream, incomingSignalData, targetUserToCall;
-
-    async function startCall(isVideo) {
-      targetUserToCall = document.getElementById('targetUser').value.trim();
-      if (!targetUserToCall) return alert("Enter target username!");
-
-      try {
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isVideo });
-        document.getElementById('localVideo').srcObject = localStream;
-        document.getElementById('callSetup').style.display = 'none';
-        document.getElementById('activeCallView').style.display = 'flex';
-
-        peerConnection = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-        peerConnection.ontrack = e => { document.getElementById('remoteVideo').srcObject = e.streams[0]; };
-        peerConnection.onicecandidate = e => {
-          if (e.candidate) {
-            socket.emit('call_user', { userToCall: targetUserToCall, signalData: peerConnection.localDescription, from: currentUsername, isVideo });
-          }
-        };
-
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-        socket.emit('call_user', { userToCall: targetUserToCall, signalData: offer, from: currentUsername, isVideo });
-      } catch(err) { alert("Could not access microphone/camera for call."); }
-    }
-
-    socket.on('incoming_call', function(data) {
-      incomingSignalData = data.signal;
-      targetUserToCall = data.from;
-      document.getElementById('callerNameText').innerText = 'Incoming call from ' + data.from;
-      document.getElementById('incomingContainer').style.display = 'block';
-      openModal('phoneApp');
-    });
-
-    async function acceptCall() {
-      try {
-        localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-        document.getElementById('localVideo').srcObject = localStream;
-        document.getElementById('callSetup').style.display = 'none';
-        document.getElementById('activeCallView').style.display = 'flex';
-
-        peerConnection = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-        peerConnection.ontrack = e => { document.getElementById('remoteVideo').srcObject = e.streams[0]; };
-        peerConnection.onicecandidate = e => {
-          if (e.candidate) {
-            socket.emit('answer_call', { to: targetUserToCall, signal: peerConnection.localDescription });
-          }
-        };
-
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingSignalData));
-        const answer = await peerConnection.createAnswer();
-        await peerConnection.setLocalDescription(answer);
-        socket.emit('answer_call', { to: targetUserToCall, signal: answer });
-      } catch(err) { alert("Could not answer call."); }
-    }
-
-    socket.on('call_accepted', async function(signal) {
-      if (peerConnection) await peerConnection.setRemoteDescription(new RTCSessionDescription(signal));
-    });
-
-    socket.on('call_failed', function(data) { alert(data.reason); endCall(); });
-    socket.on('call_ended', function() { endCall(); });
-
-    function endCall() {
-      if (peerConnection) { peerConnection.close(); peerConnection = null; }
-      if (localStream) { localStream.getTracks().forEach(t => t.stop()); }
-      document.getElementById('callSetup').style.display = 'block';
-      document.getElementById('activeCallView').style.display = 'none';
-      document.getElementById('incomingContainer').style.display = 'none';
-      closeModal('phoneApp');
     }
 
     // 4. OFFLINE CAMERA & STORAGE
