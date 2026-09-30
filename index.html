@@ -8,7 +8,7 @@
     * { box-sizing: border-box; }
     body { font-family: 'Roboto', 'Segoe UI', sans-serif; background: #0c0202; color: #fff; margin: 0; padding: 12px; }
 
-    .status-bar { background: rgba(35, 10, 10, 0.9); border: 1px solid #3d1515; padding: 10px 14px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-weight: bold; color: #e5b3b3; font-size: 13px; }
+    .status-bar { background: rgba(35, 10, 10, 0.9); border: 1px solid #3d1515; padding: 10px 14px; border-radius: 12px; display: flex; justify-space-between; align-items: center; margin-bottom: 16px; font-weight: bold; color: #e5b3b3; font-size: 13px; }
     
     .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
     .app-icon { background: rgba(30, 8, 8, 0.9); border: 1px solid #421818; border-radius: 16px; padding: 10px 4px; text-align: center; cursor: pointer; transition: transform 0.15s; }
@@ -213,7 +213,7 @@
     </div>
   </div>
 
-  <!-- Camera Modal (With Video & Switch Camera) -->
+  <!-- Camera Modal -->
   <div id="cameraApp" class="modal">
     <div class="modal-header">
       <h3>Camera & Video Recorder</h3>
@@ -239,7 +239,7 @@
     function setupUsername() {
       if (!currentUsername) {
         currentUsername = prompt("Enter your name:", "User1") || ("User" + Math.floor(Math.random() * 100));
-        localStorage.setItem('custom_username', currentUsername);
+        localStorage.setItem('custom_username', currentUsername.trim());
       }
       document.getElementById('display-username').innerText = "User: " + currentUsername;
       document.getElementById('myCallUser').innerText = currentUsername;
@@ -249,7 +249,7 @@
     function changeUsername() {
       const newName = prompt("Enter new custom name:", currentUsername);
       if (newName) {
-        currentUsername = newName;
+        currentUsername = newName.trim();
         localStorage.setItem('custom_username', currentUsername);
         document.getElementById('display-username').innerText = "User: " + currentUsername;
         document.getElementById('myCallUser').innerText = currentUsername;
@@ -267,7 +267,7 @@
       openModal('webModal');
     }
 
-    // 1. MESSAGES CODE
+    // MESSAGES
     const chatBox = document.getElementById('chat-box');
 
     socket.on('load_all_messages', function(messages) {
@@ -356,7 +356,7 @@
           audioRecorder.start();
           isRecordingAudio = true;
           btn.style.background = '#ff0000';
-        } catch(err) { alert('Microphone required'); }
+        } catch(err) { alert('Microphone access required'); }
       } else {
         audioRecorder.stop();
         isRecordingAudio = false;
@@ -364,7 +364,7 @@
       }
     }
 
-    // 2. SHARED CLOUD DRIVE / STORAGE
+    // SHARED CLOUD DRIVE
     socket.on('load_cloud_files', function(files) {
       const list = document.getElementById('cloudDriveList');
       list.innerHTML = '';
@@ -413,9 +413,7 @@
       });
     }
 
-    function deleteDriveFile(fileId) {
-      socket.emit('delete_cloud_file', fileId);
-    }
+    function deleteDriveFile(fileId) { socket.emit('delete_cloud_file', fileId); }
 
     function loadLocalSongs(input) {
       const list = document.getElementById('localSongList');
@@ -429,15 +427,43 @@
       });
     }
 
-    // 3. WEBRTC VIDEO CALLING WITH CAMERA FIX
+    // FIXED WEBRTC CALLING ENGINE
     let peerConnection, localStream, incomingSignal, targetUserToCall, callTimerInterval, callSeconds = 0;
     let isMuted = false, isSpeaker = false, isVideoActive = false, callFacingMode = "user";
+    let pendingCandidates = [];
 
-    const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
+    // STUN Servers for cellular cross-network routing
+    const rtcConfig = {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' }
+      ]
+    };
+
+    function createPeerConnection() {
+      peerConnection = new RTCPeerConnection(rtcConfig);
+
+      peerConnection.ontrack = e => {
+        const remoteVid = document.getElementById('remoteVideo');
+        const remoteAud = document.getElementById('remoteAudio');
+        if (e.streams && e.streams[0]) {
+          remoteVid.srcObject = e.streams[0];
+          remoteAud.srcObject = e.streams[0];
+        }
+      };
+
+      peerConnection.onicecandidate = e => {
+        if (e.candidate && targetUserToCall) {
+          socket.emit('send_candidate', { to: targetUserToCall, candidate: e.candidate });
+        }
+      };
+    }
 
     async function startCall(isVideo) {
       targetUserToCall = document.getElementById('targetUser').value.trim();
-      if (!targetUserToCall) return alert("Enter target username!");
+      if (!targetUserToCall) return alert("Please enter the exact name of the user to call!");
 
       isVideoActive = isVideo;
       setupCallUI(targetUserToCall, isVideo);
@@ -446,28 +472,13 @@
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isVideo ? { facingMode: callFacingMode } : false });
         if (isVideo) document.getElementById('localVideo').srcObject = localStream;
 
-        peerConnection = new RTCPeerConnection(rtcConfig);
+        createPeerConnection();
         localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-        peerConnection.ontrack = e => {
-          const remoteVid = document.getElementById('remoteVideo');
-          const remoteAud = document.getElementById('remoteAudio');
-          if (e.streams && e.streams[0]) {
-            remoteVid.srcObject = e.streams[0];
-            remoteAud.srcObject = e.streams[0];
-          }
-        };
-
-        peerConnection.onicecandidate = e => {
-          if (e.candidate) {
-            socket.emit('send_candidate', { to: targetUserToCall, candidate: e.candidate });
-          }
-        };
 
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
         socket.emit('call_user', { userToCall: targetUserToCall, signalData: offer, from: currentUsername, isVideo });
-      } catch(err) { alert("Microphone/Camera permission error."); endCall(); }
+      } catch(err) { alert("Microphone/Camera permission denied."); endCall(); }
     }
 
     function setupCallUI(targetName, isVideo) {
@@ -501,42 +512,36 @@
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isVideoActive ? { facingMode: callFacingMode } : false });
         if (isVideoActive) document.getElementById('localVideo').srcObject = localStream;
 
-        peerConnection = new RTCPeerConnection(rtcConfig);
+        createPeerConnection();
         localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
-        peerConnection.ontrack = e => {
-          const remoteVid = document.getElementById('remoteVideo');
-          const remoteAud = document.getElementById('remoteAudio');
-          if (e.streams && e.streams[0]) {
-            remoteVid.srcObject = e.streams[0];
-            remoteAud.srcObject = e.streams[0];
-          }
-        };
-
-        peerConnection.onicecandidate = e => {
-          if (e.candidate) {
-            socket.emit('send_candidate', { to: targetUserToCall, candidate: e.candidate });
-          }
-        };
-
         await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingSignal));
+        
+        // Process buffered ICE candidates
+        while (pendingCandidates.length > 0) {
+          const cand = pendingCandidates.shift();
+          await peerConnection.addIceCandidate(new RTCIceCandidate(cand));
+        }
+
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
         socket.emit('answer_call', { to: targetUserToCall, signal: answer });
         startTimer();
-      } catch(err) { alert("Call connection failed."); endCall(); }
+      } catch(err) { alert("Call connection failed: " + err.message); endCall(); }
     }
 
-    socket.on('call_accepted', async function(signal) {
+    socket.on('call_accepted', async function(data) {
       if (peerConnection) {
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(signal));
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.signal));
         startTimer();
       }
     });
 
-    socket.on('receive_candidate', async function(candidate) {
-      if (peerConnection) {
-        try { await peerConnection.addIceCandidate(new RTCIceCandidate(candidate)); } catch(e){}
+    socket.on('receive_candidate', async function(data) {
+      if (peerConnection && peerConnection.remoteDescription) {
+        try { await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch(e){}
+      } else {
+        pendingCandidates.push(data.candidate);
       }
     });
 
@@ -556,7 +561,7 @@
         document.getElementById('localVideo').srcObject = localStream;
         const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
         if (sender) sender.replaceTrack(newTrack);
-      } catch(e) { alert("Could not switch camera."); }
+      } catch(e) { alert("Could not flip camera."); }
     }
 
     function startTimer() {
@@ -595,6 +600,7 @@
 
     function endCall() {
       clearInterval(callTimerInterval);
+      pendingCandidates = [];
       if (peerConnection) { peerConnection.close(); peerConnection = null; }
       if (localStream) { localStream.getTracks().forEach(t => t.stop()); }
       document.getElementById('callSetup').style.display = 'block';
@@ -603,7 +609,7 @@
       closeModal('phoneApp');
     }
 
-    // 4. CAMERA APP (WITH FLIP CAMERA & VIDEO RECORDING)
+    // CAMERA APP
     let cameraStream, cameraFacingMode = "user", videoRecorder, videoChunks = [], isRecordingVid = false;
 
     async function openCamera() {
@@ -616,7 +622,7 @@
       try {
         cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: cameraFacingMode }, audio: true });
         document.getElementById('webcam').srcObject = cameraStream;
-      } catch(err) { alert("Camera access required."); }
+      } catch(err) { alert("Camera permission required."); }
     }
 
     function switchCameraFacing() {
@@ -637,7 +643,6 @@
       canvas.getContext('2d').drawImage(video, 0, 0);
       const dataUrl = canvas.toDataURL('image/png');
       
-      // Save directly to cloud drive
       socket.emit('upload_cloud_file', {
         name: 'Photo_' + Date.now() + '.png',
         type: 'image/png',
@@ -669,7 +674,7 @@
         };
         videoRecorder.start();
         isRecordingVid = true;
-        btn.innerText = "⏹️ Stop Recording";
+        btn.innerText = "⏹️️ Stop Recording";
         btn.style.background = "#ff0000";
       } else {
         videoRecorder.stop();
