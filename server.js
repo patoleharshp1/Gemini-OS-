@@ -46,6 +46,10 @@ io.on('connection', (socket) => {
     io.emit('message_deleted', msgId);
   });
 
+  socket.on('typing_status', (data) => {
+    socket.broadcast.emit('user_typing', data);
+  });
+
   // Cloud Drive File Upload
   socket.on('upload_cloud_file', (fileData) => {
     fileData.id = Date.now().toString() + Math.random().toString(36).substr(2, 4);
@@ -58,7 +62,7 @@ io.on('connection', (socket) => {
     io.emit('cloud_file_deleted', fileId);
   });
 
-  // FIXED CALL SIGNALING SYSTEM
+  // WEBRTC SIGNALING SYSTEM
   socket.on('call_user', (data) => {
     const targetSocketId = activeUsers[data.userToCall];
     if (targetSocketId) {
@@ -93,9 +97,11 @@ io.on('connection', (socket) => {
   });
 
   socket.on('end_call', (data) => {
-    const targetSocketId = activeUsers[data.to];
+    const targetSocketId = activeUsers[data ? data.to : null];
     if (targetSocketId) {
       io.to(targetSocketId).emit('call_ended');
+    } else {
+      socket.broadcast.emit('call_ended');
     }
   });
 
