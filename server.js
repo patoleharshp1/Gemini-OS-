@@ -15,8 +15,8 @@ const io = new Server(server, {
 });
 
 const activeUsers = {};
-let chatMessages = []; // Server memory for saved messages
-const onlineSongs = [];
+let chatMessages = [];
+let cloudStorageFiles = []; // Shared Cloud Storage & MP3 Drive
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
@@ -30,9 +30,9 @@ io.on('connection', (socket) => {
     activeUsers[username] = socket.id;
     io.emit('user_list', Object.keys(activeUsers));
     
-    // Load existing messages and songs on connect
+    // Send existing chat messages and cloud drive files
     socket.emit('load_all_messages', chatMessages);
-    socket.emit('load_online_songs', onlineSongs);
+    socket.emit('load_cloud_files', cloudStorageFiles);
   });
 
   // Chat Messaging
@@ -42,19 +42,24 @@ io.on('connection', (socket) => {
     io.emit('receive_message', data);
   });
 
-  // Delete Message
   socket.on('delete_message', (msgId) => {
     chatMessages = chatMessages.filter(m => m.id !== msgId);
     io.emit('message_deleted', msgId);
   });
 
-  // Online MP3 Upload
-  socket.on('upload_online_song', (songData) => {
-    onlineSongs.push(songData);
-    io.emit('new_online_song', songData);
+  // Cloud Drive File Upload
+  socket.on('upload_cloud_file', (fileData) => {
+    fileData.id = Date.now().toString() + Math.random().toString(36).substr(2, 4);
+    cloudStorageFiles.push(fileData);
+    io.emit('new_cloud_file', fileData);
   });
 
-  // WebRTC Calling Signaling
+  socket.on('delete_cloud_file', (fileId) => {
+    cloudStorageFiles = cloudStorageFiles.filter(f => f.id !== fileId);
+    io.emit('cloud_file_deleted', fileId);
+  });
+
+  // WebRTC Video/Audio Call Signaling Fix
   socket.on('call_user', (data) => {
     const targetSocketId = activeUsers[data.userToCall];
     if (targetSocketId) {
@@ -72,6 +77,13 @@ io.on('connection', (socket) => {
     const targetSocketId = activeUsers[data.to];
     if (targetSocketId) {
       io.to(targetSocketId).emit('call_accepted', data.signal);
+    }
+  });
+
+  socket.on('send_candidate', (data) => {
+    const targetSocketId = activeUsers[data.to];
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('receive_candidate', data.candidate);
     }
   });
 
