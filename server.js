@@ -16,7 +16,7 @@ const io = new Server(server, {
 
 const activeUsers = {};
 let chatMessages = [];
-let cloudStorageFiles = []; // Shared Cloud Storage & MP3 Drive
+let cloudStorageFiles = [];
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
@@ -26,11 +26,10 @@ io.on('connection', (socket) => {
   let registeredUser = null;
 
   socket.on('register_user', (username) => {
-    registeredUser = username;
-    activeUsers[username] = socket.id;
+    registeredUser = username.trim();
+    activeUsers[registeredUser] = socket.id;
     io.emit('user_list', Object.keys(activeUsers));
     
-    // Send existing chat messages and cloud drive files
     socket.emit('load_all_messages', chatMessages);
     socket.emit('load_cloud_files', cloudStorageFiles);
   });
@@ -59,7 +58,7 @@ io.on('connection', (socket) => {
     io.emit('cloud_file_deleted', fileId);
   });
 
-  // WebRTC Video/Audio Call Signaling Fix
+  // FIXED CALL SIGNALING SYSTEM
   socket.on('call_user', (data) => {
     const targetSocketId = activeUsers[data.userToCall];
     if (targetSocketId) {
@@ -69,21 +68,27 @@ io.on('connection', (socket) => {
         isVideo: data.isVideo
       });
     } else {
-      socket.emit('call_failed', { reason: 'User not online or username invalid.' });
+      socket.emit('call_failed', { reason: 'User "' + data.userToCall + '" is offline or not found.' });
     }
   });
 
   socket.on('answer_call', (data) => {
     const targetSocketId = activeUsers[data.to];
     if (targetSocketId) {
-      io.to(targetSocketId).emit('call_accepted', data.signal);
+      io.to(targetSocketId).emit('call_accepted', {
+        signal: data.signal,
+        from: registeredUser
+      });
     }
   });
 
   socket.on('send_candidate', (data) => {
     const targetSocketId = activeUsers[data.to];
     if (targetSocketId) {
-      io.to(targetSocketId).emit('receive_candidate', data.candidate);
+      io.to(targetSocketId).emit('receive_candidate', {
+        candidate: data.candidate,
+        from: registeredUser
+      });
     }
   });
 
