@@ -6,11 +6,13 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+// Enable large body payload handling for high-res camera photos & audio files
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
+// Increase socket buffer size to 100MB for binary/image transmission
 const io = new Server(server, {
-  maxHttpBufferSize: 5e7,
+  maxHttpBufferSize: 1e8, // 100 MB max packet size
   cors: { origin: "*", methods: ["GET", "POST"] }
 });
 
@@ -26,7 +28,7 @@ io.on('connection', (socket) => {
   let registeredUser = null;
 
   socket.on('register_user', (username) => {
-    registeredUser = username.trim();
+    registeredUser = username ? username.trim() : 'User';
     activeUsers[registeredUser] = socket.id;
     io.emit('user_list', Object.keys(activeUsers));
     
@@ -34,9 +36,9 @@ io.on('connection', (socket) => {
     socket.emit('load_cloud_files', cloudStorageFiles);
   });
 
-  // Chat Messaging
+  // Chat Messaging System
   socket.on('send_message', (data) => {
-    data.id = Date.now().toString() + Math.random().toString(36).substr(2, 4);
+    data.id = Date.now().toString() + Math.random().toString(36).substring(2, 6);
     chatMessages.push(data);
     io.emit('receive_message', data);
   });
@@ -46,23 +48,20 @@ io.on('connection', (socket) => {
     io.emit('message_deleted', msgId);
   });
 
-  socket.on('typing_status', (data) => {
-    socket.broadcast.emit('user_typing', data);
-  });
-
-  // Cloud Drive File Upload
+  // Cloud Drive File Upload (With Account Email Sync)
   socket.on('upload_cloud_file', (fileData) => {
-    fileData.id = Date.now().toString() + Math.random().toString(36).substr(2, 4);
+    fileData.id = Date.now().toString() + Math.random().toString(36).substring(2, 6);
+    fileData.email = fileData.email || "patole.harshp1@gmail.com";
     cloudStorageFiles.push(fileData);
-    io.emit('new_cloud_file', fileData);
+    io.emit('load_cloud_files', cloudStorageFiles);
   });
 
   socket.on('delete_cloud_file', (fileId) => {
     cloudStorageFiles = cloudStorageFiles.filter(f => f.id !== fileId);
-    io.emit('cloud_file_deleted', fileId);
+    io.emit('load_cloud_files', cloudStorageFiles);
   });
 
-  // WEBRTC SIGNALING SYSTEM
+  // WEBRTC CALL SIGNALING SYSTEM
   socket.on('call_user', (data) => {
     const targetSocketId = activeUsers[data.userToCall];
     if (targetSocketId) {
@@ -72,7 +71,7 @@ io.on('connection', (socket) => {
         isVideo: data.isVideo
       });
     } else {
-      socket.emit('call_failed', { reason: 'User "' + data.userToCall + '" is offline or not found.' });
+      socket.emit('call_failed', { reason: 'User "' + data.userToCall + '" is offline or not registered.' });
     }
   });
 
@@ -115,5 +114,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Gemini OS Server running on port ${PORT}`);
 });
