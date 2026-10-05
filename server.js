@@ -28,13 +28,13 @@ io.on('connection', (socket) => {
   socket.on('register_user', (username) => {
     registeredUser = username.trim();
     activeUsers[registeredUser] = socket.id;
+
     io.emit('user_list', Object.keys(activeUsers));
-    
     socket.emit('load_all_messages', chatMessages);
     socket.emit('load_cloud_files', cloudStorageFiles);
   });
 
-  // Chat Messaging
+  // MESSAGING
   socket.on('send_message', (data) => {
     data.id = Date.now().toString() + Math.random().toString(36).substr(2, 4);
     chatMessages.push(data);
@@ -50,7 +50,7 @@ io.on('connection', (socket) => {
     socket.broadcast.emit('user_typing', data);
   });
 
-  // Cloud Drive File Upload
+  // CLOUD STORAGE
   socket.on('upload_cloud_file', (fileData) => {
     fileData.id = Date.now().toString() + Math.random().toString(36).substr(2, 4);
     cloudStorageFiles.push(fileData);
@@ -62,7 +62,7 @@ io.on('connection', (socket) => {
     io.emit('cloud_file_deleted', fileId);
   });
 
-  // WEBRTC SIGNALING SYSTEM
+  // WEBRTC SIGNALING
   socket.on('call_user', (data) => {
     const targetSocketId = activeUsers[data.userToCall];
     if (targetSocketId) {
@@ -106,7 +106,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    if (registeredUser) {
+    if (registeredUser && activeUsers[registeredUser] === socket.id) {
       delete activeUsers[registeredUser];
       io.emit('user_list', Object.keys(activeUsers));
     }
@@ -115,5 +115,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Gemini OS server running on port ${PORT}`);
 });
