@@ -3,44 +3,52 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Web OS Dashboard</title>
+  <title>Gemini OS Dashboard</title>
   <script src="/socket.io/socket.io.js"></script>
   <style>
     * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
-    body { background: #1a1a2e; color: #fff; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+    body { background: #121212; color: #fff; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
     
-    /* Desktop Grid & Apps */
-    .desktop { display: flex; flex-wrap: wrap; gap: 20px; padding: 20px; flex: 1; align-content: flex-start; }
-    .app-icon { width: 80px; text-align: center; cursor: pointer; border-radius: 12px; padding: 10px; background: rgba(255, 255, 255, 0.05); transition: 0.2s; }
+    /* Desktop & Desktop Icons Layout */
+    .desktop { display: flex; flex-wrap: wrap; gap: 20px; padding: 25px; flex: 1; align-content: flex-start; }
+    .app-icon { width: 85px; text-align: center; cursor: pointer; border-radius: 12px; padding: 10px; background: rgba(255, 255, 255, 0.05); transition: all 0.2s ease-in-out; }
     .app-icon:hover { background: rgba(255, 255, 255, 0.15); transform: translateY(-3px); }
-    .app-icon img, .app-icon .icon-placeholder { width: 50px; height: 50px; margin: 0 auto 8px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; background: #333; }
+    .app-icon .icon-placeholder { width: 50px; height: 50px; margin: 0 auto 8px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+    .app-icon span { font-size: 13px; font-weight: 500; }
 
-    /* Window Overlay */
-    .app-window { display: none; position: absolute; top: 50px; left: 50px; width: 450px; min-height: 380px; background: #16213e; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 100; flex-direction: column; overflow: hidden; resize: both; }
+    /* Window Overlay Component Styling */
+    .app-window { display: none; position: absolute; top: 60px; left: 60px; width: 480px; min-height: 400px; background: #1e1e2e; border-radius: 14px; box-shadow: 0 12px 35px rgba(0,0,0,0.6); z-index: 100; flex-direction: column; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.1); }
     .app-window.active { display: flex; }
-    .window-header { background: #0f3460; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; cursor: move; }
-    .window-title { font-weight: bold; }
-    .close-btn { cursor: pointer; color: #ff5f56; font-size: 18px; }
-    .window-content { padding: 15px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+    .window-header { background: #282a36; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+    .window-title { font-weight: 600; font-size: 15px; }
+    .close-btn { cursor: pointer; color: #ff5f56; font-size: 20px; font-weight: bold; }
+    .window-content { padding: 16px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
 
-    /* Camera App Controls */
+    /* Controls & Utility Classes */
+    .btn { background: #6272a4; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; transition: 0.2s; }
+    .btn:hover { background: #7082b6; }
+    .btn-danger { background: #ff5555; }
+    .btn-danger:hover { background: #ff6e6e; }
+
+    /* Camera App */
     .camera-container { position: relative; width: 100%; height: 260px; background: #000; border-radius: 8px; overflow: hidden; }
     video, canvas { width: 100%; height: 100%; object-fit: cover; }
-    .camera-controls { display: flex; justify-content: space-around; margin-top: 10px; }
-    .btn { background: #e94560; color: white; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer; font-weight: bold; }
-    .btn:hover { opacity: 0.9; }
+    .camera-controls { display: flex; justify-content: space-around; margin-top: 12px; }
 
-    /* Video Call App */
-    .video-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-    .video-box { position: relative; width: 100%; height: 160px; background: #000; border-radius: 8px; }
-    .video-box video { width: 100%; height: 100%; border-radius: 8px; }
+    /* Video Call Grid */
+    .video-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+    .video-box { position: relative; width: 100%; height: 160px; background: #000; border-radius: 8px; overflow: hidden; border: 1px solid #444; }
+    .video-box video { width: 100%; height: 100%; object-fit: cover; }
+    .video-label { position: absolute; bottom: 6px; left: 6px; background: rgba(0,0,0,0.6); padding: 2px 6px; font-size: 11px; border-radius: 4px; }
 
-    /* Users List App */
-    .user-item { padding: 8px; background: rgba(255,255,255,0.05); margin-bottom: 5px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
+    /* Users App */
+    .user-item { padding: 10px; background: rgba(255,255,255,0.05); margin-bottom: 6px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
 
-    /* Tic Tac Toe */
-    .ttt-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; max-width: 200px; margin: 10px auto; }
-    .ttt-cell { width: 60px; height: 60px; background: #0f3460; font-size: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 6px; }
+    /* Game App Canvas & Board */
+    .game-tab { display: flex; gap: 10px; margin-bottom: 12px; }
+    .ttt-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; max-width: 210px; margin: 10px auto; }
+    .ttt-cell { width: 65px; height: 65px; background: #282a36; font-size: 26px; font-weight: bold; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 6px; color: #50fa7b; }
+    #snake-canvas { background: #000; border-radius: 6px; margin: 0 auto; display: block; border: 1px solid #444; }
   </style>
 </head>
 <body>
@@ -48,19 +56,19 @@
   <!-- Desktop Icons -->
   <div class="desktop">
     <div class="app-icon" onclick="openApp('online-users-app')">
-      <div class="icon-placeholder" style="background:#4e54c8;">👥</div>
+      <div class="icon-placeholder" style="background:#bd93f9;">👥</div>
       <span>People</span>
     </div>
     <div class="app-icon" onclick="openApp('camera-app')">
-      <div class="icon-placeholder" style="background:#ff416c;">📷</div>
+      <div class="icon-placeholder" style="background:#ff79c6;">📷</div>
       <span>Camera</span>
     </div>
     <div class="app-icon" onclick="openApp('videocall-app')">
-      <div class="icon-placeholder" style="background:#11998e;">📹</div>
-      <span>Call</span>
+      <div class="icon-placeholder" style="background:#50fa7b;">📹</div>
+      <span>Video Call</span>
     </div>
     <div class="app-icon" onclick="openApp('games-app')">
-      <div class="icon-placeholder" style="background:#f857a6;">🎮</div>
+      <div class="icon-placeholder" style="background:#ffb86c;">🎮</div>
       <span>Games</span>
     </div>
   </div>
@@ -72,20 +80,19 @@
       <span class="close-btn" onclick="closeApp('online-users-app')">&times;</span>
     </div>
     <div class="window-content">
-      <div style="margin-bottom:15px;">
-        <label>Set Your Name:</label>
-        <input type="text" id="username-input" placeholder="Enter name" style="padding: 6px; border-radius:4px; border:none; margin-left: 5px;">
-        <button class="btn" onclick="updateUsername()">Save</button>
+      <div style="margin-bottom:15px; display:flex; gap:8px;">
+        <input type="text" id="username-input" placeholder="Enter custom name" style="flex:1; padding: 8px; border-radius:6px; border:1px solid #444; background:#282a36; color:#fff;">
+        <button class="btn" onclick="updateUsername()">Save Name</button>
       </div>
-      <h3>Connected Users:</h3>
-      <div id="users-list-container" style="margin-top:10px;"></div>
+      <h4 style="margin-bottom:8px;">Active Users</h4>
+      <div id="users-list-container"></div>
     </div>
   </div>
 
   <!-- 2. REDMI CAMERA APP -->
   <div id="camera-app" class="app-window">
     <div class="window-header">
-      <span class="window-title">Camera</span>
+      <span class="window-title">Redmi Camera</span>
       <span class="close-btn" onclick="closeApp('camera-app')">&times;</span>
     </div>
     <div class="window-content">
@@ -94,8 +101,8 @@
         <canvas id="camera-canvas" style="display:none;"></canvas>
       </div>
       <div class="camera-controls">
-        <button class="btn" onclick="switchCamera()">🔄 Switch</button>
-        <button class="btn" onclick="takePhoto()">📸 Capture</button>
+        <button class="btn" onclick="switchCamera()">🔄 Switch Camera</button>
+        <button class="btn" style="background:#ff79c6;" onclick="takePhoto()">📸 Capture Photo</button>
       </div>
     </div>
   </div>
@@ -110,13 +117,15 @@
       <div class="video-grid">
         <div class="video-box">
           <video id="localVideo" autoplay playsinline muted></video>
+          <div class="video-label">You</div>
         </div>
         <div class="video-box">
           <video id="remoteVideo" autoplay playsinline></video>
+          <div class="video-label">Remote Peer</div>
         </div>
       </div>
-      <div style="display:flex; gap:10px; margin-top: 10px;">
-        <input type="text" id="target-id" placeholder="Enter Peer Socket ID" style="flex:1; padding:6px; border-radius:4px; border:none;">
+      <div style="display:flex; gap:8px; margin-top: 5px;">
+        <input type="text" id="target-id" placeholder="Enter Target Peer Socket ID" style="flex:1; padding:8px; border-radius:6px; border:1px solid #444; background:#282a36; color:#fff;">
         <button class="btn" onclick="startCall()">Call</button>
       </div>
     </div>
@@ -129,29 +138,48 @@
       <span class="close-btn" onclick="closeApp('games-app')">&times;</span>
     </div>
     <div class="window-content">
-      <h3>Tic-Tac-Toe</h3>
-      <div class="ttt-board" id="ttt-board"></div>
-      <button class="btn" style="margin-top:10px;" onclick="resetTTT()">Reset Game</button>
+      <div class="game-tab">
+        <button class="btn" onclick="showGame('ttt')">Tic-Tac-Toe</button>
+        <button class="btn" onclick="showGame('snake')">Snake Game</button>
+      </div>
+      
+      <!-- Tic Tac Toe Container -->
+      <div id="ttt-container">
+        <div class="ttt-board" id="ttt-board"></div>
+        <button class="btn" style="margin: 10px auto 0; display:block;" onclick="resetTTT()">Reset Match</button>
+      </div>
+
+      <!-- Snake Game Container -->
+      <div id="snake-container" style="display:none; text-align:center;">
+        <canvas id="snake-canvas" width="240" height="240"></canvas>
+        <div style="margin-top:8px;">Score: <span id="snake-score">0</span></div>
+        <button class="btn" style="margin-top:8px;" onclick="startSnake()">Restart Snake</button>
+      </div>
     </div>
   </div>
 
   <script>
     const socket = io();
 
-    // App Management
+    // App Window Lifecycle Management
     function openApp(id) {
       document.getElementById(id).classList.add('active');
       if (id === 'camera-app') startCamera();
       if (id === 'videocall-app') initLocalVideo();
+      if (id === 'games-app') startSnake();
     }
+
     function closeApp(id) {
       document.getElementById(id).classList.remove('active');
       if (id === 'camera-app' && cameraStream) {
         cameraStream.getTracks().forEach(track => track.stop());
       }
+      if (id === 'games-app' && snakeInterval) {
+        clearInterval(snakeInterval);
+      }
     }
 
-    // --- 1. ONLINE PEOPLE APP ---
+    // --- 1. ONLINE USERS & USERNAME ---
     function updateUsername() {
       const name = document.getElementById('username-input').value;
       if (name) socket.emit('set-username', name);
@@ -165,16 +193,16 @@
         const div = document.createElement('div');
         div.className = 'user-item';
         div.innerHTML = `
-          <span>${users[id].username} ${isSelf ? '<b>(You)</b>' : ''}</span>
-          <small style="opacity:0.6">${id}</small>
+          <span>${users[id].username} ${isSelf ? '<b style="color:#50fa7b;">(You)</b>' : ''}</span>
+          <small style="color:#8be9fd;">${id}</small>
         `;
         container.appendChild(div);
       }
     });
 
-    // --- 2. SWITCHABLE CAMERA WITH UNIQUE FILE NAME DOWNLOAD ---
+    // --- 2. SWITCHABLE CAMERA & CUSTOM TIMESTAMP FILE NAME DOWNLOAD ---
     let cameraStream = null;
-    let currentFacingMode = 'user'; // 'user' (front) or 'environment' (back)
+    let currentFacingMode = 'user';
 
     async function startCamera() {
       if (cameraStream) {
@@ -186,7 +214,7 @@
         });
         document.getElementById('camera-feed').srcObject = cameraStream;
       } catch (err) {
-        alert('Could not access camera: ' + err.message);
+        alert('Unable to access camera: ' + err.message);
       }
     }
 
@@ -200,22 +228,20 @@
       const canvas = document.getElementById('camera-canvas');
       const ctx = canvas.getContext('2d');
 
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      // Create unique timestamped name
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const fileName = `IMG_Redmi_${timestamp}.png`;
 
-      // Trigger download
       const link = document.createElement('a');
       link.download = fileName;
       link.href = canvas.toDataURL('image/png');
       link.click();
     }
 
-    // --- 3. VIDEO CALL APP (WebRTC Fix) ---
+    // --- 3. VIDEO CALL APP (FIXED REMOTE STREAM RENDERING) ---
     let localStream = null;
     let peerConnection = null;
     const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
@@ -226,7 +252,7 @@
           localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
           document.getElementById('localVideo').srcObject = localStream;
         } catch (err) {
-          console.error("Local media error:", err);
+          console.error("Error accessing video/audio: ", err);
         }
       }
     }
@@ -234,13 +260,13 @@
     function createPeerConnection(targetSocketId) {
       peerConnection = new RTCPeerConnection(rtcConfig);
 
-      // Add local tracks to peer
-      localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+      if (localStream) {
+        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+      }
 
-      // Handle incoming remote track stream
       peerConnection.ontrack = (event) => {
         const remoteVideo = document.getElementById('remoteVideo');
-        if (remoteVideo.srcObject !== event.streams[0]) {
+        if (event.streams && event.streams[0]) {
           remoteVideo.srcObject = event.streams[0];
         }
       };
@@ -254,7 +280,7 @@
 
     async function startCall() {
       const targetId = document.getElementById('target-id').value;
-      if (!targetId) return alert('Enter target Socket ID');
+      if (!targetId) return alert('Please enter a target Socket ID');
 
       createPeerConnection(targetId);
 
@@ -275,7 +301,9 @@
     });
 
     socket.on('call-accepted', async (signal) => {
-      await peerConnection.setRemoteDescription(new RTCSessionDescription(signal));
+      if (peerConnection) {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(signal));
+      }
     });
 
     socket.on('ice-candidate', async (data) => {
@@ -284,7 +312,14 @@
       }
     });
 
-    // --- 4. TIC TAC TOE APP ---
+    // --- 4. GAMES APP (TIC-TAC-TOE & SNAKE GAME) ---
+    function showGame(game) {
+      document.getElementById('ttt-container').style.display = (game === 'ttt') ? 'block' : 'none';
+      document.getElementById('snake-container').style.display = (game === 'snake') ? 'block' : 'none';
+      if (game === 'snake') startSnake();
+    }
+
+    // Tic-Tac-Toe
     let boardState = Array(9).fill(null);
     let currentPlayer = 'X';
 
@@ -314,6 +349,66 @@
       initTTT();
     }
     initTTT();
+
+    // Snake Game
+    let snakeCanvas, snakeCtx, snakeInterval;
+    let snake = [{x: 10, y: 10}];
+    let food = {x: 5, y: 5};
+    let dx = 1, dy = 0;
+    let snakeScore = 0;
+
+    function startSnake() {
+      snakeCanvas = document.getElementById('snake-canvas');
+      snakeCtx = snakeCanvas.getContext('2d');
+      snake = [{x: 10, y: 10}];
+      dx = 1; dy = 0;
+      snakeScore = 0;
+      document.getElementById('snake-score').innerText = snakeScore;
+      if (snakeInterval) clearInterval(snakeInterval);
+      snakeInterval = setInterval(updateSnake, 120);
+    }
+
+    function updateSnake() {
+      const head = {x: snake[0].x + dx, y: snake[0].y + dy};
+      
+      // Boundary collision check
+      if (head.x < 0 || head.x >= 24 || head.y < 0 || head.y >= 24) {
+        clearInterval(snakeInterval);
+        alert('Game Over! Your score: ' + snakeScore);
+        return;
+      }
+
+      snake.unshift(head);
+      if (head.x === food.x && head.y === food.y) {
+        snakeScore += 10;
+        document.getElementById('snake-score').innerText = snakeScore;
+        food = {
+          x: Math.floor(Math.random() * 24),
+          y: Math.floor(Math.random() * 24)
+        };
+      } else {
+        snake.pop();
+      }
+
+      // Render canvas
+      snakeCtx.fillStyle = '#000';
+      snakeCtx.fillRect(0, 0, 240, 240);
+
+      snakeCtx.fillStyle = '#ff5555';
+      snakeCtx.fillRect(food.x * 10, food.y * 10, 8, 8);
+
+      snakeCtx.fillStyle = '#50fa7b';
+      snake.forEach(part => {
+        snakeCtx.fillRect(part.x * 10, part.y * 10, 8, 8);
+      });
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowUp' && dy === 0) { dx = 0; dy = -1; }
+      if (e.key === 'ArrowDown' && dy === 0) { dx = 0; dy = 1; }
+      if (e.key === 'ArrowLeft' && dx === 0) { dx = -1; dy = 0; }
+      if (e.key === 'ArrowRight' && dx === 0) { dx = 1; dy = 0; }
+    });
   </script>
 </body>
 </html>
