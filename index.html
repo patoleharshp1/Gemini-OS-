@@ -1,414 +1,790 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gemini OS Dashboard</title>
-  <script src="/socket.io/socket.io.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Gemini OS</title>
   <style>
-    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
-    body { background: #121212; color: #fff; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
-    
-    /* Desktop & Desktop Icons Layout */
-    .desktop { display: flex; flex-wrap: wrap; gap: 20px; padding: 25px; flex: 1; align-content: flex-start; }
-    .app-icon { width: 85px; text-align: center; cursor: pointer; border-radius: 12px; padding: 10px; background: rgba(255, 255, 255, 0.05); transition: all 0.2s ease-in-out; }
-    .app-icon:hover { background: rgba(255, 255, 255, 0.15); transform: translateY(-3px); }
-    .app-icon .icon-placeholder { width: 50px; height: 50px; margin: 0 auto 8px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
-    .app-icon span { font-size: 13px; font-weight: 500; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Roboto', 'Segoe UI', sans-serif; background: #0c0202; color: #fff; margin: 0; padding: 12px; }
 
-    /* Window Overlay Component Styling */
-    .app-window { display: none; position: absolute; top: 60px; left: 60px; width: 480px; min-height: 400px; background: #1e1e2e; border-radius: 14px; box-shadow: 0 12px 35px rgba(0,0,0,0.6); z-index: 100; flex-direction: column; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.1); }
-    .app-window.active { display: flex; }
-    .window-header { background: #282a36; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
-    .window-title { font-weight: 600; font-size: 15px; }
-    .close-btn { cursor: pointer; color: #ff5f56; font-size: 20px; font-weight: bold; }
-    .window-content { padding: 16px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+    .status-bar { background: rgba(35, 10, 10, 0.9); border: 1px solid #3d1515; padding: 10px 14px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-weight: bold; color: #e5b3b3; font-size: 13px; }
+    .online-badge { background: #1b4d24; color: #4caf50; padding: 2px 8px; border-radius: 10px; font-size: 11px; margin-left: 6px; }
 
-    /* Controls & Utility Classes */
-    .btn { background: #6272a4; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; transition: 0.2s; }
-    .btn:hover { background: #7082b6; }
-    .btn-danger { background: #ff5555; }
-    .btn-danger:hover { background: #ff6e6e; }
+    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+    .app-icon { background: rgba(30, 8, 8, 0.9); border: 1px solid #421818; border-radius: 16px; padding: 10px 4px; text-align: center; cursor: pointer; transition: transform 0.15s; }
+    .app-icon:active { transform: scale(0.92); }
+    .app-icon img { width: 38px; height: 38px; object-fit: contain; margin-bottom: 4px; }
+    .app-icon span { display: block; font-size: 11px; color: #e5b3b3; font-family: cursive, sans-serif; }
 
-    /* Camera App */
-    .camera-container { position: relative; width: 100%; height: 260px; background: #000; border-radius: 8px; overflow: hidden; }
-    video, canvas { width: 100%; height: 100%; object-fit: cover; }
-    .camera-controls { display: flex; justify-content: space-around; margin-top: 12px; }
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0c0202; z-index: 100; flex-direction: column; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #1f0606; border-bottom: 1px solid #3d1515; }
+    .modal-header h3 { margin: 0; color: #ff8a8a; font-size: 16px; }
+    .close-btn { background: #e05656; border: none; color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+    .modal-body { flex: 1; position: relative; overflow-y: auto; padding: 12px; }
 
-    /* Video Call Grid */
-    .video-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
-    .video-box { position: relative; width: 100%; height: 160px; background: #000; border-radius: 8px; overflow: hidden; border: 1px solid #444; }
-    .video-box video { width: 100%; height: 100%; object-fit: cover; }
-    .video-label { position: absolute; bottom: 6px; left: 6px; background: rgba(0,0,0,0.6); padding: 2px 6px; font-size: 11px; border-radius: 4px; }
+    /* CHAT BUBBLES */
+    #chat-box { height: 340px; overflow-y: auto; border: 1px solid #3d1515; padding: 10px; margin-bottom: 5px; border-radius: 12px; background: #140404; display: flex; flex-direction: column; gap: 10px; }
+    .msg-wrapper { display: flex; flex-direction: column; max-width: 80%; }
+    .msg-wrapper.my-msg { align-self: flex-end; align-items: flex-end; }
+    .msg-wrapper.other-msg { align-self: flex-start; align-items: flex-start; }
+    .msg-author { font-size: 11px; color: #ff8a8a; margin-bottom: 2px; font-weight: bold; }
+    .bubble { padding: 8px 12px; border-radius: 14px; font-size: 14px; word-break: break-word; position: relative; }
+    .my-msg .bubble { background: #5c1818; color: #fff; border-bottom-right-radius: 2px; }
+    .other-msg .bubble { background: #260a0a; color: #e5b3b3; border: 1px solid #3d1515; border-bottom-left-radius: 2px; }
+    .msg-time { font-size: 9px; opacity: 0.6; margin-left: 6px; }
+    .delete-btn { background: transparent; border: none; color: #ff8a8a; font-size: 12px; cursor: pointer; margin-left: 6px; }
+    .msg-img { max-width: 180px; border-radius: 8px; display: block; margin-top: 4px; }
+    .msg-audio { margin-top: 4px; width: 200px; height: 35px; }
+    #typingNotice { font-size: 11px; color: #aaa; font-style: italic; height: 16px; margin-bottom: 6px; }
 
-    /* Users App */
-    .user-item { padding: 10px; background: rgba(255,255,255,0.05); margin-bottom: 6px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
+    .chat-controls { display: flex; gap: 6px; align-items: center; }
+    .chat-controls input[type="text"] { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #441515; background: #1f0808; color: #fff; }
+    .btn { padding: 10px 14px; border: none; background: #e05656; color: white; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer; }
+    .btn-icon { background: #2b0b0b; border: 1px solid #441515; color: #ff8a8a; }
 
-    /* Game App Canvas & Board */
-    .game-tab { display: flex; gap: 10px; margin-bottom: 12px; }
-    .ttt-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; max-width: 210px; margin: 10px auto; }
-    .ttt-cell { width: 65px; height: 65px; background: #282a36; font-size: 26px; font-weight: bold; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 6px; color: #50fa7b; }
-    #snake-canvas { background: #000; border-radius: 6px; margin: 0 auto; display: block; border: 1px solid #444; }
+    /* PHONE CALL UI */
+    .dialer-screen { display: flex; flex-direction: column; align-items: center; justify-content: space-between; height: 100%; padding: 20px 10px; background: #121212; color: #fff; }
+    .caller-avatar { width: 85px; height: 85px; border-radius: 50%; background: #3c4043; display: flex; align-items: center; justify-content: center; font-size: 36px; color: #e8eaed; margin-bottom: 8px; }
+    .caller-name { font-size: 20px; font-weight: 500; margin-bottom: 2px; }
+    .call-status { font-size: 13px; color: #9aa0a6; }
+
+    .video-container { width: 100%; height: 260px; background: #000; border-radius: 12px; position: relative; overflow: hidden; display: none; margin-top: 10px; }
+    #remoteVideo { width: 100%; height: 100%; object-fit: cover; }
+    #localVideo { width: 90px; height: 120px; object-fit: cover; position: absolute; bottom: 10px; right: 10px; border-radius: 8px; border: 2px solid #fff; }
+
+    .google-controls { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; width: 100%; max-width: 360px; margin-bottom: 15px; }
+    .g-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; background: #202124; border: none; border-radius: 50%; width: 50px; height: 50px; color: #fff; font-size: 16px; cursor: pointer; margin: 0 auto; }
+    .g-btn.active { background: #ea4335; color: #fff; }
+    .g-btn-label { font-size: 9px; color: #9aa0a6; margin-top: 3px; text-align: center; }
+
+    .end-call-btn { background: #ea4335; width: 62px; height: 62px; border-radius: 50%; border: none; color: white; font-size: 26px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+    .file-card { display: flex; justify-content: space-between; align-items: center; background: #1e0808; padding: 10px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #331010; }
   </style>
 </head>
 <body>
 
-  <!-- Desktop Icons -->
-  <div class="desktop">
-    <div class="app-icon" onclick="openApp('online-users-app')">
-      <div class="icon-placeholder" style="background:#bd93f9;">👥</div>
-      <span>People</span>
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <span>CPU: 14% | Users: <span id="onlineCount" class="online-badge">1</span></span>
+    <span id="display-username" style="cursor: pointer; text-decoration: underline;" onclick="changeUsername()">User: Setting...</span>
+  </div>
+
+  <!-- App Grid -->
+  <div class="grid">
+    <div class="app-icon" onclick="openCamera()"><img src="https://img.icons8.com/color/96/camera.png"/><span>Camera</span></div>
+    <div class="app-icon" onclick="openModal('chatApp')"><img src="https://img.icons8.com/color/96/speech-bubble.png"/><span>Messages</span></div>
+    <div class="app-icon" onclick="openModal('phoneApp')"><img src="https://img.icons8.com/color/96/phone.png"/><span>Phone Call</span></div>
+    <div class="app-icon" onclick="openModal('storageApp')"><img src="https://img.icons8.com/color/96/folder-invoiced.png"/><span>Drive / Storage</span></div>
+    
+    <div class="app-icon" onclick="openWebLink('https://m.youtube.com')"><img src="https://img.icons8.com/color/96/television.png"/><span>YouTube</span></div>
+    <div class="app-icon" onclick="openWebLink('https://gemini.google.com')"><img src="https://img.icons8.com/color/96/sparkling.png"/><span>Gemini</span></div>
+    
+    <div class="app-icon" onclick="openModal('storageApp')"><img src="https://img.icons8.com/color/96/musical-notes.png"/><span>Cloud MP3</span></div>
+    <div class="app-icon" onclick="openModal('localMusicApp')"><img src="https://img.icons8.com/color/96/audio-wave.png"/><span>Local MP3</span></div>
+
+    <div class="app-icon" onclick="openAppUrl('https://play2048.co/')"><img src="https://img.icons8.com/color/96/puzzle.png"/><span>2048</span></div>
+    <div class="app-icon" onclick="openAppUrl('https://flappybird.io/')"><img src="https://img.icons8.com/color/96/twitter.png"/><span>Flappy</span></div>
+    <div class="app-icon" onclick="openAppUrl('https://chromedino.com/')"><img src="https://img.icons8.com/color/96/dinosaur.png"/><span>Dino</span></div>
+    <div class="app-icon" onclick="openWebLink('https://maps.google.com')"><img src="https://img.icons8.com/color/96/google-maps-new.png"/><span>GPS Maps</span></div>
+  </div>
+
+  <!-- Browser Frame -->
+  <div id="webModal" class="modal">
+    <div class="modal-header">
+      <h3 id="modalTitle">App</h3>
+      <button class="close-btn" onclick="closeModal('webModal')">X</button>
     </div>
-    <div class="app-icon" onclick="openApp('camera-app')">
-      <div class="icon-placeholder" style="background:#ff79c6;">📷</div>
-      <span>Camera</span>
-    </div>
-    <div class="app-icon" onclick="openApp('videocall-app')">
-      <div class="icon-placeholder" style="background:#50fa7b;">📹</div>
-      <span>Video Call</span>
-    </div>
-    <div class="app-icon" onclick="openApp('games-app')">
-      <div class="icon-placeholder" style="background:#ffb86c;">🎮</div>
-      <span>Games</span>
+    <div class="modal-body" style="padding:0;">
+      <iframe id="appFrame" style="width:100%; height:100%; border:none;" src=""></iframe>
     </div>
   </div>
 
-  <!-- 1. ONLINE USERS APP -->
-  <div id="online-users-app" class="app-window">
-    <div class="window-header">
-      <span class="window-title">Online People</span>
-      <span class="close-btn" onclick="closeApp('online-users-app')">&times;</span>
+  <!-- Messages App -->
+  <div id="chatApp" class="modal">
+    <div class="modal-header">
+      <h3>Messages</h3>
+      <button class="close-btn" onclick="closeModal('chatApp')">X</button>
     </div>
-    <div class="window-content">
-      <div style="margin-bottom:15px; display:flex; gap:8px;">
-        <input type="text" id="username-input" placeholder="Enter custom name" style="flex:1; padding: 8px; border-radius:6px; border:1px solid #444; background:#282a36; color:#fff;">
-        <button class="btn" onclick="updateUsername()">Save Name</button>
-      </div>
-      <h4 style="margin-bottom:8px;">Active Users</h4>
-      <div id="users-list-container"></div>
-    </div>
-  </div>
-
-  <!-- 2. REDMI CAMERA APP -->
-  <div id="camera-app" class="app-window">
-    <div class="window-header">
-      <span class="window-title">Redmi Camera</span>
-      <span class="close-btn" onclick="closeApp('camera-app')">&times;</span>
-    </div>
-    <div class="window-content">
-      <div class="camera-container">
-        <video id="camera-feed" autoplay playsinline></video>
-        <canvas id="camera-canvas" style="display:none;"></canvas>
-      </div>
-      <div class="camera-controls">
-        <button class="btn" onclick="switchCamera()">🔄 Switch Camera</button>
-        <button class="btn" style="background:#ff79c6;" onclick="takePhoto()">📸 Capture Photo</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 3. VIDEO CALL APP -->
-  <div id="videocall-app" class="app-window">
-    <div class="window-header">
-      <span class="window-title">Video Call</span>
-      <span class="close-btn" onclick="closeApp('videocall-app')">&times;</span>
-    </div>
-    <div class="window-content">
-      <div class="video-grid">
-        <div class="video-box">
-          <video id="localVideo" autoplay playsinline muted></video>
-          <div class="video-label">You</div>
-        </div>
-        <div class="video-box">
-          <video id="remoteVideo" autoplay playsinline></video>
-          <div class="video-label">Remote Peer</div>
-        </div>
-      </div>
-      <div style="display:flex; gap:8px; margin-top: 5px;">
-        <input type="text" id="target-id" placeholder="Enter Target Peer Socket ID" style="flex:1; padding:8px; border-radius:6px; border:1px solid #444; background:#282a36; color:#fff;">
-        <button class="btn" onclick="startCall()">Call</button>
+    <div class="modal-body">
+      <div id="chat-box"></div>
+      <div id="typingNotice"></div>
+      <div class="chat-controls">
+        <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="sendImage(this)" />
+        <button class="btn btn-icon" onclick="document.getElementById('imageInput').click()">📷</button>
+        <button class="btn btn-icon" id="recordBtn" onclick="toggleRecord()">🎙️</button>
+        <input type="text" id="messageInput" placeholder="Type a message..." oninput="emitTyping()" />
+        <button class="btn" onclick="sendMessage()">Send</button>
       </div>
     </div>
   </div>
 
-  <!-- 4. WEB GAMES APP -->
-  <div id="games-app" class="app-window">
-    <div class="window-header">
-      <span class="window-title">Games Center</span>
-      <span class="close-btn" onclick="closeApp('games-app')">&times;</span>
+  <!-- Phone Call App -->
+  <div id="phoneApp" class="modal">
+    <div class="modal-header">
+      <h3>Google Dialer</h3>
+      <button class="close-btn" onclick="endCall()">X</button>
     </div>
-    <div class="window-content">
-      <div class="game-tab">
-        <button class="btn" onclick="showGame('ttt')">Tic-Tac-Toe</button>
-        <button class="btn" onclick="showGame('snake')">Snake Game</button>
-      </div>
+    <div class="modal-body" style="padding:0; background:#121212;">
       
-      <!-- Tic Tac Toe Container -->
-      <div id="ttt-container">
-        <div class="ttt-board" id="ttt-board"></div>
-        <button class="btn" style="margin: 10px auto 0; display:block;" onclick="resetTTT()">Reset Match</button>
+      <!-- Call Setup -->
+      <div id="callSetup" style="padding:20px;">
+        <p style="font-size:14px; color:#aaa;">Your ID: <strong id="myCallUser" style="color:#fff;"></strong></p>
+        <input type="text" id="targetUser" placeholder="Enter target username..." style="width:100%; padding:12px; margin-bottom:15px; background:#1e1e1e; border:1px solid #333; color:#fff; border-radius:8px; font-size:15px;"/>
+        
+        <div style="display:flex; gap:10px;">
+          <button class="btn" style="flex:1; background:#1a73e8;" onclick="startCall(false)">📞 Audio Call</button>
+          <button class="btn" style="flex:1; background:#34a853;" onclick="startCall(true)">📹 Video Call</button>
+        </div>
+
+        <div id="incomingContainer" style="display:none; margin-top:25px; background:#1e1e1e; padding:20px; border-radius:12px; text-align:center;">
+          <div class="caller-avatar" style="margin:0 auto 10px auto;">👤</div>
+          <p id="callerNameText" style="font-weight:bold; font-size:18px;">Incoming Call...</p>
+          <div style="display:flex; gap:15px; justify-content:center; margin-top:15px;">
+            <button class="btn" style="background:#34a853; border-radius:50%; width:55px; height:55px; font-size:20px;" onclick="acceptCall()">📞</button>
+            <button class="btn" style="background:#ea4335; border-radius:50%; width:55px; height:55px; font-size:20px;" onclick="endCall()">📵</button>
+          </div>
+        </div>
       </div>
 
-      <!-- Snake Game Container -->
-      <div id="snake-container" style="display:none; text-align:center;">
-        <canvas id="snake-canvas" width="240" height="240"></canvas>
-        <div style="margin-top:8px;">Score: <span id="snake-score">0</span></div>
-        <button class="btn" style="margin-top:8px;" onclick="startSnake()">Restart Snake</button>
+      <!-- Active Call View -->
+      <div id="activeCallView" class="dialer-screen" style="display:none;">
+        <div style="text-align:center; margin-top:10px; width:100%;">
+          <div id="avatarCircle" class="caller-avatar" style="margin:0 auto;">👤</div>
+          <div id="activeCallerName" class="caller-name">User</div>
+          <div id="callDuration" class="call-status">Connecting audio...</div>
+        </div>
+
+        <!-- Single Media Tag Handling Audio & Video to Fix Autoplay Restrictions -->
+        <div id="videoArea" class="video-container">
+          <video id="remoteVideo" autoplay playsinline style="width:100%; height:100%; object-fit:cover;"></video>
+          <video id="localVideo" autoplay muted playsinline></video>
+        </div>
+
+        <div style="width:100%; display:flex; flex-direction:column; align-items:center;">
+          <div class="google-controls">
+            <div>
+              <button class="g-btn" id="muteBtn" onclick="toggleMute()">🎙️</button>
+              <div class="g-btn-label">Mute</div>
+            </div>
+            <div>
+              <button class="g-btn" id="speakerBtn" onclick="toggleSpeaker()">🔊</button>
+              <div class="g-btn-label">Speaker</div>
+            </div>
+            <div>
+              <button class="g-btn" id="videoToggleBtn" onclick="toggleVideoMode()">📹</button>
+              <div class="g-btn-label">Video</div>
+            </div>
+            <div>
+              <button class="g-btn" onclick="shareScreen()">🖥️</button>
+              <div class="g-btn-label">Share</div>
+            </div>
+            <div>
+              <button class="g-btn" onclick="switchCallCamera()">🔄</button>
+              <div class="g-btn-label">Flip</div>
+            </div>
+          </div>
+
+          <button class="end-call-btn" onclick="endCall()">📵</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Shared Drive / Storage App -->
+  <div id="storageApp" class="modal">
+    <div class="modal-header">
+      <h3>Cloud Drive & Storage</h3>
+      <button class="close-btn" onclick="closeModal('storageApp')">X</button>
+    </div>
+    <div class="modal-body">
+      <input type="file" id="driveFileInput" onchange="uploadToDrive(this)" style="display:none;" />
+      <button class="btn" onclick="document.getElementById('driveFileInput').click()" style="width:100%; margin-bottom:15px;">☁️ Upload File / MP3 Song to Drive</button>
+      <div id="cloudDriveList"></div>
+    </div>
+  </div>
+
+  <!-- Local MP3 Player -->
+  <div id="localMusicApp" class="modal">
+    <div class="modal-header">
+      <h3>Local MP3 Player</h3>
+      <button class="close-btn" onclick="closeModal('localMusicApp')">X</button>
+    </div>
+    <div class="modal-body">
+      <input type="file" id="localMp3Input" accept="audio/*" multiple onchange="loadLocalSongs(this)" style="display:none;" />
+      <button class="btn" onclick="document.getElementById('localMp3Input').click()" style="width:100%; margin-bottom:15px;">🎵 Pick Local Audio Files</button>
+      <div id="localSongList"></div>
+    </div>
+  </div>
+
+  <!-- Camera Modal -->
+  <div id="cameraApp" class="modal">
+    <div class="modal-header">
+      <h3>Camera & Video Recorder</h3>
+      <button class="close-btn" onclick="closeCamera()">X</button>
+    </div>
+    <div class="modal-body" style="text-align: center;">
+      <video id="webcam" autoplay playsinline style="width:100%; max-height:280px; border-radius:12px; background:#000;"></video>
+      <canvas id="photoCanvas" style="display:none;"></canvas>
+      
+      <div style="display:flex; gap:10px; justify-content:center; margin-top:15px;">
+        <button class="btn" onclick="takePhoto()">📷 Snap Photo</button>
+        <button class="btn" id="camRecordBtn" style="background:#cc0000;" onclick="toggleCameraRecording()">⏺️ Record Video</button>
+        <button class="btn btn-icon" onclick="switchCameraFacing()">🔄 Flip Cam</button>
       </div>
     </div>
   </div>
 
+  <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
+    let currentUsername = localStorage.getItem('custom_username');
 
-    // App Window Lifecycle Management
-    function openApp(id) {
-      document.getElementById(id).classList.add('active');
-      if (id === 'camera-app') startCamera();
-      if (id === 'videocall-app') initLocalVideo();
-      if (id === 'games-app') startSnake();
-    }
-
-    function closeApp(id) {
-      document.getElementById(id).classList.remove('active');
-      if (id === 'camera-app' && cameraStream) {
-        cameraStream.getTracks().forEach(track => track.stop());
+    function setupUsername() {
+      if (!currentUsername) {
+        currentUsername = prompt("Enter your name:", "User1") || ("User" + Math.floor(Math.random() * 100));
+        localStorage.setItem('custom_username', currentUsername.trim());
       }
-      if (id === 'games-app' && snakeInterval) {
-        clearInterval(snakeInterval);
+      document.getElementById('display-username').innerText = "User: " + currentUsername;
+      document.getElementById('myCallUser').innerText = currentUsername;
+      socket.emit('register_user', currentUsername);
+    }
+
+    function changeUsername() {
+      const newName = prompt("Enter new custom name:", currentUsername);
+      if (newName) {
+        currentUsername = newName.trim();
+        localStorage.setItem('custom_username', currentUsername);
+        document.getElementById('display-username').innerText = "User: " + currentUsername;
+        document.getElementById('myCallUser').innerText = currentUsername;
+        socket.emit('register_user', currentUsername);
       }
     }
+    setupUsername();
 
-    // --- 1. ONLINE USERS & USERNAME ---
-    function updateUsername() {
-      const name = document.getElementById('username-input').value;
-      if (name) socket.emit('set-username', name);
+    socket.on('user_list', (users) => {
+      document.getElementById('onlineCount').innerText = users.length;
+    });
+
+    function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+    function openWebLink(url) { window.open(url, '_blank'); }
+    function openAppUrl(url) {
+      document.getElementById('appFrame').src = url;
+      document.getElementById('modalTitle').innerText = "App";
+      openModal('webModal');
     }
 
-    socket.on('update-user-list', (users) => {
-      const container = document.getElementById('users-list-container');
-      container.innerHTML = '';
-      for (let id in users) {
-        const isSelf = id === socket.id;
-        const div = document.createElement('div');
-        div.className = 'user-item';
-        div.innerHTML = `
-          <span>${users[id].username} ${isSelf ? '<b style="color:#50fa7b;">(You)</b>' : ''}</span>
-          <small style="color:#8be9fd;">${id}</small>
-        `;
-        container.appendChild(div);
+    // TYPING INDICATOR
+    let typingTimeout;
+    function emitTyping() {
+      socket.emit('typing_status', { user: currentUsername, isTyping: true });
+      clearTimeout(typingTimeout);
+      typingTimeout = setTimeout(() => {
+        socket.emit('typing_status', { user: currentUsername, isTyping: false });
+      }, 1500);
+    }
+
+    socket.on('user_typing', (data) => {
+      const el = document.getElementById('typingNotice');
+      if (data.isTyping) {
+        el.innerText = data.user + " is typing...";
+      } else {
+        el.innerText = "";
       }
     });
 
-    // --- 2. SWITCHABLE CAMERA & CUSTOM TIMESTAMP FILE NAME DOWNLOAD ---
-    let cameraStream = null;
-    let currentFacingMode = 'user';
+    // MESSAGES
+    const chatBox = document.getElementById('chat-box');
 
-    async function startCamera() {
-      if (cameraStream) {
-        cameraStream.getTracks().forEach(track => track.stop());
-      }
-      try {
-        cameraStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: currentFacingMode }
+    socket.on('load_all_messages', function(messages) {
+      chatBox.innerHTML = '';
+      messages.forEach(renderSingleMessage);
+    });
+
+    socket.on('receive_message', function(msg) {
+      renderSingleMessage(msg);
+    });
+
+    socket.on('message_deleted', function(msgId) {
+      const el = document.getElementById('msg-' + msgId);
+      if (el) el.remove();
+    });
+
+    function renderSingleMessage(data) {
+      const isMe = (data.user === currentUsername);
+      const wrapper = document.createElement('div');
+      wrapper.id = 'msg-' + data.id;
+      wrapper.className = 'msg-wrapper ' + (isMe ? 'my-msg' : 'other-msg');
+
+      let inner = '<div class="msg-author">' + data.user + '</div><div class="bubble">';
+      if (data.text) inner += data.text;
+      if (data.image) inner += '<br><img class="msg-img" src="' + data.image + '"/>';
+      if (data.audio) inner += '<br><audio class="msg-audio" controls src="' + data.audio + '"></audio>';
+      inner += '<span class="msg-time">' + data.timestamp + '</span>';
+      if (isMe) inner += '<button class="delete-btn" onclick="deleteMessage(\'' + data.id + '\')">🗑️</button>';
+      inner += '</div>';
+
+      wrapper.innerHTML = inner;
+      chatBox.appendChild(wrapper);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function sendMessage() {
+      const input = document.getElementById('messageInput');
+      if (input.value.trim() !== '') {
+        socket.emit('send_message', {
+          user: currentUsername,
+          text: input.value.trim(),
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         });
-        document.getElementById('camera-feed').srcObject = cameraStream;
-      } catch (err) {
-        alert('Unable to access camera: ' + err.message);
+        input.value = '';
+        socket.emit('typing_status', { user: currentUsername, isTyping: false });
       }
     }
 
-    function switchCamera() {
-      currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
-      startCamera();
+    function deleteMessage(msgId) { socket.emit('delete_message', msgId); }
+
+    function sendImage(fileInput) {
+      const file = fileInput.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          socket.emit('send_message', {
+            user: currentUsername,
+            image: e.target.result,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          });
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    let audioRecorder, chatAudioChunks = [], isRecordingAudio = false;
+    async function toggleRecord() {
+      const btn = document.getElementById('recordBtn');
+      if (!isRecordingAudio) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          audioRecorder = new MediaRecorder(stream);
+          chatAudioChunks = [];
+          audioRecorder.ondataavailable = e => chatAudioChunks.push(e.data);
+          audioRecorder.onstop = () => {
+            const blob = new Blob(chatAudioChunks, { type: 'audio/webm' });
+            const reader = new FileReader();
+            reader.onload = function(e) {
+              socket.emit('send_message', {
+                user: currentUsername,
+                audio: e.target.result,
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              });
+            };
+            reader.readAsDataURL(blob);
+          };
+          audioRecorder.start();
+          isRecordingAudio = true;
+          btn.style.background = '#ff0000';
+        } catch(err) { alert('Microphone access required'); }
+      } else {
+        audioRecorder.stop();
+        isRecordingAudio = false;
+        btn.style.background = '#2b0b0b';
+      }
+    }
+
+    // DRIVE
+    socket.on('load_cloud_files', function(files) {
+      const list = document.getElementById('cloudDriveList');
+      list.innerHTML = '';
+      files.forEach(renderCloudFile);
+    });
+
+    socket.on('new_cloud_file', function(fileData) { renderCloudFile(fileData); });
+    socket.on('cloud_file_deleted', function(fileId) {
+      const el = document.getElementById('drive-file-' + fileId);
+      if (el) el.remove();
+    });
+
+    function renderCloudFile(file) {
+      const list = document.getElementById('cloudDriveList');
+      const div = document.createElement('div');
+      div.id = 'drive-file-' + file.id;
+      div.className = 'file-card';
+
+      let mediaHtml = '';
+      if (file.type.startsWith('audio/')) {
+        mediaHtml = '<audio controls src="' + file.url + '" style="height:35px; margin-top:5px; width:100%;"></audio>';
+      } else if (file.type.startsWith('image/')) {
+        mediaHtml = '<br><img src="' + file.url + '" style="max-width:120px; border-radius:6px; margin-top:5px;"/>';
+      } else if (file.type.startsWith('video/')) {
+        mediaHtml = '<br><video controls src="' + file.url + '" style="max-width:180px; border-radius:6px; margin-top:5px;"></video>';
+      }
+
+      div.innerHTML = '<div><strong>' + file.name + '</strong> (by ' + file.uploader + ')' + mediaHtml + '</div>' +
+                      '<div><a href="' + file.url + '" download="' + file.name + '" style="color:#8ab4f8; margin-right:8px; text-decoration:none;">⬇️</a>' +
+                      '<button onclick="deleteDriveFile(\'' + file.id + '\')" style="background:none; border:none; color:#ff8a8a; cursor:pointer;">🗑️️</button></div>';
+      list.appendChild(div);
+    }
+
+    function uploadToDrive(input) {
+      Array.from(input.files).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          socket.emit('upload_cloud_file', {
+            name: file.name,
+            type: file.type,
+            url: e.target.result,
+            uploader: currentUsername
+          });
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function deleteDriveFile(fileId) { socket.emit('delete_cloud_file', fileId); }
+
+    function loadLocalSongs(input) {
+      const list = document.getElementById('localSongList');
+      list.innerHTML = '';
+      Array.from(input.files).forEach(file => {
+        const url = URL.createObjectURL(file);
+        const div = document.createElement('div');
+        div.className = 'file-card';
+        div.innerHTML = '<span>' + file.name + '</span><audio controls src="' + url + '"></audio>';
+        list.appendChild(div);
+      });
+    }
+
+    // WEBRTC CALL ENGINE (FIXED AUDIO & AUTOPLAY)
+    let peerConnection, localStream, incomingSignal, targetUserToCall, callTimerInterval, callSeconds = 0;
+    let isMuted = false, isSpeaker = false, isVideoActive = false, callFacingMode = "user";
+    let pendingCandidates = [];
+
+    const rtcConfig = {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' }
+      ]
+    };
+
+    // Synthesize call audio tones (Ringtone)
+    let audioCtx;
+    function playTone(freq, type) {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type || 'sine';
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.3);
+      } catch(e) {}
+    }
+
+    function createPeerConnection() {
+      peerConnection = new RTCPeerConnection(rtcConfig);
+
+      // Handle receiving tracks (AUDIO & VIDEO IN ONE ELEMENT TO SOLVE MOBILE AUTOPLAY)
+      peerConnection.ontrack = e => {
+        const remoteVid = document.getElementById('remoteVideo');
+        if (e.streams && e.streams[0]) {
+          remoteVid.srcObject = e.streams[0];
+          
+          // Force audio playback on mobile browsers
+          remoteVid.play().catch(() => {
+            const playPromise = remoteVid.play();
+            if (playPromise !== undefined) {
+              playPromise.then(() => {}).catch(error => {
+                console.log("Autoplay prevented, retrying on touch...");
+                document.body.addEventListener('touchstart', () => remoteVid.play(), { once: true });
+              });
+            }
+          });
+        }
+      };
+
+      peerConnection.onicecandidate = e => {
+        if (e.candidate && targetUserToCall) {
+          socket.emit('send_candidate', { to: targetUserToCall, candidate: e.candidate });
+        }
+      };
+    }
+
+    async function getUserAudioVideoStream(isVideo) {
+      // Constraints optimized for audio clarity across phone speakers
+      const audioConstraints = {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      };
+      
+      const constraints = {
+        audio: audioConstraints,
+        video: isVideo ? { facingMode: callFacingMode, width: { ideal: 640 }, height: { ideal: 480 } } : false
+      };
+
+      return await navigator.mediaDevices.getUserMedia(constraints);
+    }
+
+    async function startCall(isVideo) {
+      targetUserToCall = document.getElementById('targetUser').value.trim();
+      if (!targetUserToCall) return alert("Please enter the exact username of the caller!");
+
+      isVideoActive = isVideo;
+      setupCallUI(targetUserToCall, isVideo);
+
+      try {
+        localStream = await getUserAudioVideoStream(isVideo);
+        if (isVideo) document.getElementById('localVideo').srcObject = localStream;
+
+        createPeerConnection();
+        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+        socket.emit('call_user', { userToCall: targetUserToCall, signalData: offer, from: currentUsername, isVideo });
+        
+        playTone(440, 'sine');
+      } catch(err) { alert("Microphone or Camera access failed: " + err.message); endCall(); }
+    }
+
+    function setupCallUI(targetName, isVideo) {
+      document.getElementById('callSetup').style.display = 'none';
+      document.getElementById('activeCallView').style.display = 'flex';
+      document.getElementById('activeCallerName').innerText = targetName;
+      document.getElementById('callDuration').innerText = "Calling...";
+      
+      if (isVideo) {
+        document.getElementById('videoArea').style.display = 'block';
+        document.getElementById('avatarCircle').style.display = 'none';
+      } else {
+        document.getElementById('videoArea').style.display = 'none';
+        document.getElementById('avatarCircle').style.display = 'flex';
+      }
+    }
+
+    socket.on('incoming_call', function(data) {
+      incomingSignal = data.signalData;
+      targetUserToCall = data.from;
+      isVideoActive = data.isVideo;
+      document.getElementById('callerNameText').innerText = 'Incoming call from ' + data.from;
+      document.getElementById('incomingContainer').style.display = 'block';
+      openModal('phoneApp');
+      playTone(880, 'triangle');
+    });
+
+    async function acceptCall() {
+      setupCallUI(targetUserToCall, isVideoActive);
+
+      try {
+        localStream = await getUserAudioVideoStream(isVideoActive);
+        if (isVideoActive) document.getElementById('localVideo').srcObject = localStream;
+
+        createPeerConnection();
+        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingSignal));
+        
+        while (pendingCandidates.length > 0) {
+          const cand = pendingCandidates.shift();
+          await peerConnection.addIceCandidate(new RTCIceCandidate(cand));
+        }
+
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+        socket.emit('answer_call', { to: targetUserToCall, signal: answer });
+        startTimer();
+      } catch(err) { alert("Call accept failed: " + err.message); endCall(); }
+    }
+
+    socket.on('call_accepted', async function(data) {
+      if (peerConnection) {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.signal));
+        startTimer();
+      }
+    });
+
+    socket.on('receive_candidate', async function(data) {
+      if (peerConnection && peerConnection.remoteDescription) {
+        try { await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch(e){}
+      } else {
+        pendingCandidates.push(data.candidate);
+      }
+    });
+
+    async function shareScreen() {
+      try {
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        const screenTrack = screenStream.getVideoTracks()[0];
+        
+        const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+        if (sender) {
+          sender.replaceTrack(screenTrack);
+        } else {
+          peerConnection.addTrack(screenTrack, screenStream);
+        }
+        
+        document.getElementById('videoArea').style.display = 'block';
+        document.getElementById('localVideo').srcObject = screenStream;
+
+        screenTrack.onended = () => {
+          if (localStream && localStream.getVideoTracks()[0]) {
+            sender.replaceTrack(localStream.getVideoTracks()[0]);
+            document.getElementById('localVideo').srcObject = localStream;
+          }
+        };
+      } catch(err) { alert("Screen sharing canceled or not supported on this device."); }
+    }
+
+    async function switchCallCamera() {
+      if (!isVideoActive || !localStream) return;
+      callFacingMode = (callFacingMode === "user") ? "environment" : "user";
+      
+      const videoTrack = localStream.getVideoTracks()[0];
+      if (videoTrack) videoTrack.stop();
+
+      try {
+        const newStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: callFacingMode } });
+        const newTrack = newStream.getVideoTracks()[0];
+        localStream.removeTrack(videoTrack);
+        localStream.addTrack(newTrack);
+
+        document.getElementById('localVideo').srcObject = localStream;
+        const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
+        if (sender) sender.replaceTrack(newTrack);
+      } catch(e) { alert("Could not flip camera."); }
+    }
+
+    function startTimer() {
+      callSeconds = 0;
+      clearInterval(callTimerInterval);
+      callTimerInterval = setInterval(() => {
+        callSeconds++;
+        const mins = String(Math.floor(callSeconds / 60)).padStart(2, '0');
+        const secs = String(callSeconds % 60).padStart(2, '0');
+        document.getElementById('callDuration').innerText = mins + ":" + secs;
+      }, 1000);
+    }
+
+    function toggleMute() {
+      if (localStream && localStream.getAudioTracks()[0]) {
+        isMuted = !isMuted;
+        localStream.getAudioTracks()[0].enabled = !isMuted;
+        document.getElementById('muteBtn').classList.toggle('active', isMuted);
+      }
+    }
+
+    function toggleSpeaker() {
+      const remoteVid = document.getElementById('remoteVideo');
+      isSpeaker = !isSpeaker;
+      remoteVid.volume = isSpeaker ? 1.0 : 0.5;
+      document.getElementById('speakerBtn').classList.toggle('active', isSpeaker);
+    }
+
+    function toggleVideoMode() {
+      isVideoActive = !isVideoActive;
+      document.getElementById('videoToggleBtn').classList.toggle('active', !isVideoActive);
+      document.getElementById('videoArea').style.display = isVideoActive ? 'block' : 'none';
+      document.getElementById('avatarCircle').style.display = isVideoActive ? 'none' : 'flex';
+    }
+
+    socket.on('call_failed', function(data) { alert(data.reason); endCall(); });
+    socket.on('call_ended', function() { endCall(); });
+
+    function endCall() {
+      clearInterval(callTimerInterval);
+      pendingCandidates = [];
+      if (targetUserToCall) socket.emit('end_call', { to: targetUserToCall });
+      if (peerConnection) { peerConnection.close(); peerConnection = null; }
+      if (localStream) { localStream.getTracks().forEach(t => t.stop()); }
+      document.getElementById('callSetup').style.display = 'block';
+      document.getElementById('activeCallView').style.display = 'none';
+      document.getElementById('incomingContainer').style.display = 'none';
+      closeModal('phoneApp');
+    }
+
+    // CAMERA APP
+    let cameraStream, cameraFacingMode = "user", videoRecorder, videoChunks = [], isRecordingVid = false;
+
+    async function openCamera() {
+      openModal('cameraApp');
+      startCameraStream();
+    }
+
+    async function startCameraStream() {
+      if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: cameraFacingMode }, audio: true });
+        document.getElementById('webcam').srcObject = cameraStream;
+      } catch(err) { alert("Camera permission required."); }
+    }
+
+    function switchCameraFacing() {
+      cameraFacingMode = (cameraFacingMode === "user") ? "environment" : "user";
+      startCameraStream();
+    }
+
+    function closeCamera() {
+      if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
+      closeModal('cameraApp');
     }
 
     function takePhoto() {
-      const video = document.getElementById('camera-feed');
-      const canvas = document.getElementById('camera-canvas');
-      const ctx = canvas.getContext('2d');
-
-      canvas.width = video.videoWidth || 640;
-      canvas.height = video.videoHeight || 480;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const fileName = `IMG_Redmi_${timestamp}.png`;
-
-      const link = document.createElement('a');
-      link.download = fileName;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-    }
-
-    // --- 3. VIDEO CALL APP (FIXED REMOTE STREAM RENDERING) ---
-    let localStream = null;
-    let peerConnection = null;
-    const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-
-    async function initLocalVideo() {
-      if (!localStream) {
-        try {
-          localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-          document.getElementById('localVideo').srcObject = localStream;
-        } catch (err) {
-          console.error("Error accessing video/audio: ", err);
-        }
-      }
-    }
-
-    function createPeerConnection(targetSocketId) {
-      peerConnection = new RTCPeerConnection(rtcConfig);
-
-      if (localStream) {
-        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-      }
-
-      peerConnection.ontrack = (event) => {
-        const remoteVideo = document.getElementById('remoteVideo');
-        if (event.streams && event.streams[0]) {
-          remoteVideo.srcObject = event.streams[0];
-        }
-      };
-
-      peerConnection.onicecandidate = (event) => {
-        if (event.candidate) {
-          socket.emit('ice-candidate', { to: targetSocketId, candidate: event.candidate });
-        }
-      };
-    }
-
-    async function startCall() {
-      const targetId = document.getElementById('target-id').value;
-      if (!targetId) return alert('Please enter a target Socket ID');
-
-      createPeerConnection(targetId);
-
-      const offer = await peerConnection.createOffer();
-      await peerConnection.setLocalDescription(offer);
-
-      socket.emit('call-user', { userToCall: targetId, signalData: offer });
-    }
-
-    socket.on('incoming-call', async (data) => {
-      createPeerConnection(data.from);
-      await peerConnection.setRemoteDescription(new RTCSessionDescription(data.signal));
+      const video = document.getElementById('webcam');
+      const canvas = document.getElementById('photoCanvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext('2d').drawImage(video, 0, 0);
+      const dataUrl = canvas.toDataURL('image/png');
       
-      const answer = await peerConnection.createAnswer();
-      await peerConnection.setLocalDescription(answer);
-
-      socket.emit('answer-call', { to: data.from, signal: answer });
-    });
-
-    socket.on('call-accepted', async (signal) => {
-      if (peerConnection) {
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(signal));
-      }
-    });
-
-    socket.on('ice-candidate', async (data) => {
-      if (peerConnection) {
-        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-      }
-    });
-
-    // --- 4. GAMES APP (TIC-TAC-TOE & SNAKE GAME) ---
-    function showGame(game) {
-      document.getElementById('ttt-container').style.display = (game === 'ttt') ? 'block' : 'none';
-      document.getElementById('snake-container').style.display = (game === 'snake') ? 'block' : 'none';
-      if (game === 'snake') startSnake();
-    }
-
-    // Tic-Tac-Toe
-    let boardState = Array(9).fill(null);
-    let currentPlayer = 'X';
-
-    function initTTT() {
-      const board = document.getElementById('ttt-board');
-      board.innerHTML = '';
-      boardState.forEach((cell, i) => {
-        const div = document.createElement('div');
-        div.className = 'ttt-cell';
-        div.innerText = cell || '';
-        div.onclick = () => makeTTTMove(i);
-        board.appendChild(div);
+      socket.emit('upload_cloud_file', {
+        name: 'Photo_' + Date.now() + '.png',
+        type: 'image/png',
+        url: dataUrl,
+        uploader: currentUsername
       });
+      alert('Photo saved to Cloud Drive!');
     }
 
-    function makeTTTMove(i) {
-      if (!boardState[i]) {
-        boardState[i] = currentPlayer;
-        currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
-        initTTT();
-      }
-    }
-
-    function resetTTT() {
-      boardState = Array(9).fill(null);
-      currentPlayer = 'X';
-      initTTT();
-    }
-    initTTT();
-
-    // Snake Game
-    let snakeCanvas, snakeCtx, snakeInterval;
-    let snake = [{x: 10, y: 10}];
-    let food = {x: 5, y: 5};
-    let dx = 1, dy = 0;
-    let snakeScore = 0;
-
-    function startSnake() {
-      snakeCanvas = document.getElementById('snake-canvas');
-      snakeCtx = snakeCanvas.getContext('2d');
-      snake = [{x: 10, y: 10}];
-      dx = 1; dy = 0;
-      snakeScore = 0;
-      document.getElementById('snake-score').innerText = snakeScore;
-      if (snakeInterval) clearInterval(snakeInterval);
-      snakeInterval = setInterval(updateSnake, 120);
-    }
-
-    function updateSnake() {
-      const head = {x: snake[0].x + dx, y: snake[0].y + dy};
-      
-      // Boundary collision check
-      if (head.x < 0 || head.x >= 24 || head.y < 0 || head.y >= 24) {
-        clearInterval(snakeInterval);
-        alert('Game Over! Your score: ' + snakeScore);
-        return;
-      }
-
-      snake.unshift(head);
-      if (head.x === food.x && head.y === food.y) {
-        snakeScore += 10;
-        document.getElementById('snake-score').innerText = snakeScore;
-        food = {
-          x: Math.floor(Math.random() * 24),
-          y: Math.floor(Math.random() * 24)
+    function toggleCameraRecording() {
+      const btn = document.getElementById('camRecordBtn');
+      if (!isRecordingVid) {
+        videoChunks = [];
+        videoRecorder = new MediaRecorder(cameraStream);
+        videoRecorder.ondataavailable = e => videoChunks.push(e.data);
+        videoRecorder.onstop = () => {
+          const blob = new Blob(videoChunks, { type: 'video/mp4' });
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            socket.emit('upload_cloud_file', {
+              name: 'Video_' + Date.now() + '.mp4',
+              type: 'video/mp4',
+              url: e.target.result,
+              uploader: currentUsername
+            });
+            alert('Video saved to Cloud Drive!');
+          };
+          reader.readAsDataURL(blob);
         };
+        videoRecorder.start();
+        isRecordingVid = true;
+        btn.innerText = "⏹ Stop Recording";
+        btn.style.background = "#ff0000";
       } else {
-        snake.pop();
+        videoRecorder.stop();
+        isRecordingVid = false;
+        btn.innerText = "⏺️ Record Video";
+        btn.style.background = "#cc0000";
       }
-
-      // Render canvas
-      snakeCtx.fillStyle = '#000';
-      snakeCtx.fillRect(0, 0, 240, 240);
-
-      snakeCtx.fillStyle = '#ff5555';
-      snakeCtx.fillRect(food.x * 10, food.y * 10, 8, 8);
-
-      snakeCtx.fillStyle = '#50fa7b';
-      snake.forEach(part => {
-        snakeCtx.fillRect(part.x * 10, part.y * 10, 8, 8);
-      });
     }
-
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowUp' && dy === 0) { dx = 0; dy = -1; }
-      if (e.key === 'ArrowDown' && dy === 0) { dx = 0; dy = 1; }
-      if (e.key === 'ArrowLeft' && dx === 0) { dx = -1; dy = 0; }
-      if (e.key === 'ArrowRight' && dx === 0) { dx = 1; dy = 0; }
-    });
   </script>
 </body>
 </html>
