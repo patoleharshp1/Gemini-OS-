@@ -1,5 +1,6 @@
 const express = require('express');
 const http = require('http');
+const path = require('path');
 const { Server } = require('socket.io');
 
 const app = express();
@@ -8,24 +9,32 @@ const io = new Server(server, {
   cors: { origin: "*" }
 });
 
-app.use(express.static('public'));
+// Serve static files from root directory or 'public'
+app.use(express.static(__dirname));
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Active online users: { socketId: { username: string } }
+// Root route handler to guarantee index.html is served
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'), (err) => {
+    if (err) {
+      res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    }
+  });
+});
+
+// Track online users: { socketId: { username: string } }
 const activeUsers = {};
 
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
-  // Set initial default name
+  // Set default initial username
   activeUsers[socket.id] = { username: `User_${socket.id.substring(0, 4)}` };
 
-  // Send initial state to the newly connected client
-  socket.emit('update-user-list', activeUsers);
-  
-  // Broadcast updated list to everyone
+  // Broadcast updated online users list
   io.emit('update-user-list', activeUsers);
 
-  // Set user name
+  // Handle custom username updates
   socket.on('set-username', (name) => {
     if (name && name.trim()) {
       activeUsers[socket.id].username = name.trim();
@@ -33,7 +42,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // WebRTC Video Call Signaling
+  // WebRTC Signaling Events
   socket.on('call-user', (data) => {
     io.to(data.userToCall).emit('incoming-call', {
       signal: data.signalData,
