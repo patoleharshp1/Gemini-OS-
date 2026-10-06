@@ -57,6 +57,10 @@
     .g-btn-label { font-size: 9px; color: #9aa0a6; margin-top: 3px; text-align: center; }
     .end-call-btn { background: #ea4335; width: 62px; height: 62px; border-radius: 50%; border: none; color: white; font-size: 26px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
     .file-card { display: flex; justify-content: space-between; align-items: center; background: #1e0808; padding: 10px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #331010; }
+
+    /* GAME CANVAS ENGINE */
+    .game-container { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; background: #000; }
+    canvas { border: 2px solid #ff8a8a; border-radius: 8px; background: #111; max-width: 100%; }
   </style>
 </head>
 <body>
@@ -79,11 +83,11 @@
     <div class="app-icon" onclick="openWebLink('https://m.youtube.com')"><img src="https://img.icons8.com/color/96/television.png"/><span>YouTube</span></div>
     <div class="app-icon" onclick="openWebLink('https://gemini.google.com')"><img src="https://img.icons8.com/color/96/sparkling.png"/><span>Gemini</span></div>
 
-    <!-- Embedding-friendly working game links -->
-    <div class="app-icon" onclick="openAppUrl('https://play2048.co/')"><img src="https://img.icons8.com/color/96/puzzle.png"/><span>2048</span></div>
-    <div class="app-icon" onclick="openAppUrl('https://dino-chrome.com/')"><img src="https://img.icons8.com/color/96/dinosaur.png"/><span>Dino Run</span></div>
+    <!-- Embedded Canvas Games (Guaranteed to work without iframe block) -->
+    <div class="app-icon" onclick="openFlappy()"><img src="https://img.icons8.com/color/96/twitter.png"/><span>Flappy Bird</span></div>
+    <div class="app-icon" onclick="openSnake()"><img src="https://img.icons8.com/color/96/controller.png"/><span>Snake Game</span></div>
+    <div class="app-icon" onclick="openModal('dinoModal')"><img src="https://img.icons8.com/color/96/dinosaur.png"/><span>Dino Run</span></div>
     <div class="app-icon" onclick="openAppUrl('https://playtictactoe.org/')"><img src="https://img.icons8.com/color/96/grid.png"/><span>TicTacToe</span></div>
-    <div class="app-icon" onclick="openAppUrl('https://snake.googlemaps.com/')"><img src="https://img.icons8.com/color/96/controller.png"/><span>Snake Game</span></div>
   </div>
 
   <!-- Users & Friends Modal -->
@@ -208,7 +212,6 @@
       <button class="close-btn" onclick="closeCamera()">X</button>
     </div>
     <div class="modal-body" style="text-align: center;">
-      <!-- muted attribute prevents feedback screech -->
       <video id="webcam" autoplay muted playsinline style="width:100%; max-height:280px; border-radius:12px; background:#000;"></video>
       <canvas id="photoCanvas" style="display:none;"></canvas>
       <div style="display:flex; gap:10px; justify-content:center; margin-top:15px;">
@@ -216,6 +219,44 @@
         <button class="btn" id="camRecordBtn" style="background:#cc0000;" onclick="toggleCameraRecording()">⏺️ Record Video</button>
         <button class="btn btn-icon" onclick="switchCameraFacing()">🔄 Flip Cam</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Flappy Bird Modal -->
+  <div id="flappyModal" class="modal">
+    <div class="modal-header">
+      <h3>Flappy Bird</h3>
+      <button class="close-btn" onclick="closeModal('flappyModal')">X</button>
+    </div>
+    <div class="modal-body game-container">
+      <canvas id="flappyCanvas" width="320" height="420" onclick="flappyJump()"></canvas>
+      <p style="font-size:12px; color:#aaa; margin-top:8px;">Tap screen / press Space to Jump</p>
+    </div>
+  </div>
+
+  <!-- Snake Game Modal -->
+  <div id="snakeModal" class="modal">
+    <div class="modal-header">
+      <h3>Snake Game</h3>
+      <button class="close-btn" onclick="closeModal('snakeModal')">X</button>
+    </div>
+    <div class="modal-body game-container">
+      <canvas id="snakeCanvas" width="320" height="320"></canvas>
+      <div style="display:grid; grid-template-columns: repeat(3, 50px); gap:6px; margin-top:10px;">
+        <div></div><button class="btn" onclick="changeSnakeDir('UP')">⬆️</button><div></div>
+        <button class="btn" onclick="changeSnakeDir('LEFT')">⬅️</button><button class="btn" onclick="changeSnakeDir('DOWN')">⬇️</button><button class="btn" onclick="changeSnakeDir('RIGHT')">➡️</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dino Run Modal -->
+  <div id="dinoModal" class="modal">
+    <div class="modal-header">
+      <h3>Dino Runner</h3>
+      <button class="close-btn" onclick="closeModal('dinoModal')">X</button>
+    </div>
+    <div class="modal-body" style="padding:0;">
+      <iframe src="https://chromedino.com/" style="width:100%; height:100%; border:none;"></iframe>
     </div>
   </div>
 
@@ -636,7 +677,7 @@
         cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: cameraFacingMode }, audio: true });
         const webcam = document.getElementById('webcam');
         webcam.srcObject = cameraStream;
-        webcam.muted = true; // Prevents live audio feedback screeching
+        webcam.muted = true;
       } catch(err) { alert("Camera access required."); }
     }
     function switchCameraFacing() {
@@ -689,6 +730,103 @@
         isRecordingVid = false;
         btn.innerText = "⏺️ Record Video";
       }
+    }
+
+    // NATIVE CANVAS FLAPPY BIRD GAME ENGINE
+    let flappyInterval;
+    function openFlappy() {
+      openModal('flappyModal');
+      const cvs = document.getElementById("flappyCanvas");
+      const ctx = cvs.getContext("2d");
+      let birdY = 150, velocity = 0, score = 0;
+      let pipes = [{ x: 320, top: 120, bottom: 240 }];
+
+      window.flappyJump = function() { velocity = -6; };
+      document.onkeydown = (e) => { if (e.code === 'Space') window.flappyJump(); };
+
+      clearInterval(flappyInterval);
+      flappyInterval = setInterval(() => {
+        velocity += 0.4;
+        birdY += velocity;
+        ctx.fillStyle = "#111";
+        ctx.fillRect(0, 0, 320, 420);
+
+        // Draw Bird
+        ctx.fillStyle = "#ffcb05";
+        ctx.beginPath();
+        ctx.arc(60, birdY, 12, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Draw Pipes
+        ctx.fillStyle = "#2ecc71";
+        pipes.forEach(p => {
+          p.x -= 2;
+          ctx.fillRect(p.x, 0, 40, p.top);
+          ctx.fillRect(p.x, p.bottom, 40, 420 - p.bottom);
+
+          if (p.x === 60) score++;
+          if (p.x < -40) {
+            p.x = 320;
+            p.top = Math.random() * 180 + 40;
+            p.bottom = p.top + 100;
+          }
+
+          // Collision
+          if ((60 + 12 > p.x && 60 - 12 < p.x + 40) && (birdY - 12 < p.top || birdY + 12 > p.bottom)) {
+            birdY = 150; velocity = 0; score = 0; p.x = 320;
+          }
+        });
+
+        if (birdY > 420 || birdY < 0) { birdY = 150; velocity = 0; score = 0; }
+
+        ctx.fillStyle = "#fff";
+        ctx.font = "18px sans-serif";
+        ctx.fillText("Score: " + score, 10, 25);
+      }, 1000 / 60);
+    }
+
+    // NATIVE CANVAS SNAKE GAME ENGINE
+    let snakeInterval;
+    function openSnake() {
+      openModal('snakeModal');
+      const cvs = document.getElementById("snakeCanvas");
+      const ctx = cvs.getContext("2d");
+      let snake = [{x: 160, y: 160}], food = {x: 80, y: 80}, dir = "RIGHT";
+
+      window.changeSnakeDir = (d) => { dir = d; };
+      document.onkeydown = (e) => {
+        if(e.key === "ArrowUp" && dir !== "DOWN") dir = "UP";
+        if(e.key === "ArrowDown" && dir !== "UP") dir = "DOWN";
+        if(e.key === "ArrowLeft" && dir !== "RIGHT") dir = "LEFT";
+        if(e.key === "ArrowRight" && dir !== "LEFT") dir = "RIGHT";
+      };
+
+      clearInterval(snakeInterval);
+      snakeInterval = setInterval(() => {
+        let head = {x: snake[0].x, y: snake[0].y};
+        if (dir === "UP") head.y -= 16;
+        if (dir === "DOWN") head.y += 16;
+        if (dir === "LEFT") head.x -= 16;
+        if (dir === "RIGHT") head.x += 16;
+
+        if (head.x === food.x && head.y === food.y) {
+          food = {x: Math.floor(Math.random()*20)*16, y: Math.floor(Math.random()*20)*16};
+        } else {
+          snake.pop();
+        }
+
+        if (head.x < 0 || head.x >= 320 || head.y < 0 || head.y >= 320 || snake.some(s=>s.x===head.x && s.y===head.y)) {
+          head = {x: 160, y: 160}; snake = [head]; dir = "RIGHT";
+        }
+        snake.unshift(head);
+
+        ctx.fillStyle = "#111";
+        ctx.fillRect(0, 0, 320, 320);
+        ctx.fillStyle = "#ff5555";
+        ctx.fillRect(food.x, food.y, 14, 14);
+        ctx.fillStyle = "#55ff55";
+        snake.forEach(s => ctx.fillRect(s.x, s.y, 14, 14));
+      }, 120);
     }
   </script>
 </body>
