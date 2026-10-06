@@ -1,16 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Gemini OS</title>
 <style>
 *{box-sizing:border-box}
 body{font-family:'Roboto','Segoe UI',sans-serif;background:#0c0202;color:#fff;margin:0;padding:12px}
-.status-bar{background:rgba(35,10,10,.9);border:1px solid #3d1515;padding:10px 14px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;font-weight:bold;color:#e5b3b3;font-size:13px}
+.status-bar{background:#230a0a;border:1px solid #3d1515;padding:10px 14px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-weight:bold;color:#e5b3b3;font-size:13px}
 .badge{background:#1b4d24;color:#4caf50;padding:2px 8px;border-radius:10px;font-size:11px;margin-left:6px}
+#offlineBar{display:none;background:#8a1c1c;text-align:center;padding:6px;border-radius:8px;margin-bottom:10px;font-size:12px}
 .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
-.app-icon{background:rgba(30,8,8,.9);border:1px solid #421818;border-radius:16px;padding:10px 4px;text-align:center;cursor:pointer}
+.app-icon{background:#1e0808;border:1px solid #421818;border-radius:16px;padding:10px 4px;text-align:center;cursor:pointer}
 .app-icon:active{transform:scale(.92)}
 .app-icon img{width:38px;height:38px;object-fit:contain;margin-bottom:4px}
 .app-icon span{display:block;font-size:11px;color:#e5b3b3}
@@ -18,7 +19,7 @@ body{font-family:'Roboto','Segoe UI',sans-serif;background:#0c0202;color:#fff;ma
 .modal-header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#1f0606;border-bottom:1px solid #3d1515}
 .modal-header h3{margin:0;color:#ff8a8a;font-size:16px}
 .close-btn{background:#e05656;border:none;color:#fff;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:bold}
-.modal-body{flex:1;position:relative;overflow-y:auto;padding:12px}
+.modal-body{flex:1;overflow-y:auto;padding:12px}
 .btn{padding:10px 14px;border:none;background:#e05656;color:#fff;border-radius:8px;font-size:13px;font-weight:bold;cursor:pointer}
 .btn.sm{padding:5px 9px;font-size:11px}
 .btn-icon{background:#2b0b0b;border:1px solid #441515;color:#ff8a8a}
@@ -34,10 +35,9 @@ body{font-family:'Roboto','Segoe UI',sans-serif;background:#0c0202;color:#fff;ma
 .delete-btn{background:none;border:none;color:#ff8a8a;cursor:pointer;margin-left:6px}
 .msg-img{max-width:180px;border-radius:8px;display:block;margin-top:4px}
 #typingNotice{font-size:11px;color:#aaa;font-style:italic;height:16px;margin-bottom:6px}
-.chat-top{display:flex;gap:6px}
+.chat-top,.chat-controls{display:flex;gap:6px}
 select,input[type=text]{padding:10px;border-radius:8px;border:1px solid #441515;background:#1f0808;color:#fff}
-.chat-controls{display:flex;gap:6px}.chat-controls input{flex:1}
-.chat-top select{flex:1}
+.chat-top select,.chat-controls input{flex:1}
 .user-card,.file-card{display:flex;justify-content:space-between;align-items:center;gap:6px;background:#1a0808;border:1px solid #3d1515;padding:10px;border-radius:8px;margin-bottom:8px;flex-wrap:wrap}
 .user-actions{display:flex;gap:5px;flex-wrap:wrap}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
@@ -59,6 +59,7 @@ h4{color:#ff8a8a;margin:14px 0 8px}
 </head>
 <body>
 <div id="toast"></div>
+<div id="offlineBar">📴 Offline — text messages will send when you reconnect</div>
 
 <div class="status-bar">
   <span style="cursor:pointer" onclick="openModal('usersModal')">👥 Online: <span id="onlineCount" class="badge">0</span> · 👁 Visits: <span id="visitCount" class="badge">0</span></span>
@@ -72,12 +73,8 @@ h4{color:#ff8a8a;margin:14px 0 8px}
   <div class="app-icon" onclick="openModal('usersModal')"><img src="https://img.icons8.com/color/96/conference-call.png"/><span>Friends <b id="reqBadge" style="color:#ffb300"></b></span></div>
   <div class="app-icon" onclick="openModal('storageApp')"><img src="https://img.icons8.com/color/96/folder-invoiced.png"/><span>Drive Storage</span></div>
   <div class="app-icon" onclick="openModal('localMusicApp')"><img src="https://img.icons8.com/color/96/audio-wave.png"/><span>Local MP3</span></div>
-  <div class="app-icon" onclick="window.open('https://m.youtube.com','_blank')"><img src="https://img.icons8.com/color/96/television.png"/><span>YouTube</span></div>
-  <div class="app-icon" onclick="window.open('https://gemini.google.com','_blank')"><img src="https://img.icons8.com/color/96/sparkling.png"/><span>Gemini</span></div>
   <div class="app-icon" onclick="openAppUrl('https://play2048.co/')"><img src="https://img.icons8.com/color/96/puzzle.png"/><span>2048</span></div>
   <div class="app-icon" onclick="openAppUrl('https://dino-chrome.com/')"><img src="https://img.icons8.com/color/96/dinosaur.png"/><span>Dino Run</span></div>
-  <div class="app-icon" onclick="openAppUrl('https://playtictactoe.org/')"><img src="https://img.icons8.com/color/96/grid.png"/><span>TicTacToe</span></div>
-  <div class="app-icon" onclick="openAppUrl('https://snake.googlemaps.com/')"><img src="https://img.icons8.com/color/96/controller.png"/><span>Snake</span></div>
 </div>
 
 <!-- Users / Friends -->
@@ -89,13 +86,11 @@ h4{color:#ff8a8a;margin:14px 0 8px}
       <div class="stat"><b id="stVisits">0</b><small>Total visits</small></div>
       <div class="stat"><b id="stUnique">0</b><small>Unique visitors</small></div>
     </div>
-
     <h4>➕ Add friend by username</h4>
     <div style="display:flex;gap:6px">
       <input type="text" id="addFriendName" placeholder="Type username..." style="flex:1" onkeydown="if(event.key==='Enter')addByName()"/>
       <button class="btn" onclick="addByName()">Add</button>
     </div>
-
     <h4>Friend requests</h4><div id="requestList"></div>
     <h4>My friends</h4><div id="friendList"></div>
     <h4>Online users</h4><div id="activeUsersList"></div>
@@ -159,7 +154,6 @@ h4{color:#ff8a8a;margin:14px 0 8px}
         <video id="remoteVideo" autoplay playsinline muted></video>
         <video id="localVideo" autoplay muted playsinline></video>
       </div>
-      <!-- Dedicated audio element: this is what makes call sound work -->
       <audio id="remoteAudio" autoplay playsinline></audio>
       <div style="width:100%;display:flex;flex-direction:column;align-items:center">
         <div class="google-controls">
@@ -180,7 +174,7 @@ h4{color:#ff8a8a;margin:14px 0 8px}
   <div class="modal-header"><h3>Cloud Drive</h3><button class="close-btn" onclick="closeModal('storageApp')">X</button></div>
   <div class="modal-body">
     <input type="file" id="driveFileInput" multiple onchange="uploadToDrive(this)" style="display:none"/>
-    <button class="btn" onclick="$('driveFileInput').click()" style="width:100%;margin-bottom:15px">☁️ Upload File</button>
+    <button class="btn" onclick="$('driveFileInput').click()" style="width:100%;margin-bottom:15px">☁️ Upload File (max 10 MB)</button>
     <div id="cloudDriveList"></div>
   </div>
 </div>
@@ -209,17 +203,23 @@ h4{color:#ff8a8a;margin:14px 0 8px}
   </div>
 </div>
 
+<!-- Hosted on Render: keep this line. For a bundled APK/ZIP, use: <script src="socket.io.min.js"></script> -->
 <script src="/socket.io/socket.io.js"></script>
 <script>
-const socket = io();
+// For a bundled APK/ZIP app, set your Render address here, e.g. 'https://your-name.onrender.com'. Leave '' when served by Render.
+const SERVER_URL = '';
+const socket = io(SERVER_URL || undefined, { reconnection: true, reconnectionDelay: 2000, reconnectionDelayMax: 10000 });
+
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const enc = s => encodeURIComponent(s);
 const nowTime = () => new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+const MAX_FILE = 10 * 1024 * 1024;
 function toast(t){ const e=$('toast'); e.innerText=t; e.style.display='block'; clearTimeout(e._t); e._t=setTimeout(()=>e.style.display='none',3500); }
 function openModal(id){ $(id).style.display='flex'; }
 function closeModal(id){ $(id).style.display='none'; }
 function openAppUrl(u){ $('appFrame').src=u; openModal('webModal'); }
+function tooBig(f){ if(f.size>MAX_FILE){ toast('File too big (max 10 MB)'); return true; } return false; }
 
 // ---------- Identity ----------
 let clientId = localStorage.getItem('client_id');
@@ -230,36 +230,40 @@ let retried = false;
 function showName(){ $('display-username').innerText='User: '+me; $('myCallUser').innerText=me; }
 function register(){ showName(); socket.emit('register_user', {name: me, clientId}); }
 function changeUsername(){ const n=prompt('Enter new name:', me); if(n&&n.trim()){ me=n.trim(); localStorage.setItem('custom_username', me); register(); } }
-socket.on('connect', register);
 socket.on('name_taken', n => {
-  // After a page refresh the old connection may still be closing, so retry once before asking
   if(!retried){ retried=true; setTimeout(register, 2000); return; }
   retried=false;
   const x = prompt('"'+n+'" is already in use. Choose another name:', n+Math.floor(Math.random()*99));
   me = (x && x.trim()) ? x.trim() : 'User'+Math.floor(Math.random()*1000);
-  localStorage.setItem('custom_username', me);
-  register();
+  localStorage.setItem('custom_username', me); register();
 });
+
+// ---------- Connection / offline ----------
+function setOnlineUI(on){ $('offlineBar').style.display = on ? 'none' : 'block'; }
+socket.on('connect', () => { setOnlineUI(true); register(); });
+socket.on('disconnect', () => setOnlineUI(false));
+socket.on('connect_error', () => setOnlineUI(false));
+window.addEventListener('online', () => socket.connect());
+window.addEventListener('offline', () => setOnlineUI(false));
+let outbox = []; try{ outbox = JSON.parse(localStorage.getItem('outbox')||'[]'); }catch(e){}
+const saveOutbox = () => localStorage.setItem('outbox', JSON.stringify(outbox));
+function flushOutbox(){ while(outbox.length && socket.connected){ socket.emit('send_message', outbox.shift()); } saveOutbox(); }
 
 // ---------- State ----------
 let onlineUsers = [], friends = [], requests = [];
 let globalMsgs = [], dms = {}, unread = {}, cur = 'global';
+function cacheChats(){ try{ localStorage.setItem('chat_cache', JSON.stringify({g:globalMsgs.slice(-100), d:dms, f:friends})); }catch(e){} }
 
 socket.on('stats', s => {
   $('onlineCount').innerText=s.online; $('visitCount').innerText=s.totalVisits;
   $('stOnline').innerText=s.online; $('stVisits').innerText=s.totalVisits; $('stUnique').innerText=s.uniqueVisitors;
 });
 socket.on('user_list', u => { onlineUsers=u; renderUsers(); buildChatSelect(); });
-socket.on('social', s => { friends=s.friends; requests=s.requests; renderUsers(); buildChatSelect(); });
+socket.on('social', s => { friends=s.friends; requests=s.requests; renderUsers(); buildChatSelect(); cacheChats(); });
 socket.on('toast', toast);
 
-// ---------- Users / Friends UI ----------
-function addByName(){
-  const n=$('addFriendName').value.trim();
-  if(!n) return;
-  socket.emit('friend_request', n);
-  $('addFriendName').value='';
-}
+// ---------- Users / Friends ----------
+function addByName(){ const n=$('addFriendName').value.trim(); if(!n) return; socket.emit('friend_request', n); $('addFriendName').value=''; }
 function userRow(u, extra){
   const on = onlineUsers.includes(u);
   return '<div class="user-card"><span>'+(on?'🟢':'⚪')+' '+esc(u)+(u===me?' (You)':'')+'</span><div class="user-actions">'+extra+'</div></div>';
@@ -284,13 +288,14 @@ function act(type, e){
   if(type==='unfriend' && confirm('Remove '+u+' from friends?')) socket.emit('friend_remove', u);
 }
 
-// ---------- Messaging (global + private) ----------
+// ---------- Messaging ----------
 const chatBox = $('chat-box');
 socket.on('init', d => {
   retried = false;
   globalMsgs=d.global; dms=d.dms; unread={};
-  buildChatSelect(); renderChat();
+  buildChatSelect(); renderChat(); cacheChats();
   $('cloudDriveList').innerHTML=''; d.files.forEach(renderCloudFile);
+  flushOutbox();
 });
 function buildChatSelect(){
   const names = [...new Set([...friends, ...Object.keys(dms), cur].filter(n => n && n!=='global' && n!==me))];
@@ -322,21 +327,28 @@ socket.on('receive_message', d => {
   if(bucket==='global') globalMsgs.push(d); else (dms[bucket]=dms[bucket]||[]).push(d);
   if(bucket===cur) renderMsg(d);
   else if(d.user!==me){ unread[bucket]=(unread[bucket]||0)+1; toast('💬 '+(d.to?'':'[Global] ')+d.user+': '+(d.text||'media')); }
-  buildChatSelect();
+  buildChatSelect(); cacheChats();
 });
 socket.on('message_deleted', ({id}) => {
   globalMsgs = globalMsgs.filter(m=>m.id!==id);
   Object.keys(dms).forEach(k => dms[k]=dms[k].filter(m=>m.id!==id));
   const el=$('msg-'+id); if(el) el.remove();
+  cacheChats();
 });
-function delMsg(id){ socket.emit('delete_message', {id, chat: cur}); }
-function emit(data){ data.timestamp=nowTime(); if(cur!=='global') data.to=cur; socket.emit('send_message', data); }
+function delMsg(id){ if(!socket.connected) return toast('📴 Offline'); socket.emit('delete_message', {id, chat: cur}); }
+function emit(data){
+  data.timestamp = nowTime();
+  if(cur!=='global') data.to = cur;
+  if(socket.connected) return socket.emit('send_message', data);
+  if(data.image || data.audio) return toast('📴 Offline: photos and voice notes need internet');
+  outbox.push(data); saveOutbox(); toast('📴 Saved — will send when you are online');
+}
 function sendMessage(){
   const i=$('messageInput'); if(!i.value.trim()) return;
   emit({text:i.value.trim()}); i.value='';
   socket.emit('typing_status',{to:cur==='global'?null:cur,isTyping:false});
 }
-function sendImage(inp){ const f=inp.files[0]; if(!f) return; const r=new FileReader(); r.onload=e=>emit({image:e.target.result}); r.readAsDataURL(f); inp.value=''; }
+function sendImage(inp){ const f=inp.files[0]; inp.value=''; if(!f||tooBig(f)) return; const r=new FileReader(); r.onload=e=>emit({image:e.target.result}); r.readAsDataURL(f); }
 let typingTimeout;
 function emitTyping(){
   const to = cur==='global'?null:cur;
@@ -360,7 +372,7 @@ async function toggleRecord(){
       const s=await navigator.mediaDevices.getUserMedia({audio:true});
       audioRecorder=new MediaRecorder(s); chatChunks=[];
       audioRecorder.ondataavailable=e=>chatChunks.push(e.data);
-      audioRecorder.onstop=()=>{ s.getTracks().forEach(t=>t.stop()); const r=new FileReader(); r.onload=e=>emit({audio:e.target.result}); r.readAsDataURL(new Blob(chatChunks,{type:'audio/webm'})); };
+      audioRecorder.onstop=()=>{ s.getTracks().forEach(t=>t.stop()); const b=new Blob(chatChunks,{type:'audio/webm'}); if(b.size>MAX_FILE) return toast('Voice note too big'); const r=new FileReader(); r.onload=e=>emit({audio:e.target.result}); r.readAsDataURL(b); };
       audioRecorder.start(); recording=true; btn.style.background='#f00';
     }catch(e){ alert('Microphone permission required'); }
   } else { audioRecorder.stop(); recording=false; btn.style.background='#2b0b0b'; }
@@ -375,11 +387,12 @@ function renderCloudFile(f){
   if(f.type.startsWith('audio/')) m='<audio controls src="'+f.url+'" style="height:35px;width:100%"></audio>';
   else if(f.type.startsWith('image/')) m='<br><img src="'+f.url+'" style="max-width:120px;border-radius:6px"/>';
   else if(f.type.startsWith('video/')) m='<br><video controls src="'+f.url+'" style="max-width:180px;border-radius:6px"></video>';
-  d.innerHTML='<div><strong>'+esc(f.name)+'</strong> (by '+esc(f.uploader)+')'+m+'</div><div><a href="'+f.url+'" download="'+esc(f.name)+'" style="color:#8ab4f8;margin-right:8px;text-decoration:none">⬇️</a><button onclick="socket.emit(\'delete_cloud_file\',\''+f.id+'\')" style="background:none;border:none;color:#ff8a8a;cursor:pointer">🗑</button></div>';
+  d.innerHTML='<div><strong>'+esc(f.name)+'</strong> (by '+esc(f.uploader)+')'+m+'</div><div><a href="'+f.url+'" download="'+esc(f.name)+'" style="color:#8ab4f8;margin-right:8px;text-decoration:none">⬇️</a>'+(f.uploader===me?'<button onclick="socket.emit(\'delete_cloud_file\',\''+f.id+'\')" style="background:none;border:none;color:#ff8a8a;cursor:pointer">🗑</button>':'')+'</div>';
   $('cloudDriveList').appendChild(d);
 }
 function uploadToDrive(inp){
-  Array.from(inp.files).forEach(f=>{ const r=new FileReader(); r.onload=e=>socket.emit('upload_cloud_file',{name:f.name,type:f.type||'application/octet-stream',url:e.target.result}); r.readAsDataURL(f); });
+  if(!socket.connected){ inp.value=''; return toast('📴 Offline: uploads need internet'); }
+  Array.from(inp.files).forEach(f=>{ if(tooBig(f)) return; const r=new FileReader(); r.onload=e=>socket.emit('upload_cloud_file',{name:f.name,type:f.type||'application/octet-stream',url:e.target.result}); r.readAsDataURL(f); });
   inp.value='';
 }
 function loadLocalSongs(inp){
@@ -387,15 +400,14 @@ function loadLocalSongs(inp){
   Array.from(inp.files).forEach(f=>{ const d=document.createElement('div'); d.className='file-card'; d.innerHTML='<span>'+esc(f.name)+'</span><audio controls src="'+URL.createObjectURL(f)+'"></audio>'; l.appendChild(d); });
 }
 
-// ---------- WebRTC calls ----------
+// ---------- Calls (WebRTC) ----------
 let pc=null, localStream=null, incomingSignal=null, incomingVideo=false, peer=null, timer=null, secs=0;
 let muted=false, vol=1, facing='user', pending=[];
 const rtcConfig={iceServers:[
-  {urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},
-  // Public TURN relay (needed on mobile data / strict NAT). Replace with your own for production.
+  {urls:'stun:stun.cloudflare.com:3478'},
+  // Public TURN relay (helps on mobile data). For reliable calls, replace with your own TURN service.
   {urls:['turn:openrelay.metered.ca:80','turn:openrelay.metered.ca:443','turn:openrelay.metered.ca:443?transport=tcp'],username:'openrelayproject',credential:'openrelayproject'}
 ]};
-
 function playRemote(){
   const a=$('remoteAudio'), v=$('remoteVideo');
   v.play().catch(()=>{});
@@ -409,16 +421,13 @@ function makePC(){
   const remote=new MediaStream();
   $('remoteAudio').srcObject=remote; $('remoteVideo').srcObject=remote;
   pc.ontrack=e=>{
-    remote.addTrack(e.track);
-    playRemote();
+    remote.addTrack(e.track); playRemote();
     if(e.track.kind==='video'){ $('videoArea').style.display='block'; $('avatarCircle').style.display='none'; }
   };
   pc.onicecandidate=e=>{ if(e.candidate&&peer) socket.emit('send_candidate',{to:peer,candidate:e.candidate}); };
   pc.onconnectionstatechange=()=>{ if(pc&&pc.connectionState==='failed'){ toast('Call connection failed'); endCall(); } };
 }
-async function flushCandidates(){
-  while(pending.length){ try{ await pc.addIceCandidate(new RTCIceCandidate(pending.shift())); }catch(e){} }
-}
+async function flushCandidates(){ while(pending.length){ try{ await pc.addIceCandidate(new RTCIceCandidate(pending.shift())); }catch(e){} } }
 function getMedia(video){
   return navigator.mediaDevices.getUserMedia({
     audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},
@@ -434,6 +443,7 @@ async function startCall(video){
   peer=$('targetUser').value.trim();
   if(!peer) return alert('Enter the user to call!');
   if(peer===me) return alert("You can't call yourself");
+  if(!socket.connected){ peer=null; return toast('📴 Offline: calls need internet'); }
   callUI(peer,video);
   try{
     localStream=await getMedia(video);
@@ -445,7 +455,7 @@ async function startCall(video){
   }catch(err){ alert('Media access failed: '+err.message+'\n(Calls need HTTPS or localhost)'); endCall(); }
 }
 socket.on('incoming_call', d=>{
-  if(pc || incomingSignal){ socket.emit('end_call',{to:d.from}); return; } // busy
+  if(pc || incomingSignal){ socket.emit('end_call',{to:d.from}); return; }
   incomingSignal=d.signalData; peer=d.from; incomingVideo=d.isVideo;
   $('callerNameText').innerText=(d.isVideo?'📹 Video':'📞 Audio')+' call from '+d.from;
   $('incomingContainer').style.display='block'; openModal('phoneApp');
@@ -472,7 +482,7 @@ function declineCall(){
 socket.on('call_accepted', async d=>{
   if(!pc) return;
   await pc.setRemoteDescription(new RTCSessionDescription(d.signal));
-  await flushCandidates(); // caller must apply candidates that arrived before the answer
+  await flushCandidates();
   startTimer();
 });
 socket.on('receive_candidate', async d=>{
@@ -483,16 +493,9 @@ function startTimer(){
   secs=0; clearInterval(timer);
   timer=setInterval(()=>{ secs++; $('callDuration').innerText=String(Math.floor(secs/60)).padStart(2,'0')+':'+String(secs%60).padStart(2,'0'); },1000);
 }
-function toggleMute(){
-  const t=localStream&&localStream.getAudioTracks()[0]; if(!t) return;
-  muted=!muted; t.enabled=!muted; $('muteBtn').classList.toggle('active',muted);
-}
+function toggleMute(){ const t=localStream&&localStream.getAudioTracks()[0]; if(!t) return; muted=!muted; t.enabled=!muted; $('muteBtn').classList.toggle('active',muted); }
 function toggleSpeaker(){ vol=vol===1?0.4:1; $('remoteAudio').volume=vol; $('speakerBtn').classList.toggle('active',vol<1); }
-function toggleVideoMode(){
-  const t=localStream&&localStream.getVideoTracks()[0];
-  if(!t) return toast('This is an audio call');
-  t.enabled=!t.enabled; $('videoToggleBtn').classList.toggle('active',!t.enabled);
-}
+function toggleVideoMode(){ const t=localStream&&localStream.getVideoTracks()[0]; if(!t) return toast('This is an audio call'); t.enabled=!t.enabled; $('videoToggleBtn').classList.toggle('active',!t.enabled); }
 async function shareScreen(){
   if(!pc) return;
   try{
@@ -508,8 +511,7 @@ async function switchCallCamera(){
   facing=facing==='user'?'environment':'user'; old.stop();
   try{
     const ns=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing}}); const nt=ns.getVideoTracks()[0];
-    localStream.removeTrack(old); localStream.addTrack(nt);
-    $('localVideo').srcObject=localStream;
+    localStream.removeTrack(old); localStream.addTrack(nt); $('localVideo').srcObject=localStream;
     const sender=pc.getSenders().find(x=>x.track&&x.track.kind==='video'); if(sender) sender.replaceTrack(nt);
   }catch(e){ toast('Camera flip failed'); }
 }
@@ -528,7 +530,7 @@ function endCall(remote){
   closeModal('phoneApp');
 }
 
-// ---------- Camera app ----------
+// ---------- Camera ----------
 let camStream, camFacing='user', vRec, vChunks=[], recVid=false;
 function openCamera(){ openModal('cameraApp'); startCam(); }
 async function startCam(){
@@ -539,18 +541,27 @@ async function startCam(){
 function switchCameraFacing(){ camFacing=camFacing==='user'?'environment':'user'; startCam(); }
 function closeCamera(){ if(camStream) camStream.getTracks().forEach(t=>t.stop()); closeModal('cameraApp'); }
 function takePhoto(){
+  if(!socket.connected) return toast('📴 Offline: photo not saved');
   const v=$('webcam'), c=$('photoCanvas'); c.width=v.videoWidth; c.height=v.videoHeight; c.getContext('2d').drawImage(v,0,0);
-  socket.emit('upload_cloud_file',{name:'Photo_'+Date.now()+'.png',type:'image/png',url:c.toDataURL('image/png')}); toast('Photo saved to Drive');
+  socket.emit('upload_cloud_file',{name:'Photo_'+Date.now()+'.jpg',type:'image/jpeg',url:c.toDataURL('image/jpeg',0.8)}); toast('Photo saved to Drive');
 }
 function toggleCameraRecording(){
   const b=$('camRecordBtn');
   if(!recVid){
     vChunks=[]; vRec=new MediaRecorder(camStream);
     vRec.ondataavailable=e=>vChunks.push(e.data);
-    vRec.onstop=()=>{ const r=new FileReader(); r.onload=e=>{ socket.emit('upload_cloud_file',{name:'Video_'+Date.now()+'.webm',type:'video/webm',url:e.target.result}); toast('Video saved to Drive'); }; r.readAsDataURL(new Blob(vChunks,{type:'video/webm'})); };
+    vRec.onstop=()=>{ const blob=new Blob(vChunks,{type:'video/webm'}); if(blob.size>MAX_FILE) return toast('Video too big (max 10 MB). Record a shorter clip.'); if(!socket.connected) return toast('📴 Offline: video not saved'); const r=new FileReader(); r.onload=e=>{ socket.emit('upload_cloud_file',{name:'Video_'+Date.now()+'.webm',type:'video/webm',url:e.target.result}); toast('Video saved to Drive'); }; r.readAsDataURL(blob); };
     vRec.start(); recVid=true; b.innerText='⏹ Stop';
   } else { vRec.stop(); recVid=false; b.innerText='⏺️ Record'; }
 }
+
+// ---------- Show cached chats instantly (works offline) ----------
+showName();
+try{
+  const c = JSON.parse(localStorage.getItem('chat_cache') || 'null');
+  if(c){ globalMsgs=c.g||[]; dms=c.d||{}; friends=c.f||[]; buildChatSelect(); renderChat(); renderUsers(); }
+}catch(e){}
+if(!navigator.onLine) setOnlineUI(false);
 </script>
 </body>
 </html>
