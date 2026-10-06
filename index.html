@@ -3,451 +3,493 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Arcade Suite</title>
+<title>Gemini OS Launcher</title>
+<!-- Socket.io Client Library -->
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-  body { background: #0f172a; color: #f8fafc; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px; }
-  h1 { margin-bottom: 20px; color: #38bdf8; text-shadow: 0 0 10px rgba(56,189,248,0.3); }
+  :root {
+    --bg-color: #0f172a;
+    --card-bg: #1e293b;
+    --accent: #38bdf8;
+    --text-color: #f8fafc;
+    --border-color: #334155;
+  }
   
-  .game-container { display: flex; flex-wrap: wrap; gap: 30px; justify-content: center; max-width: 1200px; width: 100%; }
-  .card { background: #1e293b; border-radius: 12px; padding: 20px; border: 1px solid #334155; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.5); display: flex; flex-direction: column; align-items: center; min-width: 320px; }
-  .card h2 { margin-bottom: 15px; color: #e2e8f0; font-size: 1.25rem; }
+  /* Theme Presets */
+  body.theme-neon {
+    --bg-color: #09090b;
+    --card-bg: #18181b;
+    --accent: #a855f7;
+    --text-color: #f4f4f5;
+    --border-color: #27272a;
+  }
+  body.theme-cyberpunk {
+    --bg-color: #120024;
+    --card-bg: #2a004f;
+    --accent: #facc15;
+    --text-color: #00f0ff;
+    --border-color: #ff0055;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+  body { background: var(--bg-color); color: var(--text-color); min-height: 100vh; display: flex; flex-direction: column; transition: all 0.3s ease; }
+
+  /* OS Top Navigation Bar */
+  header {
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--border-color);
+    padding: 12px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .logo { font-size: 1.2rem; font-weight: bold; color: var(--accent); }
+  .nav-tabs { display: flex; gap: 8px; }
+  .tab-btn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: 0.2s;
+  }
+  .tab-btn.active, .tab-btn:hover { background: var(--accent); color: #000; border-color: var(--accent); }
+
+  /* App Views */
+  main { flex: 1; padding: 20px; max-width: 1100px; margin: 0 auto; width: 100%; }
+  .app-view { display: none; }
+  .app-view.active { display: block; }
+
+  /* Common UI Elements */
+  .panel { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+  button { background: var(--accent); color: #000; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+  input, select { background: var(--bg-color); color: var(--text-color); border: 1px solid var(--border-color); padding: 8px 12px; border-radius: 6px; }
+
+  /* MESSAGING & WEBRTC APP */
+  .chat-box { height: 260px; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; overflow-y: auto; margin-bottom: 10px; background: var(--bg-color); display: flex; flex-direction: column; gap: 8px; }
+  .msg { padding: 8px 12px; border-radius: 8px; background: var(--card-bg); width: fit-content; max-width: 80%; font-size: 0.95rem; border: 1px solid var(--border-color); }
+  .msg.user { background: var(--accent); color: #000; margin-left: auto; border: none; font-weight: 500; }
+  .msg.system { background: transparent; border: none; color: #94a3b8; font-size: 0.85rem; align-self: center; }
+  .msg-author { font-size: 0.75rem; font-weight: bold; margin-bottom: 2px; color: #94a3b8; }
+  .status-badge { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #ef4444; margin-right: 6px; }
+  .status-badge.online { background: #10b981; }
   
-  .controls-bar { display: flex; gap: 10px; width: 100%; margin-bottom: 15px; justify-content: space-between; align-items: center; }
-  button { background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: background 0.2s; }
-  button:hover { background: #2563eb; }
-  select { background: #334155; color: white; border: 1px solid #475569; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
-  
-  .score-board { font-size: 0.9rem; color: #94a3b8; display: flex; gap: 15px; width: 100%; justify-content: center; margin-bottom: 10px; }
-  .score-board span { color: #38bdf8; font-weight: bold; }
-  
-  /* Tic Tac Toe Grid */
-  .ttt-board { display: grid; grid-template-columns: repeat(3, 90px); grid-template-rows: repeat(3, 90px); gap: 8px; margin-top: 10px; }
-  .ttt-cell { background: #334155; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; font-weight: bold; cursor: pointer; user-select: none; transition: background 0.2s; }
-  .ttt-cell:hover { background: #475569; }
-  .ttt-cell.win { background: #10b981; color: white; }
-  .ttt-cell.X { color: #f43f5e; }
-  .ttt-cell.O { color: #38bdf8; }
-  
-  /* Canvas Games */
-  canvas { background: #020617; border-radius: 8px; border: 2px solid #334155; }
-  
-  /* Mobile D-Pad for Snake */
-  .d-pad { display: grid; grid-template-columns: repeat(3, 40px); grid-template-rows: repeat(2, 40px); gap: 5px; margin-top: 10px; }
-  .d-pad button { width: 40px; height: 40px; padding: 0; display: flex; align-items: center; justify-content: center; background: #334155; }
-  .d-pad button:hover { background: #475569; }
+  .video-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  video { width: 100%; height: 180px; background: #000; border-radius: 8px; object-fit: cover; }
+
+  /* ARCADE GAME HUB */
+  .games-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+  .game-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px; text-align: center; }
+  canvas { background: #000; border-radius: 8px; margin-top: 10px; }
+
+  /* Tic Tac Toe Board */
+  .ttt-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; max-width: 210px; margin: 10px auto; }
+  .ttt-cell { height: 65px; background: var(--bg-color); border-radius: 6px; font-size: 2rem; font-weight: bold; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+
+  /* SETTINGS APP */
+  .setting-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border-color); }
 </style>
 </head>
 <body>
 
-<h1>Arcade Suite</h1>
-
-<div class="game-container">
-
-  <!-- TIC TAC TOE -->
-  <div class="card">
-    <h2>Tic Tac Toe</h2>
-    <div class="controls-bar">
-      <select id="ttt-mode" onchange="resetTTT()">
-        <option value="pvp">2 Player (Local)</option>
-        <option value="ai">vs AI (Minimax)</option>
-      </select>
-      <button onclick="resetTTT()">Restart</button>
-    </div>
-    <div class="score-board">
-      <div>X Wins: <span id="ttt-x-score">0</span></div>
-      <div>O Wins: <span id="ttt-o-score">0</span></div>
-      <div>Ties: <span id="ttt-ties">0</span></div>
-    </div>
-    <div class="ttt-board" id="ttt-board"></div>
+<header>
+  <div class="logo">⚡ Gemini OS</div>
+  <div class="nav-tabs">
+    <button class="tab-btn active" onclick="switchApp('messages', event)">Messages & Call</button>
+    <button class="tab-btn" onclick="switchApp('drive', event)">Cloud Drive</button>
+    <button class="tab-btn" onclick="switchApp('arcade', event)">Arcade Games</button>
+    <button class="tab-btn" onclick="switchApp('settings', event)">Settings</button>
   </div>
+</header>
 
-  <!-- SNAKE -->
-  <div class="card">
-    <h2>Snake</h2>
-    <div class="controls-bar">
-      <button id="snake-play-btn" onclick="toggleSnake()">Play</button>
-      <button onclick="initSnake()">Restart</button>
-    </div>
-    <div class="score-board">
-      <div>Score: <span id="snake-score">0</span></div>
-      <div>Best: <span id="snake-best">0</span></div>
-    </div>
-    <canvas id="snakeCanvas" width="280" height="280"></canvas>
-    <div class="d-pad">
-      <div></div><button onclick="changeSnakeDir('UP')">▲</button><div></div>
-      <button onclick="changeSnakeDir('LEFT')">◄</button><button onclick="changeSnakeDir('DOWN')">▼</button><button onclick="changeSnakeDir('RIGHT')">►</button>
-    </div>
-  </div>
+<main>
 
-  <!-- FLAPPY BIRD -->
-  <div class="card">
-    <h2>Flappy Bird</h2>
-    <div class="controls-bar">
-      <select id="flappy-theme" onchange="drawFlappy()">
-        <option value="day">Day Mode</option>
-        <option value="night">Night Mode</option>
-      </select>
-      <button onclick="resetFlappy()">Restart</button>
+  <!-- APP 1: MESSAGES & CALLING -->
+  <section id="app-messages" class="app-view active">
+    <div class="panel">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h2>Real-Time Chat</h2>
+        <div style="font-size:0.85rem; color:#94a3b8;">
+          <span class="status-badge" id="connStatus"></span>
+          <span id="connText">Connecting...</span>
+        </div>
+      </div>
+      <div class="chat-box" id="chatBox"></div>
+      <form onsubmit="sendMessage(event)" style="display:flex; gap:10px;">
+        <input type="text" id="msgInput" placeholder="Type a message..." style="flex:1;" autocomplete="off">
+        <button type="submit">Send</button>
+      </form>
     </div>
-    <div class="score-board">
-      <div>Score: <span id="flappy-score">0</span></div>
-      <div>Best: <span id="flappy-best">0</span></div>
-    </div>
-    <canvas id="flappyCanvas" width="280" height="320"></canvas>
-  </div>
 
-</div>
+    <div class="panel">
+      <h2>WebRTC Video / Audio Call</h2>
+      <div style="display:flex; gap:10px; margin-bottom:10px;">
+        <button onclick="startCall()">Start Call</button>
+        <button onclick="endCall()" style="background:#ef4444; color:#fff;">End Call</button>
+      </div>
+      <div class="video-grid">
+        <video id="localVideo" autoplay playsinline muted></video>
+        <video id="remoteVideo" autoplay playsinline></video>
+      </div>
+    </div>
+  </section>
+
+  <!-- APP 2: CLOUD DRIVE -->
+  <section id="app-drive" class="app-view">
+    <div class="panel">
+      <h2>Cloud Drive Storage</h2>
+      <input type="file" id="fileUpload" style="margin: 15px 0;">
+      <button onclick="uploadFile()">Upload File</button>
+      <div id="fileList" style="margin-top:20px;">
+        <p style="color:#94a3b8;">No files uploaded yet.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- APP 3: OFFLINE ARCADE -->
+  <section id="app-arcade" class="app-view">
+    <div class="games-grid">
+      
+      <!-- Tic Tac Toe -->
+      <div class="game-card">
+        <h3>Tic Tac Toe</h3>
+        <select id="ttt-mode" style="margin:8px 0;" onchange="resetTTT()">
+          <option value="ai">vs AI (Offline)</option>
+          <option value="friend">2-Player (Friend)</option>
+        </select>
+        <div class="ttt-grid" id="tttBoard"></div>
+        <button onclick="resetTTT()">Restart</button>
+      </div>
+
+      <!-- Snake Game -->
+      <div class="game-card">
+        <h3>Snake</h3>
+        <p>Score: <span id="snakeScore">0</span></p>
+        <canvas id="snakeCanvas" width="200" height="200"></canvas>
+        <div style="margin-top:8px;">
+          <button onclick="startSnake()">Play/Pause</button>
+        </div>
+      </div>
+
+      <!-- Flappy Dino Game -->
+      <div class="game-card">
+        <h3>Flappy Dino</h3>
+        <p>Score: <span id="dinoScore">0</span></p>
+        <canvas id="dinoCanvas" width="200" height="200"></canvas>
+        <div style="margin-top:8px;">
+          <button onclick="jumpDino()">Jump (Space/Click)</button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- APP 4: SETTINGS -->
+  <section id="app-settings" class="app-view">
+    <div class="panel">
+      <h2>System & App Settings</h2>
+      
+      <div class="setting-row">
+        <div>
+          <strong>Theme Style</strong>
+          <p style="font-size:0.85rem; color:#94a3b8;">Customize the look and feel of Gemini OS</p>
+        </div>
+        <select id="themeSelect" onchange="changeTheme(this.value)">
+          <option value="default">Slate Dark (Default)</option>
+          <option value="theme-neon">Neon Dark</option>
+          <option value="theme-cyberpunk">Cyberpunk</option>
+        </select>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <strong>Sound Effects (Web Audio API)</strong>
+          <p style="font-size:0.85rem; color:#94a3b8;">Enable audio feedback for apps and games</p>
+        </div>
+        <input type="checkbox" id="soundToggle" checked style="width:20px; height:20px;">
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <strong>User Profile Name</strong>
+          <p style="font-size:0.85rem; color:#94a3b8;">Display name for chats</p>
+        </div>
+        <input type="text" id="usernameInput" value="User" onchange="saveProfile()">
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <strong>Reset System Data</strong>
+          <p style="font-size:0.85rem; color:#94a3b8;">Clear all saved settings and reload</p>
+        </div>
+        <button onclick="clearData()" style="background:#ef4444; color:#fff;">Clear Storage</button>
+      </div>
+
+    </div>
+  </section>
+
+</main>
 
 <script>
-// --- AUDIO SYNTHESIZER ---
+// --- SYSTEM INITIALIZATION & PROFILE ---
+let userProfileName = localStorage.getItem('osUsername') || `User_${Math.floor(Math.random() * 900 + 100)}`;
+document.getElementById('usernameInput').value = userProfileName;
+
+const savedTheme = localStorage.getItem('osTheme');
+if(savedTheme && savedTheme !== 'default') {
+  document.body.className = savedTheme;
+  document.getElementById('themeSelect').value = savedTheme;
+}
+
+// --- SOCKET.IO CLIENT REAL-TIME MESSAGING ---
+// Connects to public Socket.io demo server (or back-end server if self-hosted)
+const socket = io("https://express-socketio-minimal-production.up.railway.app", {
+  transports: ["websocket", "polling"]
+});
+
+socket.on("connect", () => {
+  document.getElementById("connStatus").className = "status-badge online";
+  document.getElementById("connText").innerText = "Online";
+  appendSystemMessage("Connected to real-time chat network.");
+});
+
+socket.on("disconnect", () => {
+  document.getElementById("connStatus").className = "status-badge";
+  document.getElementById("connText").innerText = "Disconnected";
+  appendSystemMessage("Disconnected from chat network.");
+});
+
+socket.on("chatMessage", (data) => {
+  // Receive message from another window/user
+  if (data.sender !== userProfileName) {
+    appendReceivedMessage(data.sender, data.text);
+    playBeep(700);
+  }
+});
+
+function sendMessage(e) {
+  if (e) e.preventDefault();
+  const input = document.getElementById('msgInput');
+  const text = input.value.trim();
+  if(!text) return;
+
+  const payload = { sender: userProfileName, text: text };
+  
+  // Emit to socket server
+  socket.emit("chatMessage", payload);
+  
+  // Append locally
+  appendUserMessage(text);
+  input.value = '';
+  playBeep(500);
+}
+
+function appendUserMessage(text) {
+  const box = document.getElementById('chatBox');
+  const msg = document.createElement('div');
+  msg.className = 'msg user';
+  msg.innerText = text;
+  box.appendChild(msg);
+  box.scrollTop = box.scrollHeight;
+}
+
+function appendReceivedMessage(sender, text) {
+  const box = document.getElementById('chatBox');
+  const msg = document.createElement('div');
+  msg.className = 'msg';
+  msg.innerHTML = `<div class="msg-author">${sender}</div>${text}`;
+  box.appendChild(msg);
+  box.scrollTop = box.scrollHeight;
+}
+
+function appendSystemMessage(text) {
+  const box = document.getElementById('chatBox');
+  const msg = document.createElement('div');
+  msg.className = 'msg system';
+  msg.innerText = text;
+  box.appendChild(msg);
+  box.scrollTop = box.scrollHeight;
+}
+
+// --- NAVIGATION ---
+function switchApp(appName, evt) {
+  document.querySelectorAll('.app-view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`app-${appName}`).classList.add('active');
+  if(evt) evt.target.classList.add('active');
+}
+
+// --- SOUND API ---
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-function playSound(type) {
-  if (audioCtx.state === 'suspended') audioCtx.resume();
+function playBeep(freq = 440) {
+  if(!document.getElementById('soundToggle').checked) return;
+  if(audioCtx.state === 'suspended') audioCtx.resume();
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
+  osc.frequency.value = freq;
   osc.connect(gain);
   gain.connect(audioCtx.destination);
-  
-  const now = audioCtx.currentTime;
-  if (type === 'tap') {
-    osc.frequency.setValueAtTime(400, now);
-    gain.gain.setValueAtTime(0.1, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
-    osc.start(now); osc.stop(now + 0.05);
-  } else if (type === 'eat') {
-    osc.frequency.setValueAtTime(600, now);
-    osc.frequency.exponentialRampToValueAtTime(900, now + 0.1);
-    gain.gain.setValueAtTime(0.15, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-    osc.start(now); osc.stop(now + 0.1);
-  } else if (type === 'jump') {
-    osc.frequency.setValueAtTime(300, now);
-    osc.frequency.exponentialRampToValueAtTime(600, now + 0.1);
-    gain.gain.setValueAtTime(0.1, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-    osc.start(now); osc.stop(now + 0.1);
-  } else if (type === 'over') {
-    osc.frequency.setValueAtTime(300, now);
-    osc.frequency.exponentialRampToValueAtTime(100, now + 0.3);
-    gain.gain.setValueAtTime(0.2, now);
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
-    osc.start(now); osc.stop(now + 0.3);
-  }
+  osc.start();
+  gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.1);
+  osc.stop(audioCtx.currentTime + 0.1);
 }
 
-// --- TIC TAC TOE LOGIC ---
-let tttState = Array(9).fill(null);
-let tttTurn = 'X';
-let tttActive = true;
-let tttScores = JSON.parse(localStorage.getItem('tttScores')) || { x: 0, o: 0, ties: 0 };
-
-function updateTTTScores() {
-  document.getElementById('ttt-x-score').innerText = tttScores.x;
-  document.getElementById('ttt-o-score').innerText = tttScores.o;
-  document.getElementById('ttt-ties').innerText = tttScores.ties;
-  localStorage.setItem('tttScores', JSON.stringify(tttScores));
+// --- WEBRTC DUMMY HANDLERS ---
+async function startCall() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    document.getElementById('localVideo').srcObject = stream;
+    playBeep(800);
+  } catch(e) { alert("Camera/Mic access required for calls."); }
+}
+function endCall() {
+  const v = document.getElementById('localVideo');
+  if(v.srcObject) v.srcObject.getTracks().forEach(t => t.stop());
+  v.srcObject = null;
+  playBeep(300);
 }
 
+// --- CLOUD DRIVE ---
+function uploadFile() {
+  const f = document.getElementById('fileUpload').files[0];
+  if(!f) return;
+  const list = document.getElementById('fileList');
+  if(list.querySelector('p')) list.innerHTML = '';
+  const item = document.createElement('div');
+  item.style.padding = '8px';
+  item.style.borderBottom = '1px solid var(--border-color)';
+  item.innerText = `📄 ${f.name} (${Math.round(f.size/1024)} KB)`;
+  list.appendChild(item);
+  playBeep(700);
+}
+
+// --- TIC TAC TOE (OFFLINE AI / FRIEND) ---
+let tttState = Array(9).fill(null), tttTurn = 'X';
+function resetTTT() {
+  tttState = Array(9).fill(null); tttTurn = 'X';
+  renderTTT();
+}
 function renderTTT() {
-  const board = document.getElementById('ttt-board');
+  const board = document.getElementById('tttBoard');
   board.innerHTML = '';
-  tttState.forEach((val, idx) => {
+  tttState.forEach((val, i) => {
     const cell = document.createElement('div');
-    cell.className = `ttt-cell ${val || ''}`;
+    cell.className = 'ttt-cell';
     cell.innerText = val || '';
-    cell.onclick = () => handleTTTClick(idx);
+    cell.onclick = () => handleTTTClick(i);
     board.appendChild(cell);
   });
 }
-
-function handleTTTClick(idx) {
-  if (!tttState[idx] && tttActive) {
-    makeTTTMove(idx, tttTurn);
-    playSound('tap');
-    if (tttActive && document.getElementById('ttt-mode').value === 'ai' && tttTurn === 'O') {
-      setTimeout(makeAIMove, 250);
-    }
-  }
-}
-
-function makeTTTMove(idx, player) {
-  tttState[idx] = player;
-  const winComb = checkTTTWin(tttState);
-  if (winComb) {
-    tttActive = false;
-    renderTTT();
-    winComb.forEach(i => document.querySelectorAll('.ttt-cell')[i].classList.add('win'));
-    tttScores[player.toLowerCase()]++;
-    updateTTTScores();
-    playSound('eat');
-  } else if (tttState.every(c => c !== null)) {
-    tttActive = false;
-    tttScores.ties++;
-    updateTTTScores();
-    renderTTT();
-    playSound('over');
-  } else {
-    tttTurn = player === 'X' ? 'O' : 'X';
-    renderTTT();
-  }
-}
-
-function checkTTTWin(board) {
-  const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-  for (let l of lines) {
-    if (board[l[0]] && board[l[0]] === board[l[1]] && board[l[0]] === board[l[2]]) return l;
-  }
-  return null;
-}
-
-function makeAIMove() {
-  let bestScore = -Infinity;
-  let move;
-  for (let i = 0; i < 9; i++) {
-    if (!tttState[i]) {
-      tttState[i] = 'O';
-      let score = minimax(tttState, 0, false);
-      tttState[i] = null;
-      if (score > bestScore) { bestScore = score; move = i; }
-    }
-  }
-  if (move !== undefined) makeTTTMove(move, 'O');
-}
-
-function minimax(board, depth, isMaximizing) {
-  const win = checkTTTWin(board);
-  if (win) return board[win[0]] === 'O' ? 10 - depth : depth - 10;
-  if (board.every(c => c !== null)) return 0;
+function handleTTTClick(i) {
+  if(tttState[i]) return;
+  tttState[i] = tttTurn;
+  playBeep(500);
+  if(checkWin(tttState)) { alert(`${tttTurn} Wins!`); resetTTT(); return; }
   
-  if (isMaximizing) {
-    let best = -Infinity;
-    for (let i = 0; i < 9; i++) {
-      if (!board[i]) {
-        board[i] = 'O';
-        best = Math.max(best, minimax(board, depth + 1, false));
-        board[i] = null;
-      }
-    }
-    return best;
-  } else {
-    let best = Infinity;
-    for (let i = 0; i < 9; i++) {
-      if (!board[i]) {
-        board[i] = 'X';
-        best = Math.min(best, minimax(board, depth + 1, true));
-        board[i] = null;
-      }
-    }
-    return best;
-  }
-}
-
-function resetTTT() {
-  tttState = Array(9).fill(null);
-  tttTurn = 'X';
-  tttActive = true;
+  tttTurn = tttTurn === 'X' ? 'O' : 'X';
   renderTTT();
-}
-
-// --- SNAKE LOGIC ---
-const snakeCv = document.getElementById('snakeCanvas');
-const snakeCtx = snakeCv.getContext('2d');
-const grid = 14;
-let snake, dir, food, snakeScore, snakeBest, snakeLoop, snakeRunning, speed;
-
-function initSnake() {
-  clearInterval(snakeLoop);
-  snake = [{x: 5, y: 5}];
-  dir = 'RIGHT';
-  snakeScore = 0;
-  speed = 120;
-  snakeBest = localStorage.getItem('snakeBest') || 0;
-  document.getElementById('snake-score').innerText = snakeScore;
-  document.getElementById('snake-best').innerText = snakeBest;
-  spawnFood();
-  snakeRunning = false;
-  document.getElementById('snake-play-btn').innerText = 'Play';
-  drawSnake();
-}
-
-function toggleSnake() {
-  if (snakeRunning) {
-    clearInterval(snakeLoop);
-    snakeRunning = false;
-    document.getElementById('snake-play-btn').innerText = 'Play';
-  } else {
-    snakeRunning = true;
-    document.getElementById('snake-play-btn').innerText = 'Pause';
-    snakeLoop = setInterval(stepSnake, speed);
+  
+  if(document.getElementById('ttt-mode').value === 'ai' && tttTurn === 'O') {
+    setTimeout(() => {
+      let empty = tttState.map((v, idx) => v === null ? idx : null).filter(v => v !== null);
+      if(empty.length) {
+        tttState[empty[Math.floor(Math.random()*empty.length)]] = 'O';
+        playBeep(400);
+        if(checkWin(tttState)) { alert(`AI Wins!`); resetTTT(); return; }
+        tttTurn = 'X';
+        renderTTT();
+      }
+    }, 300);
   }
 }
-
-function spawnFood() {
-  food = {
-    x: Math.floor(Math.random() * (snakeCv.width / grid)),
-    y: Math.floor(Math.random() * (snakeCv.height / grid)),
-    special: Math.random() < 0.2
-  };
+function checkWin(b) {
+  const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  return lines.some(l => b[l[0]] && b[l[0]] === b[l[1]] && b[l[0]] === b[l[2]]);
 }
 
-function changeSnakeDir(newDir) {
-  if (newDir === 'LEFT' && dir !== 'RIGHT') dir = 'LEFT';
-  if (newDir === 'UP' && dir !== 'DOWN') dir = 'UP';
-  if (newDir === 'RIGHT' && dir !== 'LEFT') dir = 'RIGHT';
-  if (newDir === 'DOWN' && dir !== 'UP') dir = 'DOWN';
-}
+// --- SNAKE ---
+const sCv = document.getElementById('snakeCanvas'), sCtx = sCv.getContext('2d');
+let snake = [{x:5,y:5}], sDir = 'RIGHT', sFood = {x:10,y:10}, sScore = 0, sLoop = null;
 
+function startSnake() {
+  if(sLoop) { clearInterval(sLoop); sLoop = null; return; }
+  sLoop = setInterval(stepSnake, 120);
+}
+function stepSnake() {
+  let head = {...snake[0]};
+  if(sDir==='RIGHT') head.x++; if(sDir==='LEFT') head.x--;
+  if(sDir==='DOWN') head.y++; if(sDir==='UP') head.y--;
+  
+  if(head.x < 0 || head.x >= 20 || head.y < 0 || head.y >= 20) { clearInterval(sLoop); sLoop = null; snake = [{x:5,y:5}]; return; }
+  snake.unshift(head);
+  if(head.x === sFood.x && head.y === sFood.y) {
+    sScore += 10; document.getElementById('snakeScore').innerText = sScore;
+    sFood = {x: Math.floor(Math.random()*20), y: Math.floor(Math.random()*20)};
+    playBeep(800);
+  } else { snake.pop(); }
+  
+  sCtx.fillStyle = '#000'; sCtx.fillRect(0,0,200,200);
+  sCtx.fillStyle = '#ef4444'; sCtx.fillRect(sFood.x*10, sFood.y*10, 9, 9);
+  sCtx.fillStyle = '#10b981'; snake.forEach(p => sCtx.fillRect(p.x*10, p.y*10, 9, 9));
+}
 document.addEventListener('keydown', e => {
-  if (e.key === 'ArrowLeft' || e.key === 'a') changeSnakeDir('LEFT');
-  if (e.key === 'ArrowUp' || e.key === 'w') changeSnakeDir('UP');
-  if (e.key === 'ArrowRight' || e.key === 'd') changeSnakeDir('RIGHT');
-  if (e.key === 'ArrowDown' || e.key === 's') changeSnakeDir('DOWN');
+  if(e.key === 'ArrowUp' && sDir !== 'DOWN') sDir = 'UP';
+  if(e.key === 'ArrowDown' && sDir !== 'UP') sDir = 'DOWN';
+  if(e.key === 'ArrowLeft' && sDir !== 'RIGHT') sDir = 'LEFT';
+  if(e.key === 'ArrowRight' && sDir !== 'LEFT') sDir = 'RIGHT';
+  if(e.code === 'Space') jumpDino();
 });
 
-function stepSnake() {
-  let head = { ...snake[0] };
-  if (dir === 'LEFT') head.x--;
-  if (dir === 'UP') head.y--;
-  if (dir === 'RIGHT') head.x++;
-  if (dir === 'DOWN') head.y++;
-  
-  if (head.x < 0 || head.x >= snakeCv.width/grid || head.y < 0 || head.y >= snakeCv.height/grid || snake.some(s => s.x === head.x && s.y === head.y)) {
-    playSound('over');
-    initSnake();
-    return;
+// --- FLAPPY DINO ---
+const dCv = document.getElementById('dinoCanvas'), dCtx = dCv.getContext('2d');
+let dino = {y: 150, vy: 0}, cacti = [], dScore = 0, dLoop = null;
+
+function jumpDino() {
+  dino.vy = -5;
+  playBeep(650);
+  if(!dLoop) dLoop = setInterval(stepDino, 30);
+}
+dCv.addEventListener('click', jumpDino);
+
+function stepDino() {
+  dino.vy += 0.3; dino.y += dino.vy;
+  if(cacti.length === 0 || cacti[cacti.length-1].x < 120) {
+    cacti.push({x: 200, h: Math.random()*40 + 20});
   }
+  cacti.forEach(c => c.x -= 3);
+  if(cacti[0] && cacti[0].x < -10) cacti.shift();
   
-  snake.unshift(head);
-  if (head.x === food.x && head.y === food.y) {
-    playSound('eat');
-    snakeScore += food.special ? 30 : 10;
-    if (snakeScore > snakeBest) {
-      snakeBest = snakeScore;
-      localStorage.setItem('snakeBest', snakeBest);
-    }
-    document.getElementById('snake-score').innerText = snakeScore;
-    document.getElementById('snake-best').innerText = snakeBest;
-    spawnFood();
-    if (speed > 50) { clearInterval(snakeLoop); speed -= 2; snakeLoop = setInterval(stepSnake, speed); }
-  } else {
-    snake.pop();
+  dScore++; document.getElementById('dinoScore').innerText = dScore;
+  
+  // Render
+  dCtx.fillStyle = '#000'; dCtx.fillRect(0,0,200,200);
+  dCtx.fillStyle = '#f59e0b'; dCtx.fillRect(30, dino.y, 15, 15); // Dino
+  dCtx.fillStyle = '#22c55e';
+  cacti.forEach(c => dCtx.fillRect(c.x, 200 - c.h, 12, c.h)); // Cacti
+  
+  if(dino.y > 185 || dino.y < 0 || cacti.some(c => c.x < 45 && c.x + 12 > 30 && dino.y + 15 > 200 - c.h)) {
+    alert("Game Over!"); clearInterval(dLoop); dLoop = null; dino = {y:150, vy:0}; cacti = []; dScore = 0;
   }
-  drawSnake();
 }
 
-function drawSnake() {
-  snakeCtx.fillStyle = '#020617';
-  snakeCtx.fillRect(0, 0, snakeCv.width, snakeCv.height);
-  
-  snakeCtx.fillStyle = food.special ? '#f59e0b' : '#ef4444';
-  snakeCtx.beginPath();
-  snakeCtx.arc(food.x * grid + grid/2, food.y * grid + grid/2, grid/2, 0, Math.PI * 2);
-  snakeCtx.fill();
-  
-  snake.forEach((part, i) => {
-    snakeCtx.fillStyle = i === 0 ? '#10b981' : '#34d399';
-    snakeCtx.fillRect(part.x * grid, part.y * grid, grid - 1, grid - 1);
-  });
+// --- SETTINGS ---
+function changeTheme(theme) {
+  document.body.className = theme === 'default' ? '' : theme;
+  localStorage.setItem('osTheme', theme);
+}
+function saveProfile() {
+  userProfileName = document.getElementById('usernameInput').value || 'User';
+  localStorage.setItem('osUsername', userProfileName);
+}
+function clearData() {
+  localStorage.clear();
+  location.reload();
 }
 
-// --- FLAPPY BIRD LOGIC ---
-const flappyCv = document.getElementById('flappyCanvas');
-const flappyCtx = flappyCv.getContext('2d');
-let bird, pipes, flappyScore, flappyBest, flappyLoop, flappyRunning;
-
-function resetFlappy() {
-  cancelAnimationFrame(flappyLoop);
-  bird = { x: 40, y: 150, vy: 0, gravity: 0.35, jump: -6 };
-  pipes = [];
-  flappyScore = 0;
-  flappyBest = localStorage.getItem('flappyBest') || 0;
-  document.getElementById('flappy-score').innerText = flappyScore;
-  document.getElementById('flappy-best').innerText = flappyBest;
-  flappyRunning = false;
-  drawFlappy();
-}
-
-function flap() {
-  if (!flappyRunning) {
-    flappyRunning = true;
-    flappyLoop = requestAnimationFrame(stepFlappy);
-  }
-  bird.vy = bird.jump;
-  playSound('jump');
-}
-
-flappyCv.addEventListener('click', flap);
-
-function stepFlappy() {
-  bird.vy += bird.gravity;
-  bird.y += bird.vy;
-  
-  if (pipes.length === 0 || pipes[pipes.length - 1].x < flappyCv.width - 140) {
-    let gap = 90;
-    let top = Math.random() * (flappyCv.height - gap - 60) + 30;
-    pipes.push({ x: flappyCv.width, top: top, bottom: top + gap, passed: false });
-  }
-  
-  pipes.forEach(p => {
-    p.x -= 2;
-    if (!p.passed && p.x < bird.x) {
-      p.passed = true;
-      flappyScore++;
-      playSound('eat');
-      if (flappyScore > flappyBest) {
-        flappyBest = flappyScore;
-        localStorage.setItem('flappyBest', flappyBest);
-      }
-      document.getElementById('flappy-score').innerText = flappyScore;
-      document.getElementById('flappy-best').innerText = flappyBest;
-    }
-  });
-  
-  if (pipes.length && pipes[0].x < -40) pipes.shift();
-  
-  // Collision
-  if (bird.y > flappyCv.height - 15 || bird.y < 0 || pipes.some(p => p.x < bird.x + 12 && p.x + 40 > bird.x - 12 && (bird.y - 12 < p.top || bird.y + 12 > p.bottom))) {
-    playSound('over');
-    resetFlappy();
-    return;
-  }
-  
-  drawFlappy();
-  flappyLoop = requestAnimationFrame(stepFlappy);
-}
-
-function drawFlappy() {
-  const theme = document.getElementById('flappy-theme').value;
-  flappyCtx.fillStyle = theme === 'night' ? '#0f172a' : '#38bdf8';
-  flappyCtx.fillRect(0, 0, flappyCv.width, flappyCv.height);
-  
-  // Draw Pipes
-  flappyCtx.fillStyle = '#22c55e';
-  pipes.forEach(p => {
-    flappyCtx.fillRect(p.x, 0, 40, p.top);
-    flappyCtx.fillRect(p.x, p.bottom, 40, flappyCv.height - p.bottom);
-  });
-  
-  // Draw Bird with rotation
-  flappyCtx.save();
-  flappyCtx.translate(bird.x, bird.y);
-  let rot = Math.min(Math.max(bird.vy * 0.05, -0.5), 0.7);
-  flappyCtx.rotate(rot);
-  flappyCtx.fillStyle = '#f59e0b';
-  flappyCtx.beginPath();
-  flappyCtx.arc(0, 0, 12, 0, Math.PI * 2);
-  flappyCtx.fill();
-  flappyCtx.fillStyle = '#ffffff';
-  flappyCtx.fillRect(2, -6, 6, 6);
-  flappyCtx.restore();
-}
-
-// Initializations
-updateTTTScores();
+// Init
 resetTTT();
-initSnake();
-resetFlappy();
 </script>
 </body>
 </html>
