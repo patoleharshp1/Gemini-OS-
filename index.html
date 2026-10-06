@@ -1,833 +1,453 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Gemini OS</title>
-  <style>
-    * { box-sizing: border-box; }
-    body { font-family: 'Roboto', 'Segoe UI', sans-serif; background: #0c0202; color: #fff; margin: 0; padding: 12px; }
-    .status-bar { background: rgba(35, 10, 10, 0.9); border: 1px solid #3d1515; padding: 10px 14px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-weight: bold; color: #e5b3b3; font-size: 13px; }
-    .online-badge { background: #1b4d24; color: #4caf50; padding: 2px 8px; border-radius: 10px; font-size: 11px; margin-left: 6px; }
-    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
-    .app-icon { background: rgba(30, 8, 8, 0.9); border: 1px solid #421818; border-radius: 16px; padding: 10px 4px; text-align: center; cursor: pointer; transition: transform 0.15s; }
-    .app-icon:active { transform: scale(0.92); }
-    .app-icon img { width: 38px; height: 38px; object-fit: contain; margin-bottom: 4px; }
-    .app-icon span { display: block; font-size: 11px; color: #e5b3b3; }
-    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0c0202; z-index: 100; flex-direction: column; }
-    .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #1f0606; border-bottom: 1px solid #3d1515; }
-    .modal-header h3 { margin: 0; color: #ff8a8a; font-size: 16px; }
-    .close-btn { background: #e05656; border: none; color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; }
-    .modal-body { flex: 1; position: relative; overflow-y: auto; padding: 12px; }
-    
-    /* CHAT BUBBLES */
-    #chat-box { height: 340px; overflow-y: auto; border: 1px solid #3d1515; padding: 10px; margin-bottom: 5px; border-radius: 12px; background: #140404; display: flex; flex-direction: column; gap: 10px; }
-    .msg-wrapper { display: flex; flex-direction: column; max-width: 80%; }
-    .msg-wrapper.my-msg { align-self: flex-end; align-items: flex-end; }
-    .msg-wrapper.other-msg { align-self: flex-start; align-items: flex-start; }
-    .msg-author { font-size: 11px; color: #ff8a8a; margin-bottom: 2px; font-weight: bold; }
-    .bubble { padding: 8px 12px; border-radius: 14px; font-size: 14px; word-break: break-word; position: relative; }
-    .my-msg .bubble { background: #5c1818; color: #fff; border-bottom-right-radius: 2px; }
-    .other-msg .bubble { background: #260a0a; color: #e5b3b3; border: 1px solid #3d1515; border-bottom-left-radius: 2px; }
-    .msg-time { font-size: 9px; opacity: 0.6; margin-left: 6px; }
-    .delete-btn { background: transparent; border: none; color: #ff8a8a; font-size: 12px; cursor: pointer; margin-left: 6px; }
-    .msg-img { max-width: 180px; border-radius: 8px; display: block; margin-top: 4px; }
-    .msg-audio { margin-top: 4px; width: 200px; height: 35px; }
-    #typingNotice { font-size: 11px; color: #aaa; font-style: italic; height: 16px; margin-bottom: 6px; }
-    .chat-controls { display: flex; gap: 6px; align-items: center; }
-    .chat-controls input[type="text"] { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #441515; background: #1f0808; color: #fff; }
-    .btn { padding: 10px 14px; border: none; background: #e05656; color: white; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer; }
-    .btn-icon { background: #2b0b0b; border: 1px solid #441515; color: #ff8a8a; }
-
-    /* USER & FRIENDS LIST */
-    .user-card { display: flex; justify-content: space-between; align-items: center; background: #1a0808; border: 1px solid #3d1515; padding: 10px; border-radius: 8px; margin-bottom: 8px; }
-    .user-actions { display: flex; gap: 6px; }
-
-    /* PHONE CALL UI */
-    .dialer-screen { display: flex; flex-direction: column; align-items: center; justify-content: space-between; height: 100%; padding: 20px 10px; background: #121212; color: #fff; }
-    .caller-avatar { width: 85px; height: 85px; border-radius: 50%; background: #3c4043; display: flex; align-items: center; justify-content: center; font-size: 36px; color: #e8eaed; margin-bottom: 8px; }
-    .caller-name { font-size: 20px; font-weight: 500; margin-bottom: 2px; }
-    .call-status { font-size: 13px; color: #9aa0a6; }
-    .video-container { width: 100%; height: 260px; background: #000; border-radius: 12px; position: relative; overflow: hidden; display: none; margin-top: 10px; }
-    #remoteVideo { width: 100%; height: 100%; object-fit: cover; }
-    #localVideo { width: 90px; height: 120px; object-fit: cover; position: absolute; bottom: 10px; right: 10px; border-radius: 8px; border: 2px solid #fff; }
-    .google-controls { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; width: 100%; max-width: 360px; margin-bottom: 15px; }
-    .g-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; background: #202124; border: none; border-radius: 50%; width: 50px; height: 50px; color: #fff; font-size: 16px; cursor: pointer; margin: 0 auto; }
-    .g-btn.active { background: #ea4335; color: #fff; }
-    .g-btn-label { font-size: 9px; color: #9aa0a6; margin-top: 3px; text-align: center; }
-    .end-call-btn { background: #ea4335; width: 62px; height: 62px; border-radius: 50%; border: none; color: white; font-size: 26px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-    .file-card { display: flex; justify-content: space-between; align-items: center; background: #1e0808; padding: 10px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #331010; }
-
-    /* GAME CANVAS ENGINE */
-    .game-container { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; background: #000; }
-    canvas { border: 2px solid #ff8a8a; border-radius: 8px; background: #111; max-width: 100%; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arcade Suite</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+  body { background: #0f172a; color: #f8fafc; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px; }
+  h1 { margin-bottom: 20px; color: #38bdf8; text-shadow: 0 0 10px rgba(56,189,248,0.3); }
+  
+  .game-container { display: flex; flex-wrap: wrap; gap: 30px; justify-content: center; max-width: 1200px; width: 100%; }
+  .card { background: #1e293b; border-radius: 12px; padding: 20px; border: 1px solid #334155; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.5); display: flex; flex-direction: column; align-items: center; min-width: 320px; }
+  .card h2 { margin-bottom: 15px; color: #e2e8f0; font-size: 1.25rem; }
+  
+  .controls-bar { display: flex; gap: 10px; width: 100%; margin-bottom: 15px; justify-content: space-between; align-items: center; }
+  button { background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: background 0.2s; }
+  button:hover { background: #2563eb; }
+  select { background: #334155; color: white; border: 1px solid #475569; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+  
+  .score-board { font-size: 0.9rem; color: #94a3b8; display: flex; gap: 15px; width: 100%; justify-content: center; margin-bottom: 10px; }
+  .score-board span { color: #38bdf8; font-weight: bold; }
+  
+  /* Tic Tac Toe Grid */
+  .ttt-board { display: grid; grid-template-columns: repeat(3, 90px); grid-template-rows: repeat(3, 90px); gap: 8px; margin-top: 10px; }
+  .ttt-cell { background: #334155; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; font-weight: bold; cursor: pointer; user-select: none; transition: background 0.2s; }
+  .ttt-cell:hover { background: #475569; }
+  .ttt-cell.win { background: #10b981; color: white; }
+  .ttt-cell.X { color: #f43f5e; }
+  .ttt-cell.O { color: #38bdf8; }
+  
+  /* Canvas Games */
+  canvas { background: #020617; border-radius: 8px; border: 2px solid #334155; }
+  
+  /* Mobile D-Pad for Snake */
+  .d-pad { display: grid; grid-template-columns: repeat(3, 40px); grid-template-rows: repeat(2, 40px); gap: 5px; margin-top: 10px; }
+  .d-pad button { width: 40px; height: 40px; padding: 0; display: flex; align-items: center; justify-content: center; background: #334155; }
+  .d-pad button:hover { background: #475569; }
+</style>
 </head>
 <body>
 
-  <!-- Status Bar -->
-  <div class="status-bar">
-    <span style="cursor:pointer;" onclick="openModal('usersModal')">👥 Online Users: <span id="onlineCount" class="online-badge">0</span></span>
-    <span id="display-username" style="cursor: pointer; text-decoration: underline;" onclick="changeUsername()">User: Setting...</span>
+<h1>Arcade Suite</h1>
+
+<div class="game-container">
+
+  <!-- TIC TAC TOE -->
+  <div class="card">
+    <h2>Tic Tac Toe</h2>
+    <div class="controls-bar">
+      <select id="ttt-mode" onchange="resetTTT()">
+        <option value="pvp">2 Player (Local)</option>
+        <option value="ai">vs AI (Minimax)</option>
+      </select>
+      <button onclick="resetTTT()">Restart</button>
+    </div>
+    <div class="score-board">
+      <div>X Wins: <span id="ttt-x-score">0</span></div>
+      <div>O Wins: <span id="ttt-o-score">0</span></div>
+      <div>Ties: <span id="ttt-ties">0</span></div>
+    </div>
+    <div class="ttt-board" id="ttt-board"></div>
   </div>
 
-  <!-- App Grid -->
-  <div class="grid">
-    <div class="app-icon" onclick="openCamera()"><img src="https://img.icons8.com/color/96/camera.png"/><span>Camera</span></div>
-    <div class="app-icon" onclick="openModal('chatApp')"><img src="https://img.icons8.com/color/96/speech-bubble.png"/><span>Messages</span></div>
-    <div class="app-icon" onclick="openModal('phoneApp')"><img src="https://img.icons8.com/color/96/phone.png"/><span>Phone Call</span></div>
-    <div class="app-icon" onclick="openModal('usersModal')"><img src="https://img.icons8.com/color/96/conference-call.png"/><span>Friends</span></div>
-    
-    <div class="app-icon" onclick="openModal('storageApp')"><img src="https://img.icons8.com/color/96/folder-invoiced.png"/><span>Drive Storage</span></div>
-    <div class="app-icon" onclick="openModal('localMusicApp')"><img src="https://img.icons8.com/color/96/audio-wave.png"/><span>Local MP3</span></div>
-    <div class="app-icon" onclick="openWebLink('https://m.youtube.com')"><img src="https://img.icons8.com/color/96/television.png"/><span>YouTube</span></div>
-    <div class="app-icon" onclick="openWebLink('https://gemini.google.com')"><img src="https://img.icons8.com/color/96/sparkling.png"/><span>Gemini</span></div>
-
-    <!-- Embedded Canvas Games (Guaranteed to work without iframe block) -->
-    <div class="app-icon" onclick="openFlappy()"><img src="https://img.icons8.com/color/96/twitter.png"/><span>Flappy Bird</span></div>
-    <div class="app-icon" onclick="openSnake()"><img src="https://img.icons8.com/color/96/controller.png"/><span>Snake Game</span></div>
-    <div class="app-icon" onclick="openModal('dinoModal')"><img src="https://img.icons8.com/color/96/dinosaur.png"/><span>Dino Run</span></div>
-    <div class="app-icon" onclick="openAppUrl('https://playtictactoe.org/')"><img src="https://img.icons8.com/color/96/grid.png"/><span>TicTacToe</span></div>
-  </div>
-
-  <!-- Users & Friends Modal -->
-  <div id="usersModal" class="modal">
-    <div class="modal-header">
-      <h3>Active Users & Friends</h3>
-      <button class="close-btn" onclick="closeModal('usersModal')">X</button>
+  <!-- SNAKE -->
+  <div class="card">
+    <h2>Snake</h2>
+    <div class="controls-bar">
+      <button id="snake-play-btn" onclick="toggleSnake()">Play</button>
+      <button onclick="initSnake()">Restart</button>
     </div>
-    <div class="modal-body">
-      <div id="activeUsersList"></div>
+    <div class="score-board">
+      <div>Score: <span id="snake-score">0</span></div>
+      <div>Best: <span id="snake-best">0</span></div>
     </div>
-  </div>
-
-  <!-- Web View Frame -->
-  <div id="webModal" class="modal">
-    <div class="modal-header">
-      <h3 id="modalTitle">App View</h3>
-      <button class="close-btn" onclick="closeModal('webModal')">X</button>
-    </div>
-    <div class="modal-body" style="padding:0;">
-      <iframe id="appFrame" style="width:100%; height:100%; border:none;" src=""></iframe>
+    <canvas id="snakeCanvas" width="280" height="280"></canvas>
+    <div class="d-pad">
+      <div></div><button onclick="changeSnakeDir('UP')">▲</button><div></div>
+      <button onclick="changeSnakeDir('LEFT')">◄</button><button onclick="changeSnakeDir('DOWN')">▼</button><button onclick="changeSnakeDir('RIGHT')">►</button>
     </div>
   </div>
 
-  <!-- Messages App -->
-  <div id="chatApp" class="modal">
-    <div class="modal-header">
-      <h3>Messages</h3>
-      <button class="close-btn" onclick="closeModal('chatApp')">X</button>
+  <!-- FLAPPY BIRD -->
+  <div class="card">
+    <h2>Flappy Bird</h2>
+    <div class="controls-bar">
+      <select id="flappy-theme" onchange="drawFlappy()">
+        <option value="day">Day Mode</option>
+        <option value="night">Night Mode</option>
+      </select>
+      <button onclick="resetFlappy()">Restart</button>
     </div>
-    <div class="modal-body">
-      <div id="chat-box"></div>
-      <div id="typingNotice"></div>
-      <div class="chat-controls">
-        <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="sendImage(this)" />
-        <button class="btn btn-icon" onclick="document.getElementById('imageInput').click()">📷</button>
-        <button class="btn btn-icon" id="recordBtn" onclick="toggleRecord()">🎙️</button>
-        <input type="text" id="messageInput" placeholder="Type a message..." oninput="emitTyping()" />
-        <button class="btn" onclick="sendMessage()">Send</button>
-      </div>
+    <div class="score-board">
+      <div>Score: <span id="flappy-score">0</span></div>
+      <div>Best: <span id="flappy-best">0</span></div>
     </div>
+    <canvas id="flappyCanvas" width="280" height="320"></canvas>
   </div>
 
-  <!-- Phone Call App -->
-  <div id="phoneApp" class="modal">
-    <div class="modal-header">
-      <h3>Google Dialer</h3>
-      <button class="close-btn" onclick="endCall()">X</button>
-    </div>
-    <div class="modal-body" style="padding:0; background:#121212;">
-      <div id="callSetup" style="padding:20px;">
-        <p style="font-size:14px; color:#aaa;">Your ID: <strong id="myCallUser" style="color:#fff;"></strong></p>
-        <input type="text" id="targetUser" placeholder="Enter target username..." style="width:100%; padding:12px; margin-bottom:15px; background:#1e1e1e; border:1px solid #333; color:#fff; border-radius:8px; font-size:15px;"/>
-        <div style="display:flex; gap:10px;">
-          <button class="btn" style="flex:1; background:#1a73e8;" onclick="startCall(false)">📞 Audio Call</button>
-          <button class="btn" style="flex:1; background:#34a853;" onclick="startCall(true)">📹 Video Call</button>
-        </div>
-        <div id="incomingContainer" style="display:none; margin-top:25px; background:#1e1e1e; padding:20px; border-radius:12px; text-align:center;">
-          <div class="caller-avatar" style="margin:0 auto 10px auto;">👤</div>
-          <p id="callerNameText" style="font-weight:bold; font-size:18px;">Incoming Call...</p>
-          <div style="display:flex; gap:15px; justify-content:center; margin-top:15px;">
-            <button class="btn" style="background:#34a853; border-radius:50%; width:55px; height:55px; font-size:20px;" onclick="acceptCall()">📞</button>
-            <button class="btn" style="background:#ea4335; border-radius:50%; width:55px; height:55px; font-size:20px;" onclick="endCall()">📵</button>
-          </div>
-        </div>
-      </div>
+</div>
 
-      <div id="activeCallView" class="dialer-screen" style="display:none;">
-        <div style="text-align:center; margin-top:10px; width:100%;">
-          <div id="avatarCircle" class="caller-avatar" style="margin:0 auto;">👤</div>
-          <div id="activeCallerName" class="caller-name">User</div>
-          <div id="callDuration" class="call-status">Connecting audio...</div>
-        </div>
-        <div id="videoArea" class="video-container">
-          <video id="remoteVideo" autoplay playsinline style="width:100%; height:100%; object-fit:cover;"></video>
-          <video id="localVideo" autoplay muted playsinline></video>
-        </div>
-        <div style="width:100%; display:flex; flex-direction:column; align-items:center;">
-          <div class="google-controls">
-            <div><button class="g-btn" id="muteBtn" onclick="toggleMute()">🎙️</button><div class="g-btn-label">Mute</div></div>
-            <div><button class="g-btn" id="speakerBtn" onclick="toggleSpeaker()">🔊</button><div class="g-btn-label">Speaker</div></div>
-            <div><button class="g-btn" id="videoToggleBtn" onclick="toggleVideoMode()">📹</button><div class="g-btn-label">Video</div></div>
-            <div><button class="g-btn" onclick="shareScreen()">🖥️</button><div class="g-btn-label">Share</div></div>
-            <div><button class="g-btn" onclick="switchCallCamera()">🔄</button><div class="g-btn-label">Flip</div></div>
-          </div>
-          <button class="end-call-btn" onclick="endCall()">📵</button>
-        </div>
-      </div>
-    </div>
-  </div>
+<script>
+// --- AUDIO SYNTHESIZER ---
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playSound(type) {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  
+  const now = audioCtx.currentTime;
+  if (type === 'tap') {
+    osc.frequency.setValueAtTime(400, now);
+    gain.gain.setValueAtTime(0.1, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+    osc.start(now); osc.stop(now + 0.05);
+  } else if (type === 'eat') {
+    osc.frequency.setValueAtTime(600, now);
+    osc.frequency.exponentialRampToValueAtTime(900, now + 0.1);
+    gain.gain.setValueAtTime(0.15, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+    osc.start(now); osc.stop(now + 0.1);
+  } else if (type === 'jump') {
+    osc.frequency.setValueAtTime(300, now);
+    osc.frequency.exponentialRampToValueAtTime(600, now + 0.1);
+    gain.gain.setValueAtTime(0.1, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+    osc.start(now); osc.stop(now + 0.1);
+  } else if (type === 'over') {
+    osc.frequency.setValueAtTime(300, now);
+    osc.frequency.exponentialRampToValueAtTime(100, now + 0.3);
+    gain.gain.setValueAtTime(0.2, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+    osc.start(now); osc.stop(now + 0.3);
+  }
+}
 
-  <!-- Shared Drive Storage -->
-  <div id="storageApp" class="modal">
-    <div class="modal-header">
-      <h3>Cloud Drive & Storage</h3>
-      <button class="close-btn" onclick="closeModal('storageApp')">X</button>
-    </div>
-    <div class="modal-body">
-      <input type="file" id="driveFileInput" onchange="uploadToDrive(this)" style="display:none;" />
-      <button class="btn" onclick="document.getElementById('driveFileInput').click()" style="width:100%; margin-bottom:15px;">☁️ Upload File / MP3 Song to Drive</button>
-      <div id="cloudDriveList"></div>
-    </div>
-  </div>
+// --- TIC TAC TOE LOGIC ---
+let tttState = Array(9).fill(null);
+let tttTurn = 'X';
+let tttActive = true;
+let tttScores = JSON.parse(localStorage.getItem('tttScores')) || { x: 0, o: 0, ties: 0 };
 
-  <!-- Local MP3 Player -->
-  <div id="localMusicApp" class="modal">
-    <div class="modal-header">
-      <h3>Local MP3 Player</h3>
-      <button class="close-btn" onclick="closeModal('localMusicApp')">X</button>
-    </div>
-    <div class="modal-body">
-      <input type="file" id="localMp3Input" accept="audio/*" multiple onchange="loadLocalSongs(this)" style="display:none;" />
-      <button class="btn" onclick="document.getElementById('localMp3Input').click()" style="width:100%; margin-bottom:15px;">🎵 Pick Local Audio Files</button>
-      <div id="localSongList"></div>
-    </div>
-  </div>
+function updateTTTScores() {
+  document.getElementById('ttt-x-score').innerText = tttScores.x;
+  document.getElementById('ttt-o-score').innerText = tttScores.o;
+  document.getElementById('ttt-ties').innerText = tttScores.ties;
+  localStorage.setItem('tttScores', JSON.stringify(tttScores));
+}
 
-  <!-- Camera Modal -->
-  <div id="cameraApp" class="modal">
-    <div class="modal-header">
-      <h3>Camera & Video Recorder</h3>
-      <button class="close-btn" onclick="closeCamera()">X</button>
-    </div>
-    <div class="modal-body" style="text-align: center;">
-      <video id="webcam" autoplay muted playsinline style="width:100%; max-height:280px; border-radius:12px; background:#000;"></video>
-      <canvas id="photoCanvas" style="display:none;"></canvas>
-      <div style="display:flex; gap:10px; justify-content:center; margin-top:15px;">
-        <button class="btn" onclick="takePhoto()">📷 Snap Photo</button>
-        <button class="btn" id="camRecordBtn" style="background:#cc0000;" onclick="toggleCameraRecording()">⏺️ Record Video</button>
-        <button class="btn btn-icon" onclick="switchCameraFacing()">🔄 Flip Cam</button>
-      </div>
-    </div>
-  </div>
+function renderTTT() {
+  const board = document.getElementById('ttt-board');
+  board.innerHTML = '';
+  tttState.forEach((val, idx) => {
+    const cell = document.createElement('div');
+    cell.className = `ttt-cell ${val || ''}`;
+    cell.innerText = val || '';
+    cell.onclick = () => handleTTTClick(idx);
+    board.appendChild(cell);
+  });
+}
 
-  <!-- Flappy Bird Modal -->
-  <div id="flappyModal" class="modal">
-    <div class="modal-header">
-      <h3>Flappy Bird</h3>
-      <button class="close-btn" onclick="closeModal('flappyModal')">X</button>
-    </div>
-    <div class="modal-body game-container">
-      <canvas id="flappyCanvas" width="320" height="420" onclick="flappyJump()"></canvas>
-      <p style="font-size:12px; color:#aaa; margin-top:8px;">Tap screen / press Space to Jump</p>
-    </div>
-  </div>
-
-  <!-- Snake Game Modal -->
-  <div id="snakeModal" class="modal">
-    <div class="modal-header">
-      <h3>Snake Game</h3>
-      <button class="close-btn" onclick="closeModal('snakeModal')">X</button>
-    </div>
-    <div class="modal-body game-container">
-      <canvas id="snakeCanvas" width="320" height="320"></canvas>
-      <div style="display:grid; grid-template-columns: repeat(3, 50px); gap:6px; margin-top:10px;">
-        <div></div><button class="btn" onclick="changeSnakeDir('UP')">⬆️</button><div></div>
-        <button class="btn" onclick="changeSnakeDir('LEFT')">⬅️</button><button class="btn" onclick="changeSnakeDir('DOWN')">⬇️</button><button class="btn" onclick="changeSnakeDir('RIGHT')">➡️</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Dino Run Modal -->
-  <div id="dinoModal" class="modal">
-    <div class="modal-header">
-      <h3>Dino Runner</h3>
-      <button class="close-btn" onclick="closeModal('dinoModal')">X</button>
-    </div>
-    <div class="modal-body" style="padding:0;">
-      <iframe src="https://chromedino.com/" style="width:100%; height:100%; border:none;"></iframe>
-    </div>
-  </div>
-
-  <script src="/socket.io/socket.io.js"></script>
-  <script>
-    const socket = io();
-    let currentUsername = localStorage.getItem('custom_username');
-
-    function setupUsername() {
-      if (!currentUsername) {
-        currentUsername = prompt("Enter your display name:", "User" + Math.floor(Math.random() * 100)) || ("User" + Math.floor(Math.random() * 100));
-        localStorage.setItem('custom_username', currentUsername.trim());
-      }
-      document.getElementById('display-username').innerText = "User: " + currentUsername;
-      document.getElementById('myCallUser').innerText = currentUsername;
-      socket.emit('register_user', currentUsername);
+function handleTTTClick(idx) {
+  if (!tttState[idx] && tttActive) {
+    makeTTTMove(idx, tttTurn);
+    playSound('tap');
+    if (tttActive && document.getElementById('ttt-mode').value === 'ai' && tttTurn === 'O') {
+      setTimeout(makeAIMove, 250);
     }
+  }
+}
 
-    function changeUsername() {
-      const newName = prompt("Enter new custom name:", currentUsername);
-      if (newName) {
-        currentUsername = newName.trim();
-        localStorage.setItem('custom_username', currentUsername);
-        document.getElementById('display-username').innerText = "User: " + currentUsername;
-        document.getElementById('myCallUser').innerText = currentUsername;
-        socket.emit('register_user', currentUsername);
+function makeTTTMove(idx, player) {
+  tttState[idx] = player;
+  const winComb = checkTTTWin(tttState);
+  if (winComb) {
+    tttActive = false;
+    renderTTT();
+    winComb.forEach(i => document.querySelectorAll('.ttt-cell')[i].classList.add('win'));
+    tttScores[player.toLowerCase()]++;
+    updateTTTScores();
+    playSound('eat');
+  } else if (tttState.every(c => c !== null)) {
+    tttActive = false;
+    tttScores.ties++;
+    updateTTTScores();
+    renderTTT();
+    playSound('over');
+  } else {
+    tttTurn = player === 'X' ? 'O' : 'X';
+    renderTTT();
+  }
+}
+
+function checkTTTWin(board) {
+  const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  for (let l of lines) {
+    if (board[l[0]] && board[l[0]] === board[l[1]] && board[l[0]] === board[l[2]]) return l;
+  }
+  return null;
+}
+
+function makeAIMove() {
+  let bestScore = -Infinity;
+  let move;
+  for (let i = 0; i < 9; i++) {
+    if (!tttState[i]) {
+      tttState[i] = 'O';
+      let score = minimax(tttState, 0, false);
+      tttState[i] = null;
+      if (score > bestScore) { bestScore = score; move = i; }
+    }
+  }
+  if (move !== undefined) makeTTTMove(move, 'O');
+}
+
+function minimax(board, depth, isMaximizing) {
+  const win = checkTTTWin(board);
+  if (win) return board[win[0]] === 'O' ? 10 - depth : depth - 10;
+  if (board.every(c => c !== null)) return 0;
+  
+  if (isMaximizing) {
+    let best = -Infinity;
+    for (let i = 0; i < 9; i++) {
+      if (!board[i]) {
+        board[i] = 'O';
+        best = Math.max(best, minimax(board, depth + 1, false));
+        board[i] = null;
       }
     }
-    setupUsername();
-
-    socket.on('user_list', (users) => {
-      document.getElementById('onlineCount').innerText = users.length;
-      const list = document.getElementById('activeUsersList');
-      list.innerHTML = '';
-      users.forEach(u => {
-        const div = document.createElement('div');
-        div.className = 'user-card';
-        div.innerHTML = '<span>🟢 ' + u + (u === currentUsername ? ' (You)' : '') + '</span>' +
-          '<div class="user-actions">' +
-            (u !== currentUsername ? 
-              '<button class="btn" style="padding:4px 8px; font-size:11px;" onclick="quickMessage(\'' + u + '\')">💬 Chat</button>' +
-              '<button class="btn" style="padding:4px 8px; font-size:11px; background:#1a73e8;" onclick="quickCall(\'' + u + '\')">📞 Call</button>' : '') +
-          '</div>';
-        list.appendChild(div);
-      });
-    });
-
-    function quickMessage(user) {
-      closeModal('usersModal');
-      openModal('chatApp');
-      document.getElementById('messageInput').value = '@' + user + ' ';
-      document.getElementById('messageInput').focus();
-    }
-
-    function quickCall(user) {
-      closeModal('usersModal');
-      openModal('phoneApp');
-      document.getElementById('targetUser').value = user;
-    }
-
-    function openModal(id) { document.getElementById(id).style.display = 'flex'; }
-    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-    function openWebLink(url) { window.open(url, '_blank'); }
-    function openAppUrl(url) {
-      document.getElementById('appFrame').src = url;
-      openModal('webModal');
-    }
-
-    // TYPING STATUS
-    let typingTimeout;
-    function emitTyping() {
-      socket.emit('typing_status', { user: currentUsername, isTyping: true });
-      clearTimeout(typingTimeout);
-      typingTimeout = setTimeout(() => {
-        socket.emit('typing_status', { user: currentUsername, isTyping: false });
-      }, 1500);
-    }
-    socket.on('user_typing', (data) => {
-      const el = document.getElementById('typingNotice');
-      el.innerText = data.isTyping ? data.user + " is typing..." : "";
-    });
-
-    // CHAT MESSAGING
-    const chatBox = document.getElementById('chat-box');
-    socket.on('load_all_messages', function(messages) {
-      chatBox.innerHTML = '';
-      messages.forEach(renderSingleMessage);
-    });
-    socket.on('receive_message', renderSingleMessage);
-    socket.on('message_deleted', function(msgId) {
-      const el = document.getElementById('msg-' + msgId);
-      if (el) el.remove();
-    });
-
-    function renderSingleMessage(data) {
-      const isMe = (data.user === currentUsername);
-      const wrapper = document.createElement('div');
-      wrapper.id = 'msg-' + data.id;
-      wrapper.className = 'msg-wrapper ' + (isMe ? 'my-msg' : 'other-msg');
-      let inner = '<div class="msg-author">' + data.user + '</div><div class="bubble">';
-      if (data.text) inner += data.text;
-      if (data.image) inner += '<br><img class="msg-img" src="' + data.image + '"/>';
-      if (data.audio) inner += '<br><audio class="msg-audio" controls src="' + data.audio + '"></audio>';
-      inner += '<span class="msg-time">' + data.timestamp + '</span>';
-      if (isMe) inner += '<button class="delete-btn" onclick="deleteMessage(\'' + data.id + '\')">🗑️</button>';
-      inner += '</div>';
-      wrapper.innerHTML = inner;
-      chatBox.appendChild(wrapper);
-      chatBox.scrollTop = chatBox.scrollHeight;
-    }
-
-    function sendMessage() {
-      const input = document.getElementById('messageInput');
-      if (input.value.trim() !== '') {
-        socket.emit('send_message', {
-          user: currentUsername,
-          text: input.value.trim(),
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        });
-        input.value = '';
-        socket.emit('typing_status', { user: currentUsername, isTyping: false });
+    return best;
+  } else {
+    let best = Infinity;
+    for (let i = 0; i < 9; i++) {
+      if (!board[i]) {
+        board[i] = 'X';
+        best = Math.min(best, minimax(board, depth + 1, true));
+        board[i] = null;
       }
     }
-    function deleteMessage(msgId) { socket.emit('delete_message', msgId); }
+    return best;
+  }
+}
 
-    function sendImage(fileInput) {
-      const file = fileInput.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          socket.emit('send_message', {
-            user: currentUsername,
-            image: e.target.result,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          });
-        };
-        reader.readAsDataURL(file);
+function resetTTT() {
+  tttState = Array(9).fill(null);
+  tttTurn = 'X';
+  tttActive = true;
+  renderTTT();
+}
+
+// --- SNAKE LOGIC ---
+const snakeCv = document.getElementById('snakeCanvas');
+const snakeCtx = snakeCv.getContext('2d');
+const grid = 14;
+let snake, dir, food, snakeScore, snakeBest, snakeLoop, snakeRunning, speed;
+
+function initSnake() {
+  clearInterval(snakeLoop);
+  snake = [{x: 5, y: 5}];
+  dir = 'RIGHT';
+  snakeScore = 0;
+  speed = 120;
+  snakeBest = localStorage.getItem('snakeBest') || 0;
+  document.getElementById('snake-score').innerText = snakeScore;
+  document.getElementById('snake-best').innerText = snakeBest;
+  spawnFood();
+  snakeRunning = false;
+  document.getElementById('snake-play-btn').innerText = 'Play';
+  drawSnake();
+}
+
+function toggleSnake() {
+  if (snakeRunning) {
+    clearInterval(snakeLoop);
+    snakeRunning = false;
+    document.getElementById('snake-play-btn').innerText = 'Play';
+  } else {
+    snakeRunning = true;
+    document.getElementById('snake-play-btn').innerText = 'Pause';
+    snakeLoop = setInterval(stepSnake, speed);
+  }
+}
+
+function spawnFood() {
+  food = {
+    x: Math.floor(Math.random() * (snakeCv.width / grid)),
+    y: Math.floor(Math.random() * (snakeCv.height / grid)),
+    special: Math.random() < 0.2
+  };
+}
+
+function changeSnakeDir(newDir) {
+  if (newDir === 'LEFT' && dir !== 'RIGHT') dir = 'LEFT';
+  if (newDir === 'UP' && dir !== 'DOWN') dir = 'UP';
+  if (newDir === 'RIGHT' && dir !== 'LEFT') dir = 'RIGHT';
+  if (newDir === 'DOWN' && dir !== 'UP') dir = 'DOWN';
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft' || e.key === 'a') changeSnakeDir('LEFT');
+  if (e.key === 'ArrowUp' || e.key === 'w') changeSnakeDir('UP');
+  if (e.key === 'ArrowRight' || e.key === 'd') changeSnakeDir('RIGHT');
+  if (e.key === 'ArrowDown' || e.key === 's') changeSnakeDir('DOWN');
+});
+
+function stepSnake() {
+  let head = { ...snake[0] };
+  if (dir === 'LEFT') head.x--;
+  if (dir === 'UP') head.y--;
+  if (dir === 'RIGHT') head.x++;
+  if (dir === 'DOWN') head.y++;
+  
+  if (head.x < 0 || head.x >= snakeCv.width/grid || head.y < 0 || head.y >= snakeCv.height/grid || snake.some(s => s.x === head.x && s.y === head.y)) {
+    playSound('over');
+    initSnake();
+    return;
+  }
+  
+  snake.unshift(head);
+  if (head.x === food.x && head.y === food.y) {
+    playSound('eat');
+    snakeScore += food.special ? 30 : 10;
+    if (snakeScore > snakeBest) {
+      snakeBest = snakeScore;
+      localStorage.setItem('snakeBest', snakeBest);
+    }
+    document.getElementById('snake-score').innerText = snakeScore;
+    document.getElementById('snake-best').innerText = snakeBest;
+    spawnFood();
+    if (speed > 50) { clearInterval(snakeLoop); speed -= 2; snakeLoop = setInterval(stepSnake, speed); }
+  } else {
+    snake.pop();
+  }
+  drawSnake();
+}
+
+function drawSnake() {
+  snakeCtx.fillStyle = '#020617';
+  snakeCtx.fillRect(0, 0, snakeCv.width, snakeCv.height);
+  
+  snakeCtx.fillStyle = food.special ? '#f59e0b' : '#ef4444';
+  snakeCtx.beginPath();
+  snakeCtx.arc(food.x * grid + grid/2, food.y * grid + grid/2, grid/2, 0, Math.PI * 2);
+  snakeCtx.fill();
+  
+  snake.forEach((part, i) => {
+    snakeCtx.fillStyle = i === 0 ? '#10b981' : '#34d399';
+    snakeCtx.fillRect(part.x * grid, part.y * grid, grid - 1, grid - 1);
+  });
+}
+
+// --- FLAPPY BIRD LOGIC ---
+const flappyCv = document.getElementById('flappyCanvas');
+const flappyCtx = flappyCv.getContext('2d');
+let bird, pipes, flappyScore, flappyBest, flappyLoop, flappyRunning;
+
+function resetFlappy() {
+  cancelAnimationFrame(flappyLoop);
+  bird = { x: 40, y: 150, vy: 0, gravity: 0.35, jump: -6 };
+  pipes = [];
+  flappyScore = 0;
+  flappyBest = localStorage.getItem('flappyBest') || 0;
+  document.getElementById('flappy-score').innerText = flappyScore;
+  document.getElementById('flappy-best').innerText = flappyBest;
+  flappyRunning = false;
+  drawFlappy();
+}
+
+function flap() {
+  if (!flappyRunning) {
+    flappyRunning = true;
+    flappyLoop = requestAnimationFrame(stepFlappy);
+  }
+  bird.vy = bird.jump;
+  playSound('jump');
+}
+
+flappyCv.addEventListener('click', flap);
+
+function stepFlappy() {
+  bird.vy += bird.gravity;
+  bird.y += bird.vy;
+  
+  if (pipes.length === 0 || pipes[pipes.length - 1].x < flappyCv.width - 140) {
+    let gap = 90;
+    let top = Math.random() * (flappyCv.height - gap - 60) + 30;
+    pipes.push({ x: flappyCv.width, top: top, bottom: top + gap, passed: false });
+  }
+  
+  pipes.forEach(p => {
+    p.x -= 2;
+    if (!p.passed && p.x < bird.x) {
+      p.passed = true;
+      flappyScore++;
+      playSound('eat');
+      if (flappyScore > flappyBest) {
+        flappyBest = flappyScore;
+        localStorage.setItem('flappyBest', flappyBest);
       }
+      document.getElementById('flappy-score').innerText = flappyScore;
+      document.getElementById('flappy-best').innerText = flappyBest;
     }
+  });
+  
+  if (pipes.length && pipes[0].x < -40) pipes.shift();
+  
+  // Collision
+  if (bird.y > flappyCv.height - 15 || bird.y < 0 || pipes.some(p => p.x < bird.x + 12 && p.x + 40 > bird.x - 12 && (bird.y - 12 < p.top || bird.y + 12 > p.bottom))) {
+    playSound('over');
+    resetFlappy();
+    return;
+  }
+  
+  drawFlappy();
+  flappyLoop = requestAnimationFrame(stepFlappy);
+}
 
-    let audioRecorder, chatAudioChunks = [], isRecordingAudio = false;
-    async function toggleRecord() {
-      const btn = document.getElementById('recordBtn');
-      if (!isRecordingAudio) {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          audioRecorder = new MediaRecorder(stream);
-          chatAudioChunks = [];
-          audioRecorder.ondataavailable = e => chatAudioChunks.push(e.data);
-          audioRecorder.onstop = () => {
-            const blob = new Blob(chatAudioChunks, { type: 'audio/webm' });
-            const reader = new FileReader();
-            reader.onload = function(e) {
-              socket.emit('send_message', {
-                user: currentUsername,
-                audio: e.target.result,
-                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-              });
-            };
-            reader.readAsDataURL(blob);
-          };
-          audioRecorder.start();
-          isRecordingAudio = true;
-          btn.style.background = '#ff0000';
-        } catch(err) { alert('Microphone permission required'); }
-      } else {
-        audioRecorder.stop();
-        isRecordingAudio = false;
-        btn.style.background = '#2b0b0b';
-      }
-    }
+function drawFlappy() {
+  const theme = document.getElementById('flappy-theme').value;
+  flappyCtx.fillStyle = theme === 'night' ? '#0f172a' : '#38bdf8';
+  flappyCtx.fillRect(0, 0, flappyCv.width, flappyCv.height);
+  
+  // Draw Pipes
+  flappyCtx.fillStyle = '#22c55e';
+  pipes.forEach(p => {
+    flappyCtx.fillRect(p.x, 0, 40, p.top);
+    flappyCtx.fillRect(p.x, p.bottom, 40, flappyCv.height - p.bottom);
+  });
+  
+  // Draw Bird with rotation
+  flappyCtx.save();
+  flappyCtx.translate(bird.x, bird.y);
+  let rot = Math.min(Math.max(bird.vy * 0.05, -0.5), 0.7);
+  flappyCtx.rotate(rot);
+  flappyCtx.fillStyle = '#f59e0b';
+  flappyCtx.beginPath();
+  flappyCtx.arc(0, 0, 12, 0, Math.PI * 2);
+  flappyCtx.fill();
+  flappyCtx.fillStyle = '#ffffff';
+  flappyCtx.fillRect(2, -6, 6, 6);
+  flappyCtx.restore();
+}
 
-    // CLOUD STORAGE DRIVE
-    socket.on('load_cloud_files', function(files) {
-      const list = document.getElementById('cloudDriveList');
-      list.innerHTML = '';
-      files.forEach(renderCloudFile);
-    });
-    socket.on('new_cloud_file', renderCloudFile);
-    socket.on('cloud_file_deleted', function(fileId) {
-      const el = document.getElementById('drive-file-' + fileId);
-      if (el) el.remove();
-    });
-
-    function renderCloudFile(file) {
-      const list = document.getElementById('cloudDriveList');
-      const div = document.createElement('div');
-      div.id = 'drive-file-' + file.id;
-      div.className = 'file-card';
-      let mediaHtml = '';
-      if (file.type.startsWith('audio/')) {
-        mediaHtml = '<audio controls src="' + file.url + '" style="height:35px; margin-top:5px; width:100%;"></audio>';
-      } else if (file.type.startsWith('image/')) {
-        mediaHtml = '<br><img src="' + file.url + '" style="max-width:120px; border-radius:6px; margin-top:5px;"/>';
-      } else if (file.type.startsWith('video/')) {
-        mediaHtml = '<br><video controls src="' + file.url + '" style="max-width:180px; border-radius:6px; margin-top:5px;"></video>';
-      }
-      div.innerHTML = '<div><strong>' + file.name + '</strong> (by ' + file.uploader + ')' + mediaHtml + '</div>' +
-                      '<div><a href="' + file.url + '" download="' + file.name + '" style="color:#8ab4f8; margin-right:8px; text-decoration:none;">⬇️</a>' +
-                      '<button onclick="deleteDriveFile(\'' + file.id + '\')" style="background:none; border:none; color:#ff8a8a; cursor:pointer;">🗑</button></div>';
-      list.appendChild(div);
-    }
-
-    function uploadToDrive(input) {
-      Array.from(input.files).forEach(file => {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          socket.emit('upload_cloud_file', {
-            name: file.name,
-            type: file.type,
-            url: e.target.result,
-            uploader: currentUsername
-          });
-        };
-        reader.readAsDataURL(file);
-      });
-    }
-    function deleteDriveFile(fileId) { socket.emit('delete_cloud_file', fileId); }
-
-    function loadLocalSongs(input) {
-      const list = document.getElementById('localSongList');
-      list.innerHTML = '';
-      Array.from(input.files).forEach(file => {
-        const url = URL.createObjectURL(file);
-        const div = document.createElement('div');
-        div.className = 'file-card';
-        div.innerHTML = '<span>' + file.name + '</span><audio controls src="' + url + '"></audio>';
-        list.appendChild(div);
-      });
-    }
-
-    // WEBRTC CALL ENGINE
-    let peerConnection, localStream, incomingSignal, targetUserToCall, callTimerInterval, callSeconds = 0;
-    let isMuted = false, isSpeaker = false, isVideoActive = false, callFacingMode = "user";
-    let pendingCandidates = [];
-    const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] };
-
-    function createPeerConnection() {
-      peerConnection = new RTCPeerConnection(rtcConfig);
-      peerConnection.ontrack = e => {
-        const remoteVid = document.getElementById('remoteVideo');
-        if (e.streams && e.streams[0]) {
-          remoteVid.srcObject = e.streams[0];
-          remoteVid.play().catch(() => {
-            document.body.addEventListener('touchstart', () => remoteVid.play(), { once: true });
-          });
-        }
-      };
-      peerConnection.onicecandidate = e => {
-        if (e.candidate && targetUserToCall) {
-          socket.emit('send_candidate', { to: targetUserToCall, candidate: e.candidate });
-        }
-      };
-    }
-
-    async function getUserAudioVideoStream(isVideo) {
-      return await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true },
-        video: isVideo ? { facingMode: callFacingMode, width: { ideal: 640 }, height: { ideal: 480 } } : false
-      });
-    }
-
-    async function startCall(isVideo) {
-      targetUserToCall = document.getElementById('targetUser').value.trim();
-      if (!targetUserToCall) return alert("Please enter the user to call!");
-      isVideoActive = isVideo;
-      setupCallUI(targetUserToCall, isVideo);
-      try {
-        localStream = await getUserAudioVideoStream(isVideo);
-        if (isVideo) document.getElementById('localVideo').srcObject = localStream;
-        createPeerConnection();
-        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-        socket.emit('call_user', { userToCall: targetUserToCall, signalData: offer, from: currentUsername, isVideo });
-      } catch(err) { alert("Media access failed: " + err.message); endCall(); }
-    }
-
-    function setupCallUI(targetName, isVideo) {
-      document.getElementById('callSetup').style.display = 'none';
-      document.getElementById('activeCallView').style.display = 'flex';
-      document.getElementById('activeCallerName').innerText = targetName;
-      document.getElementById('callDuration').innerText = "Calling...";
-      document.getElementById('videoArea').style.display = isVideo ? 'block' : 'none';
-      document.getElementById('avatarCircle').style.display = isVideo ? 'none' : 'flex';
-    }
-
-    socket.on('incoming_call', function(data) {
-      incomingSignal = data.signalData;
-      targetUserToCall = data.from;
-      isVideoActive = data.isVideo;
-      document.getElementById('callerNameText').innerText = 'Call from ' + data.from;
-      document.getElementById('incomingContainer').style.display = 'block';
-      openModal('phoneApp');
-    });
-
-    async function acceptCall() {
-      setupCallUI(targetUserToCall, isVideoActive);
-      try {
-        localStream = await getUserAudioVideoStream(isVideoActive);
-        if (isVideoActive) document.getElementById('localVideo').srcObject = localStream;
-        createPeerConnection();
-        localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingSignal));
-        while (pendingCandidates.length > 0) {
-          await peerConnection.addIceCandidate(new RTCIceCandidate(pendingCandidates.shift()));
-        }
-        const answer = await peerConnection.createAnswer();
-        await peerConnection.setLocalDescription(answer);
-        socket.emit('answer_call', { to: targetUserToCall, signal: answer });
-        startTimer();
-      } catch(err) { alert("Call accept failed: " + err.message); endCall(); }
-    }
-
-    socket.on('call_accepted', async function(data) {
-      if (peerConnection) {
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.signal));
-        startTimer();
-      }
-    });
-
-    socket.on('receive_candidate', async function(data) {
-      if (peerConnection && peerConnection.remoteDescription) {
-        try { await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch(e){}
-      } else {
-        pendingCandidates.push(data.candidate);
-      }
-    });
-
-    async function shareScreen() {
-      try {
-        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        const screenTrack = screenStream.getVideoTracks()[0];
-        const sender = peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
-        if (sender) sender.replaceTrack(screenTrack);
-        document.getElementById('videoArea').style.display = 'block';
-        document.getElementById('localVideo').srcObject = screenStream;
-        screenTrack.onended = () => {
-          if (localStream && localStream.getVideoTracks()[0]) {
-            sender.replaceTrack(localStream.getVideoTracks()[0]);
-            document.getElementById('localVideo').srcObject = localStream;
-          }
-        };
-      } catch(err) { alert("Screen share failed."); }
-    }
-
-    async function switchCallCamera() {
-      if (!isVideoActive || !localStream) return;
-      callFacingMode = (callFacingMode === "user") ? "environment" : "user";
-      const videoTrack = localStream.getVideoTracks()[0];
-      if (videoTrack) videoTrack.stop();
-      try {
-        const newStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: callFacingMode } });
-        const newTrack = newStream.getVideoTracks()[0];
-        localStream.removeTrack(videoTrack);
-        localStream.addTrack(newTrack);
-        document.getElementById('localVideo').srcObject = localStream;
-        const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
-        if (sender) sender.replaceTrack(newTrack);
-      } catch(e) { alert("Camera flip failed."); }
-    }
-
-    function startTimer() {
-      callSeconds = 0;
-      clearInterval(callTimerInterval);
-      callTimerInterval = setInterval(() => {
-        callSeconds++;
-        const mins = String(Math.floor(callSeconds / 60)).padStart(2, '0');
-        const secs = String(callSeconds % 60).padStart(2, '0');
-        document.getElementById('callDuration').innerText = mins + ":" + secs;
-      }, 1000);
-    }
-
-    function toggleMute() {
-      if (localStream && localStream.getAudioTracks()[0]) {
-        isMuted = !isMuted;
-        localStream.getAudioTracks()[0].enabled = !isMuted;
-        document.getElementById('muteBtn').classList.toggle('active', isMuted);
-      }
-    }
-    function toggleSpeaker() {
-      const remoteVid = document.getElementById('remoteVideo');
-      isSpeaker = !isSpeaker;
-      remoteVid.volume = isSpeaker ? 1.0 : 0.5;
-      document.getElementById('speakerBtn').classList.toggle('active', isSpeaker);
-    }
-    function toggleVideoMode() {
-      isVideoActive = !isVideoActive;
-      document.getElementById('videoToggleBtn').classList.toggle('active', !isVideoActive);
-      document.getElementById('videoArea').style.display = isVideoActive ? 'block' : 'none';
-      document.getElementById('avatarCircle').style.display = isVideoActive ? 'none' : 'flex';
-    }
-
-    socket.on('call_failed', function(data) { alert(data.reason); endCall(); });
-    socket.on('call_ended', endCall);
-
-    function endCall() {
-      clearInterval(callTimerInterval);
-      pendingCandidates = [];
-      if (targetUserToCall) socket.emit('end_call', { to: targetUserToCall });
-      if (peerConnection) { peerConnection.close(); peerConnection = null; }
-      if (localStream) { localStream.getTracks().forEach(t => t.stop()); }
-      document.getElementById('callSetup').style.display = 'block';
-      document.getElementById('activeCallView').style.display = 'none';
-      document.getElementById('incomingContainer').style.display = 'none';
-      closeModal('phoneApp');
-    }
-
-    // CAMERA APP
-    let cameraStream, cameraFacingMode = "user", videoRecorder, videoChunks = [], isRecordingVid = false;
-    async function openCamera() {
-      openModal('cameraApp');
-      startCameraStream();
-    }
-    async function startCameraStream() {
-      if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
-      try {
-        cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: cameraFacingMode }, audio: true });
-        const webcam = document.getElementById('webcam');
-        webcam.srcObject = cameraStream;
-        webcam.muted = true;
-      } catch(err) { alert("Camera access required."); }
-    }
-    function switchCameraFacing() {
-      cameraFacingMode = (cameraFacingMode === "user") ? "environment" : "user";
-      startCameraStream();
-    }
-    function closeCamera() {
-      if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
-      closeModal('cameraApp');
-    }
-    function takePhoto() {
-      const video = document.getElementById('webcam');
-      const canvas = document.getElementById('photoCanvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      canvas.getContext('2d').drawImage(video, 0, 0);
-      socket.emit('upload_cloud_file', {
-        name: 'Photo_' + Date.now() + '.png',
-        type: 'image/png',
-        url: canvas.toDataURL('image/png'),
-        uploader: currentUsername
-      });
-      alert('Photo saved to Cloud Drive!');
-    }
-    function toggleCameraRecording() {
-      const btn = document.getElementById('camRecordBtn');
-      if (!isRecordingVid) {
-        videoChunks = [];
-        videoRecorder = new MediaRecorder(cameraStream);
-        videoRecorder.ondataavailable = e => videoChunks.push(e.data);
-        videoRecorder.onstop = () => {
-          const blob = new Blob(videoChunks, { type: 'video/mp4' });
-          const reader = new FileReader();
-          reader.onload = function(e) {
-            socket.emit('upload_cloud_file', {
-              name: 'Video_' + Date.now() + '.mp4',
-              type: 'video/mp4',
-              url: e.target.result,
-              uploader: currentUsername
-            });
-            alert('Video saved to Cloud Drive!');
-          };
-          reader.readAsDataURL(blob);
-        };
-        videoRecorder.start();
-        isRecordingVid = true;
-        btn.innerText = "⏹ Stop";
-      } else {
-        videoRecorder.stop();
-        isRecordingVid = false;
-        btn.innerText = "⏺️ Record Video";
-      }
-    }
-
-    // NATIVE CANVAS FLAPPY BIRD GAME ENGINE
-    let flappyInterval;
-    function openFlappy() {
-      openModal('flappyModal');
-      const cvs = document.getElementById("flappyCanvas");
-      const ctx = cvs.getContext("2d");
-      let birdY = 150, velocity = 0, score = 0;
-      let pipes = [{ x: 320, top: 120, bottom: 240 }];
-
-      window.flappyJump = function() { velocity = -6; };
-      document.onkeydown = (e) => { if (e.code === 'Space') window.flappyJump(); };
-
-      clearInterval(flappyInterval);
-      flappyInterval = setInterval(() => {
-        velocity += 0.4;
-        birdY += velocity;
-        ctx.fillStyle = "#111";
-        ctx.fillRect(0, 0, 320, 420);
-
-        // Draw Bird
-        ctx.fillStyle = "#ffcb05";
-        ctx.beginPath();
-        ctx.arc(60, birdY, 12, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Draw Pipes
-        ctx.fillStyle = "#2ecc71";
-        pipes.forEach(p => {
-          p.x -= 2;
-          ctx.fillRect(p.x, 0, 40, p.top);
-          ctx.fillRect(p.x, p.bottom, 40, 420 - p.bottom);
-
-          if (p.x === 60) score++;
-          if (p.x < -40) {
-            p.x = 320;
-            p.top = Math.random() * 180 + 40;
-            p.bottom = p.top + 100;
-          }
-
-          // Collision
-          if ((60 + 12 > p.x && 60 - 12 < p.x + 40) && (birdY - 12 < p.top || birdY + 12 > p.bottom)) {
-            birdY = 150; velocity = 0; score = 0; p.x = 320;
-          }
-        });
-
-        if (birdY > 420 || birdY < 0) { birdY = 150; velocity = 0; score = 0; }
-
-        ctx.fillStyle = "#fff";
-        ctx.font = "18px sans-serif";
-        ctx.fillText("Score: " + score, 10, 25);
-      }, 1000 / 60);
-    }
-
-    // NATIVE CANVAS SNAKE GAME ENGINE
-    let snakeInterval;
-    function openSnake() {
-      openModal('snakeModal');
-      const cvs = document.getElementById("snakeCanvas");
-      const ctx = cvs.getContext("2d");
-      let snake = [{x: 160, y: 160}], food = {x: 80, y: 80}, dir = "RIGHT";
-
-      window.changeSnakeDir = (d) => { dir = d; };
-      document.onkeydown = (e) => {
-        if(e.key === "ArrowUp" && dir !== "DOWN") dir = "UP";
-        if(e.key === "ArrowDown" && dir !== "UP") dir = "DOWN";
-        if(e.key === "ArrowLeft" && dir !== "RIGHT") dir = "LEFT";
-        if(e.key === "ArrowRight" && dir !== "LEFT") dir = "RIGHT";
-      };
-
-      clearInterval(snakeInterval);
-      snakeInterval = setInterval(() => {
-        let head = {x: snake[0].x, y: snake[0].y};
-        if (dir === "UP") head.y -= 16;
-        if (dir === "DOWN") head.y += 16;
-        if (dir === "LEFT") head.x -= 16;
-        if (dir === "RIGHT") head.x += 16;
-
-        if (head.x === food.x && head.y === food.y) {
-          food = {x: Math.floor(Math.random()*20)*16, y: Math.floor(Math.random()*20)*16};
-        } else {
-          snake.pop();
-        }
-
-        if (head.x < 0 || head.x >= 320 || head.y < 0 || head.y >= 320 || snake.some(s=>s.x===head.x && s.y===head.y)) {
-          head = {x: 160, y: 160}; snake = [head]; dir = "RIGHT";
-        }
-        snake.unshift(head);
-
-        ctx.fillStyle = "#111";
-        ctx.fillRect(0, 0, 320, 320);
-        ctx.fillStyle = "#ff5555";
-        ctx.fillRect(food.x, food.y, 14, 14);
-        ctx.fillStyle = "#55ff55";
-        snake.forEach(s => ctx.fillRect(s.x, s.y, 14, 14));
-      }, 120);
-    }
-  </script>
+// Initializations
+updateTTTScores();
+resetTTT();
+initSnake();
+resetFlappy();
+</script>
 </body>
 </html>
