@@ -79,10 +79,11 @@
     <div class="app-icon" onclick="openWebLink('https://m.youtube.com')"><img src="https://img.icons8.com/color/96/television.png"/><span>YouTube</span></div>
     <div class="app-icon" onclick="openWebLink('https://gemini.google.com')"><img src="https://img.icons8.com/color/96/sparkling.png"/><span>Gemini</span></div>
 
+    <!-- Embedding-friendly working game links -->
     <div class="app-icon" onclick="openAppUrl('https://play2048.co/')"><img src="https://img.icons8.com/color/96/puzzle.png"/><span>2048</span></div>
-    <div class="app-icon" onclick="openAppUrl('https://flappybird.io/')"><img src="https://img.icons8.com/color/96/twitter.png"/><span>Flappy</span></div>
-    <div class="app-icon" onclick="openAppUrl('https://chromedino.com/')"><img src="https://img.icons8.com/color/96/dinosaur.png"/><span>Dino Run</span></div>
+    <div class="app-icon" onclick="openAppUrl('https://dino-chrome.com/')"><img src="https://img.icons8.com/color/96/dinosaur.png"/><span>Dino Run</span></div>
     <div class="app-icon" onclick="openAppUrl('https://playtictactoe.org/')"><img src="https://img.icons8.com/color/96/grid.png"/><span>TicTacToe</span></div>
+    <div class="app-icon" onclick="openAppUrl('https://snake.googlemaps.com/')"><img src="https://img.icons8.com/color/96/controller.png"/><span>Snake Game</span></div>
   </div>
 
   <!-- Users & Friends Modal -->
@@ -207,7 +208,8 @@
       <button class="close-btn" onclick="closeCamera()">X</button>
     </div>
     <div class="modal-body" style="text-align: center;">
-      <video id="webcam" autoplay playsinline style="width:100%; max-height:280px; border-radius:12px; background:#000;"></video>
+      <!-- muted attribute prevents feedback screech -->
+      <video id="webcam" autoplay muted playsinline style="width:100%; max-height:280px; border-radius:12px; background:#000;"></video>
       <canvas id="photoCanvas" style="display:none;"></canvas>
       <div style="display:flex; gap:10px; justify-content:center; margin-top:15px;">
         <button class="btn" onclick="takePhoto()">📷 Snap Photo</button>
@@ -632,7 +634,9 @@
       if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
       try {
         cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: cameraFacingMode }, audio: true });
-        document.getElementById('webcam').srcObject = cameraStream;
+        const webcam = document.getElementById('webcam');
+        webcam.srcObject = cameraStream;
+        webcam.muted = true; // Prevents live audio feedback screeching
       } catch(err) { alert("Camera access required."); }
     }
     function switchCameraFacing() {
