@@ -3,6 +3,10 @@ const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
+let OAuth2Client = null;
+try { ({ OAuth2Client } = require('google-auth-library')); } catch (e) {}
+const metaOf = () => ({ totalVisits: db.totalVisits, visitors: db.visitors, users: db.users, friends: db.friends, requests: db.requests, profiles: db.profiles, blocks: db.blocks, accounts: db.accounts, sessions: db.sessions });
 
 const app = express();
 const server = http.createServer(app);
