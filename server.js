@@ -17,7 +17,7 @@ let db = {
   totalVisits: 0, visitors: [], users: [], friends: {}, requests: {},
   global: [], dms: {}, files: [], profiles: {}, blocks: {}, accounts: {}, sessions: {}
 };
-let M = null; // MongoDB collections when connected
+let M = null;
 const logErr = e => console.error('Storage error:', e.message);
 const metaOf = () => ({
   totalVisits: db.totalVisits, visitors: db.visitors, users: db.users, friends: db.friends,
@@ -60,7 +60,7 @@ const pMsgDel = id => { if (M) M.msgs.deleteOne({ _id: id }).catch(logErr); else
 const pFile = f => { if (M) M.files.replaceOne({ _id: f.id }, { ...f, _id: f.id }, { upsert: true }).catch(logErr); else pMeta(); };
 const pFileDel = id => { if (M) M.files.deleteOne({ _id: id }).catch(logErr); else pMeta(); };
 
-async function fullSave() { // used after /restore
+async function fullSave() {
   if (!M) return flushMeta();
   await M.msgs.deleteMany({}); await M.files.deleteMany({});
   const all = [...db.global, ...Object.values(db.dms).flat()];
@@ -71,9 +71,9 @@ async function fullSave() { // used after /restore
 process.on('SIGTERM', async () => { clearTimeout(metaTimer); await flushMeta(); process.exit(0); });
 
 // ================= HELPERS =================
-const online = {}; // username -> socket.id
-const MAX_BYTES = 14e6; // ~10 MB file as base64
-const A = () => io.to('authed'); // only logged-in sockets
+const online = {};
+const MAX_BYTES = 14e6;
+const A = () => io.to('authed');
 const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 const arr = (o, k) => (hasOwn(o, k) ? o[k] : (o[k] = []));
 const prof = n => (hasOwn(db.profiles, n) ? db.profiles[n] : (db.profiles[n] = { lastSeen: 0, visits: 0, status: '', emoji: '😀' }));
@@ -94,7 +94,7 @@ const hashPw = (pw, salt) => crypto.scryptSync(pw, salt, 32).toString('hex');
 const sha = s => crypto.createHash('sha256').update(s).digest('hex');
 const nameOfToken = t => (hasOwn(db.sessions, sha(String(t || ''))) ? db.sessions[sha(String(t))] : null);
 const newSession = name => {
-  Object.keys(db.sessions).forEach(h => { if (db.sessions[h] === name) delete db.sessions[h]; }); // one device at a time
+  Object.keys(db.sessions).forEach(h => { if (db.sessions[h] === name) delete db.sessions[h]; });
   const t = crypto.randomBytes(32).toString('hex');
   db.sessions[sha(t)] = name; pMeta(); return t;
 };
@@ -119,6 +119,71 @@ function dmsFor(name) {
     if (a === name) out[b] = db.dms[k]; else if (b === name) out[a] = db.dms[k];
   });
   return out;
+}
+
+// ================= GROUP CALLS (mesh rooms, max 8 people) =================
+const rooms = {}; // id -> { id, host, video, members:Set, pending:Map(name->timer) }
+const busy = n => Object.values(rooms).some(r => r.members.has(n));
+
+function missedNote(from, target, video) {
+  const m = { user: from, id: uid(), t: Date.now(), timestamp: '', to: target, chat: key(from, target),
+    text: '📞 Missed ' + (video ? 'video ' : '') + 'call from ' + from };
+  arr(db.dms, m.chat).push(m); pMsg(m);
+  to(from, 'receive_message', m); to(target, 'receive_message', m);
+}
+function checkRoom(r, reason) {
+  if (r.members.size <= 1 && r.pending.size === 0) {
+    r.members.forEach(n => to(n, 'call_ended', { room: r.id, reason: reason || 'Everyone else left the call' }));
+    delete rooms[r.id];
+  }
+}
+function invite(r, name, from) {
+  if (r.members.has(name) || r.pending.has(name)) return;
+  if (r.members.size + r.pending.size >= 8) return to(from, 'toast', 'Max 8 people in a call');
+  if (!online[name]) { missedNote(from, name, r.video); return to(from, 'toast', name + ' is offline (missed-call note left)'); }
+  if (busy(name)) return r.members.forEach(m => to(m, 'call_declined', { room: r.id, name, busy: true }));
+  to(name, 'call_invite', { room: r.id, from, video: r.video, members: [...r.members] });
+  r.pending.set(name, setTimeout(() => {
+    r.pending.delete(name);
+    to(name, 'call_cancelled', { room: r.id });
+    missedNote(from, name, r.video);
+    r.members.forEach(m => to(m, 'call_missed', { room: r.id, name }));
+    checkRoom(r, 'No answer');
+  }, 45000));
+}
+function leaveRoom(name, id) {
+  const r = rooms[id]; if (!r) return;
+  if (r.pending.has(name)) {
+    clearTimeout(r.pending.get(name)); r.pending.delete(name);
+    r.members.forEach(m => to(m, 'call_declined', { room: id, name }));
+  }
+  if (r.members.delete(name)) r.members.forEach(m => to(m, 'peer_left', { room: id, name }));
+  if (r.members.size === 0) {
+    r.pending.forEach((t, n) => { clearTimeout(t); to(n, 'call_cancelled', { room: id }); });
+    delete rooms[id]; return;
+  }
+  checkRoom(r);
+}
+function leaveAllRooms(name) {
+  Object.keys(rooms).forEach(id => { const r = rooms[id]; if (r && (r.members.has(name) || r.pending.has(name))) leaveRoom(name, id); });
+}
+
+// ================= TIC-TAC-TOE (online) =================
+const ttt = {};
+const TL = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+const tttResult = b => {
+  for (const l of TL) if (b[l[0]] && b[l[0]] === b[l[1]] && b[l[0]] === b[l[2]]) return { w: b[l[0]], line: l };
+  return b.every(Boolean) ? { w: 'draw', line: [] } : null;
+};
+const emitG = g => {
+  const s = { id: g.id, x: g.x, o: g.o, board: g.board, turn: g.turn, over: !!g.over, result: g.result || null };
+  to(g.x, 'ttt_state', s); to(g.o, 'ttt_state', s);
+};
+function tttLeaveAll(name) {
+  Object.keys(ttt).forEach(id => {
+    const g = ttt[id];
+    if (g.x === name || g.o === name) { to(g.x === name ? g.o : g.x, 'ttt_closed', { id }); delete ttt[id]; }
+  });
 }
 
 // ================= ROUTES =================
@@ -177,7 +242,7 @@ io.on('connection', (socket) => {
     if (badName(name)) return socket.emit('auth_error', 'Choose another name (2–24 characters)');
     if (password.length < 6) return socket.emit('auth_error', 'Password must be at least 6 characters');
     if (getAcc(akey(name))) return socket.emit('auth_exists', name);
-    const display = findUser(name) || name; // claims an old name from before accounts existed
+    const display = findUser(name) || name;
     const salt = crypto.randomBytes(16).toString('hex');
     db.accounts[akey(display)] = { name: display, salt, hash: hashPw(password, salt), created: Date.now() };
     ok(display, newSession(display));
@@ -218,7 +283,10 @@ io.on('connection', (socket) => {
   socket.on('logout', ({ token } = {}) => {
     const h = sha(String(token || ''));
     if (hasOwn(db.sessions, h)) delete db.sessions[h];
-    if (me && online[me] === socket.id) { delete online[me]; prof(me).lastSeen = Date.now(); }
+    if (me && online[me] === socket.id) {
+      leaveAllRooms(me); tttLeaveAll(me);
+      delete online[me]; prof(me).lastSeen = Date.now();
+    }
     socket.leave('authed');
     me = null; pMeta(); stats();
   });
@@ -335,24 +403,84 @@ io.on('connection', (socket) => {
     A().emit('cloud_file_deleted', id);
   });
 
-  // ---------- Call signaling ----------
-  socket.on('call_user', (d = {}) => {
+  // ---------- Group calls ----------
+  socket.on('call_start', ({ invitees, isVideo } = {}) => {
     if (!me) return;
-    const target = findUser(d.userToCall);
-    if (!target) return socket.emit('call_failed', { reason: 'User not found' });
-    if (isBlocked(me, target)) return socket.emit('call_failed', { reason: 'Call not possible' });
-    if (online[target]) return to(target, 'incoming_call', { signalData: d.signalData, from: me, isVideo: d.isVideo });
-    const m = { user: me, id: uid(), t: Date.now(), timestamp: '', to: target, chat: key(me, target), text: '📞 Missed ' + (d.isVideo ? 'video ' : '') + 'call from ' + me };
-    arr(db.dms, m.chat).push(m); pMsg(m);
-    to(me, 'receive_message', m);
-    socket.emit('call_failed', { reason: '"' + target + '" is offline. A missed-call note was left.' });
+    if (busy(me)) return socket.emit('toast', 'You are already in a call');
+    const names = [...new Set((Array.isArray(invitees) ? invitees : []).map(findUser).filter(n => n && n !== me && !isBlocked(me, n)))].slice(0, 7);
+    if (!names.length) return socket.emit('call_failed', { reason: 'Pick someone to call' });
+    const id = uid();
+    const r = rooms[id] = { id, host: me, video: !!isVideo, members: new Set([me]), pending: new Map() };
+    socket.emit('call_room', { room: id });
+    names.forEach(n => invite(r, n, me));
+    checkRoom(r, 'Nobody could be reached. A missed-call note was left.');
   });
-  socket.on('answer_call', (d = {}) => { if (me) to(d.to, 'call_accepted', { signal: d.signal, from: me }); });
-  socket.on('send_candidate', (d = {}) => { if (me) to(d.to, 'receive_candidate', { candidate: d.candidate, from: me }); });
-  socket.on('end_call', (d) => { if (me && d && d.to) to(d.to, 'call_ended'); });
+  socket.on('call_join', ({ room } = {}) => {
+    const r = rooms[room];
+    if (!me) return;
+    if (!r || !r.pending.has(me)) return socket.emit('call_ended', { room, reason: 'The call has ended' });
+    clearTimeout(r.pending.get(me)); r.pending.delete(me);
+    const others = [...r.members];
+    r.members.add(me);
+    socket.emit('call_joined', { room, peers: others });
+    others.forEach(n => to(n, 'peer_joined', { room, name: me }));
+  });
+  socket.on('call_add', ({ room, names } = {}) => {
+    const r = rooms[room];
+    if (!me || !r || !r.members.has(me)) return;
+    (Array.isArray(names) ? names : []).map(findUser)
+      .filter(n => n && ![...r.members].some(m => isBlocked(m, n)))
+      .forEach(n => invite(r, n, me));
+  });
+  socket.on('call_leave', ({ room } = {}) => { if (me) leaveRoom(me, room); });
+  socket.on('rtc_signal', ({ room, to: target, data } = {}) => {
+    const r = rooms[room];
+    if (!me || !r || !r.members.has(me) || !r.members.has(target)) return;
+    to(target, 'rtc_signal', { room, from: me, data });
+  });
+
+  // ---------- Tic-Tac-Toe (online) ----------
+  socket.on('ttt_invite', (name) => {
+    const t = findUser(name);
+    if (!me || !t || t === me || !online[t] || isBlocked(me, t)) return socket.emit('toast', 'Player not available');
+    const id = uid();
+    ttt[id] = { id, x: me, o: t, board: Array(9).fill(''), turn: 'X', started: false };
+    socket.emit('toast', 'Invite sent to ' + t);
+    to(t, 'ttt_invited', { id, from: me });
+    setTimeout(() => { if (ttt[id] && !ttt[id].started) delete ttt[id]; }, 60000);
+  });
+  socket.on('ttt_accept', (id) => { const g = ttt[id]; if (!g || g.o !== me) return; g.started = true; emitG(g); });
+  socket.on('ttt_decline', (id) => { const g = ttt[id]; if (!g || g.o !== me) return; to(g.x, 'toast', me + ' declined your game'); delete ttt[id]; });
+  socket.on('ttt_move', ({ id, i } = {}) => {
+    const g = ttt[id];
+    if (!g || !g.started || g.over) return;
+    const sym = g.x === me ? 'X' : g.o === me ? 'O' : null;
+    if (!sym || sym !== g.turn || !(i >= 0 && i < 9) || g.board[i]) return;
+    g.board[i] = sym;
+    const r = tttResult(g.board);
+    if (r) { g.over = true; g.result = r; } else g.turn = sym === 'X' ? 'O' : 'X';
+    emitG(g);
+  });
+  socket.on('ttt_again', (id) => {
+    const g = ttt[id];
+    if (!g || !g.over || (g.x !== me && g.o !== me)) return;
+    [g.x, g.o] = [g.o, g.x];
+    g.board = Array(9).fill(''); g.turn = 'X'; g.over = false; g.result = null;
+    emitG(g);
+  });
+  socket.on('ttt_leave', (id) => {
+    const g = ttt[id];
+    if (!g || (g.x !== me && g.o !== me)) return;
+    const other = g.x === me ? g.o : g.x;
+    to(other, 'toast', me + ' left the game'); to(other, 'ttt_closed', { id });
+    delete ttt[id];
+  });
 
   socket.on('disconnect', () => {
-    if (me && online[me] === socket.id) { delete online[me]; prof(me).lastSeen = Date.now(); pMeta(); stats(); }
+    if (me && online[me] === socket.id) {
+      leaveAllRooms(me); tttLeaveAll(me);
+      delete online[me]; prof(me).lastSeen = Date.now(); pMeta(); stats();
+    }
   });
 });
 
