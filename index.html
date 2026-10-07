@@ -36,7 +36,7 @@ body{font-family:'Roboto','Segoe UI',sans-serif;background:#0c0202;color:#fff;ma
 .msg-img{max-width:180px;border-radius:8px;display:block;margin-top:4px}
 #typingNotice{font-size:11px;color:#aaa;font-style:italic;height:16px;margin-bottom:6px}
 .chat-top,.chat-controls{display:flex;gap:6px}
-select,input[type=text]{padding:10px;border-radius:8px;border:1px solid #441515;background:#1f0808;color:#fff}
+select,input[type=text],input[type=password]{padding:10px;border-radius:8px;border:1px solid #441515;background:#1f0808;color:#fff}
 .chat-top select,.chat-controls input{flex:1}
 .user-card,.file-card{display:flex;justify-content:space-between;align-items:center;gap:6px;background:#1a0808;border:1px solid #3d1515;padding:10px;border-radius:8px;margin-bottom:8px;flex-wrap:wrap}
 .user-actions{display:flex;gap:5px;flex-wrap:wrap}
@@ -59,11 +59,32 @@ h4{color:#ff8a8a;margin:14px 0 8px}
 </head>
 <body>
 <div id="toast"></div>
+
+<!-- LOGIN / SIGN UP SCREEN -->
+<div id="authModal" class="modal" style="z-index:500">
+  <div class="modal-header"><h3>Welcome to Gemini OS</h3></div>
+  <div class="modal-body">
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+      <button class="btn" id="tabSignup" style="flex:1" onclick="setAuthMode('signup')">Sign up</button>
+      <button class="btn gray" id="tabLogin" style="flex:1" onclick="setAuthMode('login')">Log in</button>
+    </div>
+    <div id="authMsg" style="color:#ffb300;font-size:13px;min-height:18px;margin-bottom:8px"></div>
+    <input type="text" id="authName" placeholder="Name (spaces allowed)" maxlength="24" autocomplete="username" style="width:100%;margin-bottom:8px"/>
+    <input type="password" id="authPass" placeholder="Password (min 6 characters)" style="width:100%;margin-bottom:8px" onkeydown="if(event.key==='Enter')submitAuth()"/>
+    <input type="password" id="authPass2" placeholder="Repeat password" style="width:100%;margin-bottom:8px"/>
+    <button class="btn" style="width:100%" id="authBtn" onclick="submitAuth()">Create account</button>
+    <div id="googleWrap" style="display:none;margin-top:16px;text-align:center">
+      <div style="color:#888;font-size:12px;margin-bottom:8px">or</div>
+      <div id="googleBtn" style="display:flex;justify-content:center"></div>
+    </div>
+  </div>
+</div>
+
 <div id="offlineBar">📴 Offline — text messages will send when you reconnect</div>
 
 <div class="status-bar">
   <span style="cursor:pointer" onclick="openModal('usersModal')">👥 Online: <span id="onlineCount" class="badge">0</span> · 👁 Visits: <span id="visitCount" class="badge">0</span></span>
-  <span id="display-username" style="cursor:pointer;text-decoration:underline" onclick="changeUsername()"></span>
+  <span id="display-username" style="cursor:pointer;text-decoration:underline" onclick="logout()"></span>
 </div>
 
 <div class="grid">
@@ -86,14 +107,26 @@ h4{color:#ff8a8a;margin:14px 0 8px}
       <div class="stat"><b id="stVisits">0</b><small>Total visits</small></div>
       <div class="stat"><b id="stUnique">0</b><small>Unique visitors</small></div>
     </div>
-    <h4>➕ Add friend by username</h4>
+
+    <h4>🙂 My profile</h4>
     <div style="display:flex;gap:6px">
-      <input type="text" id="addFriendName" placeholder="Type username..." style="flex:1" onkeydown="if(event.key==='Enter')addByName()"/>
+      <select id="profEmoji"><option>😀</option><option>😎</option><option>🤖</option><option>🦊</option><option>🐱</option><option>🔥</option><option>🌙</option><option>🎧</option><option>👑</option><option>🚀</option></select>
+      <input type="text" id="profStatus" placeholder="Your status..." maxlength="60" style="flex:1"/>
+      <button class="btn" onclick="saveProfile()">Save</button>
+    </div>
+
+    <h4>➕ Add friend by name</h4>
+    <div style="display:flex;gap:6px">
+      <input type="text" id="addFriendName" placeholder="Type name..." style="flex:1" onkeydown="if(event.key==='Enter')addByName()"/>
       <button class="btn" onclick="addByName()">Add</button>
     </div>
+
     <h4>Friend requests</h4><div id="requestList"></div>
     <h4>My friends</h4><div id="friendList"></div>
     <h4>Online users</h4><div id="activeUsersList"></div>
+    <h4>📜 All visitors (<span id="dirCount">0</span>)</h4>
+    <input type="text" id="dirSearch" placeholder="Search visitors..." style="width:100%;margin-bottom:8px" oninput="dirQuery=this.value;renderDirectory()"/>
+    <div id="allUsersList"></div>
   </div>
 </div>
 
@@ -129,8 +162,8 @@ h4{color:#ff8a8a;margin:14px 0 8px}
   <div class="modal-header"><h3>Phone</h3><button class="close-btn" onclick="endCall()">X</button></div>
   <div class="modal-body" style="padding:0;background:#121212">
     <div id="callSetup" style="padding:20px">
-      <p style="font-size:14px;color:#aaa">Your ID: <strong id="myCallUser" style="color:#fff"></strong></p>
-      <input type="text" id="targetUser" placeholder="Enter username to call..." style="width:100%;margin-bottom:15px"/>
+      <p style="font-size:14px;color:#aaa">You are: <strong id="myCallUser" style="color:#fff"></strong></p>
+      <input type="text" id="targetUser" placeholder="Enter name to call..." style="width:100%;margin-bottom:15px"/>
       <div style="display:flex;gap:10px">
         <button class="btn blue" style="flex:1" onclick="startCall(false)">📞 Audio Call</button>
         <button class="btn green" style="flex:1" onclick="startCall(true)">📹 Video Call</button>
@@ -203,13 +236,14 @@ h4{color:#ff8a8a;margin:14px 0 8px}
   </div>
 </div>
 
-<!-- Hosted on Render: keep this line. For a bundled APK/ZIP, use: <script src="socket.io.min.js"></script> -->
+<!-- Hosted on Render: keep this line. For a bundled APK/ZIP use: <script src="socket.io.min.js"></script> -->
 <script src="/socket.io/socket.io.js"></script>
 <script>
-// For a bundled APK/ZIP app, set your Render address here, e.g. 'https://your-name.onrender.com'. Leave '' when served by Render.
+// Leave '' when the page is served by Render. For a bundled APK/ZIP app, put your Render address, e.g. 'https://your-name.onrender.com'
 const SERVER_URL = '';
 const socket = io(SERVER_URL || undefined, { reconnection: true, reconnectionDelay: 2000, reconnectionDelayMax: 10000 });
 
+// ---------- Helpers ----------
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const enc = s => encodeURIComponent(s);
@@ -220,63 +254,160 @@ function openModal(id){ $(id).style.display='flex'; }
 function closeModal(id){ $(id).style.display='none'; }
 function openAppUrl(u){ $('appFrame').src=u; openModal('webModal'); }
 function tooBig(f){ if(f.size>MAX_FILE){ toast('File too big (max 10 MB)'); return true; } return false; }
+const timeAgo = t => {
+  if(!t) return 'a while ago';
+  const s = Math.floor((Date.now()-t)/1000);
+  if(s<60) return 'just now';
+  if(s<3600) return Math.floor(s/60)+' min ago';
+  if(s<86400) return Math.floor(s/3600)+' h ago';
+  return Math.floor(s/86400)+' d ago';
+};
 
-// ---------- Identity ----------
+// ---------- State ----------
 let clientId = localStorage.getItem('client_id');
 if(!clientId){ clientId = Math.random().toString(36).slice(2)+Date.now().toString(36); localStorage.setItem('client_id', clientId); }
-let me = localStorage.getItem('custom_username');
-if(!me){ me = (prompt('Enter your display name:', 'User'+Math.floor(Math.random()*100)) || 'User'+Math.floor(Math.random()*1000)).trim(); localStorage.setItem('custom_username', me); }
-let retried = false;
-function showName(){ $('display-username').innerText='User: '+me; $('myCallUser').innerText=me; }
-function register(){ showName(); socket.emit('register_user', {name: me, clientId}); }
-function changeUsername(){ const n=prompt('Enter new name:', me); if(n&&n.trim()){ me=n.trim(); localStorage.setItem('custom_username', me); register(); } }
-socket.on('name_taken', n => {
-  if(!retried){ retried=true; setTimeout(register, 2000); return; }
-  retried=false;
-  const x = prompt('"'+n+'" is already in use. Choose another name:', n+Math.floor(Math.random()*99));
-  me = (x && x.trim()) ? x.trim() : 'User'+Math.floor(Math.random()*1000);
-  localStorage.setItem('custom_username', me); register();
+let me = localStorage.getItem('token') ? (localStorage.getItem('saved_name')||'') : '';
+let onlineUsers=[], friends=[], requests=[], directory=[], blocks=[], dirMap={}, dirQuery='', profileLoaded=false;
+let globalMsgs=[], dms={}, unread={}, cur='global';
+let authMode='signup', pendingGoogle=null;
+let outbox=[]; try{ outbox=JSON.parse(localStorage.getItem('outbox')||'[]'); }catch(e){}
+const saveOutbox = () => localStorage.setItem('outbox', JSON.stringify(outbox));
+function cacheChats(){ try{ localStorage.setItem('chat_cache', JSON.stringify({g:globalMsgs.slice(-100), d:dms, f:friends})); }catch(e){} }
+
+// ---------- Accounts (sign up / log in / Google / log out) ----------
+function showName(){ $('display-username').innerText = me ? '👤 '+me+' · Log out' : ''; $('myCallUser').innerText = me; }
+function showAuth(msg){ $('authModal').style.display='flex'; if(msg) $('authMsg').innerText=msg; }
+function setAuthMode(m, msg){
+  authMode = m;
+  $('tabSignup').className = 'btn'+(m==='signup'?'':' gray');
+  $('tabLogin').className = 'btn'+(m==='login'?'':' gray');
+  $('authPass2').style.display = m==='signup' ? 'block' : 'none';
+  $('authBtn').innerText = m==='signup' ? 'Create account' : 'Log in';
+  $('authMsg').innerText = msg || '';
+}
+function authNow(){
+  const t = localStorage.getItem('token');
+  if(t) socket.emit('auth_token', {token:t, clientId});
+  else if($('authModal').style.display !== 'flex'){ setAuthMode('signup'); showAuth(); }
+}
+function submitAuth(){
+  const name = $('authName').value.trim(), password = $('authPass').value;
+  if(name.length < 2) return $('authMsg').innerText = 'Enter a name (2–24 characters)';
+  if(authMode==='signup'){
+    if(password.length < 6) return $('authMsg').innerText = 'Password must be at least 6 characters';
+    if(password !== $('authPass2').value) return $('authMsg').innerText = 'Passwords do not match';
+  }
+  if(!socket.connected) return $('authMsg').innerText = 'Connecting to server... try again in a moment';
+  socket.emit(authMode, {name, password, clientId});
+}
+socket.on('auth_ok', ({name, token}) => {
+  me = name; localStorage.setItem('token', token); localStorage.setItem('saved_name', name);
+  $('authModal').style.display = 'none'; $('authPass').value=''; $('authPass2').value='';
+  showName();
+});
+socket.on('auth_fail', () => {
+  ['token','saved_name','chat_cache'].forEach(k => localStorage.removeItem(k));
+  me=''; showName(); setAuthMode('login', 'Please log in again'); showAuth();
+});
+socket.on('auth_error', m => $('authMsg').innerText = m);
+socket.on('auth_exists', n => setAuthMode('login', '"'+n+'" is already registered. If that is you, enter its password. Otherwise tap Sign up and pick another name.'));
+socket.on('kicked', () => {
+  ['token','saved_name'].forEach(k => localStorage.removeItem(k));
+  me=''; showName(); setAuthMode('login', 'This account was opened on another device.'); showAuth();
+});
+function logout(){
+  if(!me || !confirm('Log out of '+me+'?')) return;
+  socket.emit('logout', {token: localStorage.getItem('token')});
+  ['token','saved_name','chat_cache','outbox'].forEach(k => localStorage.removeItem(k));
+  if(pc) endCall(true);
+  outbox=[]; me=''; globalMsgs=[]; dms={}; friends=[]; requests=[]; blocks=[]; directory=[]; dirMap={}; unread={}; cur='global'; profileLoaded=false;
+  showName(); buildChatSelect(); renderChat(); renderUsers();
+  setAuthMode('signup'); showAuth();
+}
+// Optional Google sign-in (the button appears only if the server has GOOGLE_CLIENT_ID)
+fetch((SERVER_URL||'')+'/config').then(r=>r.json()).then(c=>{
+  if(!c.googleClientId) return;
+  const s = document.createElement('script');
+  s.src = 'https://accounts.google.com/gsi/client'; s.async = true;
+  s.onload = () => {
+    google.accounts.id.initialize({client_id: c.googleClientId, callback: r => { pendingGoogle = r.credential; socket.emit('google_auth', {credential: pendingGoogle, clientId}); }});
+    google.accounts.id.renderButton($('googleBtn'), {theme:'filled_black', size:'large', text:'continue_with'});
+    $('googleWrap').style.display = 'block';
+  };
+  document.head.appendChild(s);
+}).catch(()=>{});
+socket.on('google_need_name', ({suggested, error}) => {
+  const n = prompt((error ? error+'\n' : '')+'Choose your display name (spaces allowed):', suggested || '');
+  if(n && n.trim()) socket.emit('google_auth', {credential: pendingGoogle, name: n.trim(), clientId});
 });
 
 // ---------- Connection / offline ----------
 function setOnlineUI(on){ $('offlineBar').style.display = on ? 'none' : 'block'; }
-socket.on('connect', () => { setOnlineUI(true); register(); });
+socket.on('connect', () => { setOnlineUI(true); authNow(); });
 socket.on('disconnect', () => setOnlineUI(false));
 socket.on('connect_error', () => setOnlineUI(false));
 window.addEventListener('online', () => socket.connect());
 window.addEventListener('offline', () => setOnlineUI(false));
-let outbox = []; try{ outbox = JSON.parse(localStorage.getItem('outbox')||'[]'); }catch(e){}
-const saveOutbox = () => localStorage.setItem('outbox', JSON.stringify(outbox));
 function flushOutbox(){ while(outbox.length && socket.connected){ socket.emit('send_message', outbox.shift()); } saveOutbox(); }
 
-// ---------- State ----------
-let onlineUsers = [], friends = [], requests = [];
-let globalMsgs = [], dms = {}, unread = {}, cur = 'global';
-function cacheChats(){ try{ localStorage.setItem('chat_cache', JSON.stringify({g:globalMsgs.slice(-100), d:dms, f:friends})); }catch(e){} }
-
+// ---------- Stats, users, friends, visitors ----------
 socket.on('stats', s => {
   $('onlineCount').innerText=s.online; $('visitCount').innerText=s.totalVisits;
   $('stOnline').innerText=s.online; $('stVisits').innerText=s.totalVisits; $('stUnique').innerText=s.uniqueVisitors;
 });
 socket.on('user_list', u => { onlineUsers=u; renderUsers(); buildChatSelect(); });
 socket.on('social', s => { friends=s.friends; requests=s.requests; renderUsers(); buildChatSelect(); cacheChats(); });
+socket.on('blocks', b => { blocks=b; renderDirectory(); });
+socket.on('directory', d => {
+  directory=d; dirMap={}; d.forEach(u => dirMap[u.name]=u);
+  if(!profileLoaded && dirMap[me]){
+    profileLoaded=true;
+    $('profEmoji').value = dirMap[me].emoji || '😀';
+    $('profStatus').value = dirMap[me].status || '';
+  }
+  renderUsers();
+});
 socket.on('toast', toast);
 
-// ---------- Users / Friends ----------
 function addByName(){ const n=$('addFriendName').value.trim(); if(!n) return; socket.emit('friend_request', n); $('addFriendName').value=''; }
+function saveProfile(){ socket.emit('set_profile', {emoji:$('profEmoji').value, status:$('profStatus').value.trim()}); toast('Profile saved'); }
 function userRow(u, extra){
-  const on = onlineUsers.includes(u);
-  return '<div class="user-card"><span>'+(on?'🟢':'⚪')+' '+esc(u)+(u===me?' (You)':'')+'</span><div class="user-actions">'+extra+'</div></div>';
+  const on = onlineUsers.includes(u), p = dirMap[u] || {};
+  return '<div class="user-card"><div><span>'+(on?'🟢':'⚪')+' '+esc(p.emoji||'👤')+' '+esc(u)+(u===me?' (You)':'')+'</span>'
+    +(p.status?'<br><small style="color:#aaa">'+esc(p.status)+'</small>':'')
+    +(!on?'<br><small style="color:#888">last seen '+timeAgo(p.lastSeen)+'</small>':'')
+    +'</div><div class="user-actions">'+extra+'</div></div>';
 }
 function renderUsers(){
   $('reqBadge').innerText = requests.length ? '('+requests.length+')' : '';
   $('requestList').innerHTML = requests.length ? requests.map(u => userRow(u,
     '<button class="btn sm green" onclick="act(\'accept\',\''+enc(u)+'\')">Accept</button><button class="btn sm gray" onclick="act(\'decline\',\''+enc(u)+'\')">Decline</button>')).join('') : '<small style="color:#888">None</small>';
   $('friendList').innerHTML = friends.length ? friends.map(u => userRow(u,
-    '<button class="btn sm" onclick="act(\'chat\',\''+enc(u)+'\')">💬 Message</button><button class="btn sm blue" onclick="act(\'call\',\''+enc(u)+'\')">📞 Call</button><button class="btn sm gray" onclick="act(\'unfriend\',\''+enc(u)+'\')">✖</button>')).join('') : '<small style="color:#888">No friends yet — add someone above.</small>';
+    '<button class="btn sm" onclick="act(\'chat\',\''+enc(u)+'\')">💬 Message</button>'
+    +(onlineUsers.includes(u)?'<button class="btn sm blue" onclick="act(\'call\',\''+enc(u)+'\')">📞 Call</button>':'')
+    +'<button class="btn sm gray" onclick="act(\'unfriend\',\''+enc(u)+'\')">✖</button>')).join('') : '<small style="color:#888">No friends yet — add someone above.</small>';
   $('activeUsersList').innerHTML = onlineUsers.filter(u=>u!==me).map(u => userRow(u,
-    '<button class="btn sm" onclick="act(\'chat\',\''+enc(u)+'\')">💬 Message</button><button class="btn sm blue" onclick="act(\'call\',\''+enc(u)+'\')">📞 Call</button>'+
-    (friends.includes(u) ? '' : '<button class="btn sm green" onclick="act(\'add\',\''+enc(u)+'\')">➕ Friend</button>'))).join('') || '<small style="color:#888">Nobody else online.</small>';
+    '<button class="btn sm" onclick="act(\'chat\',\''+enc(u)+'\')">💬 Message</button><button class="btn sm blue" onclick="act(\'call\',\''+enc(u)+'\')">📞 Call</button>'
+    +(friends.includes(u)?'':'<button class="btn sm green" onclick="act(\'add\',\''+enc(u)+'\')">➕ Friend</button>'))).join('') || '<small style="color:#888">Nobody else online.</small>';
+  renderDirectory();
+}
+function renderDirectory(){
+  const q = dirQuery.toLowerCase();
+  $('dirCount').innerText = directory.length;
+  const list = directory.filter(u => u.name!==me && u.name.toLowerCase().includes(q))
+    .sort((a,b) => (onlineUsers.includes(b.name)-onlineUsers.includes(a.name)) || (b.lastSeen-a.lastSeen));
+  $('allUsersList').innerHTML = list.map(u => {
+    const on=onlineUsers.includes(u.name), isF=friends.includes(u.name), bl=blocks.includes(u.name), n=enc(u.name);
+    return '<div class="user-card"><div><span>'+(on?'🟢':'⚪')+' '+esc(u.emoji||'👤')+' '+esc(u.name)+'</span>'
+      +(u.status?'<br><small style="color:#aaa">'+esc(u.status)+'</small>':'')
+      +'<br><small style="color:#888">'+(on?'online now':'last seen '+timeAgo(u.lastSeen))+' · 👁 '+(u.visits||0)+' visits</small></div>'
+      +'<div class="user-actions">'
+      +(bl?'':'<button class="btn sm" onclick="act(\'chat\',\''+n+'\')">💬</button>')
+      +(on&&!bl?'<button class="btn sm blue" onclick="act(\'call\',\''+n+'\')">📞</button>':'')
+      +(!isF&&!bl?'<button class="btn sm green" onclick="act(\'add\',\''+n+'\')">➕</button>':'')
+      +'<button class="btn sm gray" onclick="act2(\''+(bl?'unblock':'block')+'\',\''+n+'\')">'+(bl?'Unblock':'🚫 Block')+'</button>'
+      +'</div></div>';
+  }).join('') || '<small style="color:#888">No visitors found.</small>';
 }
 function act(type, e){
   const u = decodeURIComponent(e);
@@ -287,11 +418,15 @@ function act(type, e){
   if(type==='decline') socket.emit('friend_decline', u);
   if(type==='unfriend' && confirm('Remove '+u+' from friends?')) socket.emit('friend_remove', u);
 }
+function act2(type, e){
+  const u = decodeURIComponent(e);
+  if(type==='block' && confirm('Block '+u+'? This also removes them as a friend.')) socket.emit('block_user', u);
+  if(type==='unblock') socket.emit('unblock_user', u);
+}
 
 // ---------- Messaging ----------
 const chatBox = $('chat-box');
 socket.on('init', d => {
-  retried = false;
   globalMsgs=d.global; dms=d.dms; unread={};
   buildChatSelect(); renderChat(); cacheChats();
   $('cloudDriveList').innerHTML=''; d.files.forEach(renderCloudFile);
@@ -322,11 +457,24 @@ function renderMsg(d){
   w.innerHTML = h+'</div>';
   chatBox.appendChild(w); chatBox.scrollTop = chatBox.scrollHeight;
 }
+let audioCtx;
+function beep(){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.connect(g); g.connect(audioCtx.destination); o.frequency.value=880;
+    g.gain.setValueAtTime(.12, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001, audioCtx.currentTime+.25);
+    o.start(); o.stop(audioCtx.currentTime+.25);
+    if(navigator.vibrate) navigator.vibrate(100);
+  }catch(e){}
+}
 socket.on('receive_message', d => {
   const bucket = d.to ? (d.user===me ? d.to : d.user) : 'global';
   if(bucket==='global') globalMsgs.push(d); else (dms[bucket]=dms[bucket]||[]).push(d);
   if(bucket===cur) renderMsg(d);
   else if(d.user!==me){ unread[bucket]=(unread[bucket]||0)+1; toast('💬 '+(d.to?'':'[Global] ')+d.user+': '+(d.text||'media')); }
+  if(d.user!==me && d.to) beep();
   buildChatSelect(); cacheChats();
 });
 socket.on('message_deleted', ({id}) => {
@@ -335,11 +483,11 @@ socket.on('message_deleted', ({id}) => {
   const el=$('msg-'+id); if(el) el.remove();
   cacheChats();
 });
-function delMsg(id){ if(!socket.connected) return toast('📴 Offline'); socket.emit('delete_message', {id, chat: cur}); }
+function delMsg(id){ if(!socket.connected) return toast('📴 Offline'); socket.emit('delete_message', {id, chat:cur}); }
 function emit(data){
   data.timestamp = nowTime();
   if(cur!=='global') data.to = cur;
-  if(socket.connected) return socket.emit('send_message', data);
+  if(socket.connected && me) return socket.emit('send_message', data);
   if(data.image || data.audio) return toast('📴 Offline: photos and voice notes need internet');
   outbox.push(data); saveOutbox(); toast('📴 Saved — will send when you are online');
 }
@@ -440,9 +588,11 @@ function callUI(name,video){
   $('videoToggleBtn').classList.remove('active');
 }
 async function startCall(video){
-  peer=$('targetUser').value.trim();
-  if(!peer) return alert('Enter the user to call!');
-  if(peer===me) return alert("You can't call yourself");
+  const typed=$('targetUser').value.trim();
+  if(!typed) return alert('Enter the name to call!');
+  const hit=directory.find(u=>u.name.toLowerCase()===typed.toLowerCase());
+  peer = hit ? hit.name : typed;
+  if(peer===me) { peer=null; return alert("You can't call yourself"); }
   if(!socket.connected){ peer=null; return toast('📴 Offline: calls need internet'); }
   callUI(peer,video);
   try{
@@ -458,7 +608,7 @@ socket.on('incoming_call', d=>{
   if(pc || incomingSignal){ socket.emit('end_call',{to:d.from}); return; }
   incomingSignal=d.signalData; peer=d.from; incomingVideo=d.isVideo;
   $('callerNameText').innerText=(d.isVideo?'📹 Video':'📞 Audio')+' call from '+d.from;
-  $('incomingContainer').style.display='block'; openModal('phoneApp');
+  $('incomingContainer').style.display='block'; openModal('phoneApp'); beep();
 });
 async function acceptCall(){
   $('incomingContainer').style.display='none'; callUI(peer,incomingVideo);
@@ -555,12 +705,14 @@ function toggleCameraRecording(){
   } else { vRec.stop(); recVid=false; b.innerText='⏺️ Record'; }
 }
 
-// ---------- Show cached chats instantly (works offline) ----------
+// ---------- Boot: show saved chats instantly, or ask to sign up ----------
 showName();
-try{
-  const c = JSON.parse(localStorage.getItem('chat_cache') || 'null');
-  if(c){ globalMsgs=c.g||[]; dms=c.d||{}; friends=c.f||[]; buildChatSelect(); renderChat(); renderUsers(); }
-}catch(e){}
+if(localStorage.getItem('token')){
+  try{
+    const c = JSON.parse(localStorage.getItem('chat_cache') || 'null');
+    if(c){ globalMsgs=c.g||[]; dms=c.d||{}; friends=c.f||[]; buildChatSelect(); renderChat(); renderUsers(); }
+  }catch(e){}
+} else { setAuthMode('signup'); showAuth(); }
 if(!navigator.onLine) setOnlineUI(false);
 </script>
 </body>
