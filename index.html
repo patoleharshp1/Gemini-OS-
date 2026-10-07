@@ -120,7 +120,11 @@ h4{color:var(--hi);margin:14px 0 8px}
 
 /* ---------- Games ---------- */
 .gtabs{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:12px}
-#gc{background:#140404;border:1px solid var(--bd);border-radius:12px;max-width:100%;touch-action:manipulation}
+#gamesModal .modal-body{display:flex;flex-direction:column}
+#frameWrap{flex:1;min-height:320px;display:flex;flex-direction:column}
+#gframe{flex:1;width:100%;min-height:300px;border:1px solid var(--bd);border-radius:12px;background:#000}
+.gnote{font-size:11px;color:#aaa;text-align:center;margin:8px 0 0}
+.gnote a{color:#8ab4f8}
 .board{display:grid;grid-template-columns:repeat(3,92px);gap:6px;justify-content:center}
 .cell{width:92px;height:92px;font-size:44px;background:#1f0808;border:1px solid #441515;border-radius:12px;cursor:pointer}
 .cell.win{background:#1b4d24}
@@ -304,7 +308,7 @@ h4{color:var(--hi);margin:14px 0 8px}
   </div>
 </div>
 
-<!-- Games -->
+<!-- Games: Dino + Flappy run from hosted web pages (iframe), Tic-Tac-Toe is the app's own code -->
 <div id="gamesModal" class="modal">
   <div class="modal-header"><h3>Games</h3><button class="close-btn" onclick="closeModal('gamesModal')">X</button></div>
   <div class="modal-body">
@@ -313,9 +317,9 @@ h4{color:var(--hi);margin:14px 0 8px}
       <button class="btn gray" id="gt-flappy" onclick="gameTab('flappy')">🐤 Flappy</button>
       <button class="btn gray" id="gt-xo" onclick="gameTab('xo')">❌⭕ Tic-Tac-Toe</button>
     </div>
-    <div id="canvasWrap" style="text-align:center">
-      <canvas id="gc"></canvas>
-      <p style="font-size:12px;color:#aaa">Space / ↑ / tap to jump · tap again to restart</p>
+    <div id="frameWrap">
+      <iframe id="gframe" src="about:blank" title="Game" allow="autoplay; fullscreen" referrerpolicy="no-referrer"></iframe>
+      <p class="gnote">Click or tap inside the game once, then use Space / ↑ / tap to play. <span id="gameOpen"></span></p>
     </div>
     <div id="xoWrap" style="display:none;text-align:center">
       <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:10px">
@@ -858,61 +862,25 @@ function endCallLocal(){
 function hideIncomingIfAny(){}
 
 // ================= GAMES =================
-const G={raf:0,input:null,tab:'dino'};
+// Dino and Flappy Bird run from hosted web pages inside an iframe. Tic-Tac-Toe below is the app's own code.
+// To swap a game, just change its URL here.
+const GAME_URLS={
+  dino:'https://wayou.github.io/t-rex-runner/',
+  flappy:'https://nebez.github.io/floppybird/'
+};
+const G={tab:'dino'};
 function openGames(){ openModal('gamesModal'); gameTab(G.tab); }
-function stopGame(){ cancelAnimationFrame(G.raf); G.raf=0; G.input=null; }
+function stopGame(){ const f=$('gframe'); if(f) f.src='about:blank'; }   // stops the game and its sound when you leave
 function gameTab(t){
-  stopGame(); G.tab=t;
+  G.tab=t;
   ['dino','flappy','xo'].forEach(k=>$('gt-'+k).className='btn'+(k===t?'':' gray'));
-  $('canvasWrap').style.display=t==='xo'?'none':'block'; $('xoWrap').style.display=t==='xo'?'block':'none';
-  if(t==='dino') dino(); else if(t==='flappy') flappy(); else { showModeUI(); renderXO(); }
-}
-document.addEventListener('keydown',e=>{
-  if($('gamesModal').style.display==='flex' && (e.code==='Space'||e.code==='ArrowUp') && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName) && G.input){ e.preventDefault(); G.input(); }
-});
-$('gc').addEventListener('pointerdown',e=>{ e.preventDefault(); if(G.input) G.input(); });
-
-function dino(){
-  const c=$('gc'), x=c.getContext('2d'); c.width=640; c.height=200;
-  let y=150,vy=0,obs=[],sp=6,sc=0,over=false,next=300,hi=+localStorage.getItem('dinoHi')||0;
-  G.input=()=>{ if(over){ y=150;vy=0;obs=[];sp=6;sc=0;over=false;next=300; } else if(y>=150) vy=-13; };
-  (function loop(){
-    G.raf=requestAnimationFrame(loop);
-    x.fillStyle='#140404'; x.fillRect(0,0,640,200); x.fillStyle='#e5b3b3'; x.fillRect(0,190,640,2);
-    if(!over){
-      vy+=.75; y=Math.min(150,y+vy); if(y>=150) vy=0;
-      sc+=.12; sp=Math.min(13,6+sc/80);
-      next-=sp; if(next<=0){ obs.push({x:660,w:14+(Math.random()*14|0),h:26+(Math.random()*26|0)}); next=sp*42+Math.random()*sp*40; }
-      obs.forEach(o=>o.x-=sp); obs=obs.filter(o=>o.x>-40);
-      for(const o of obs) if(o.x<68&&o.x+o.w>44&&y+40>190-o.h+4){ over=true; hi=Math.max(hi,sc|0); localStorage.setItem('dinoHi',hi); }
-    }
-    x.fillStyle='#4caf50'; x.fillRect(40,y,30,40); x.fillRect(58,y-8,18,14); x.fillStyle='#fff'; x.fillRect(68,y-4,3,3);
-    x.fillStyle='#ff8a8a'; obs.forEach(o=>x.fillRect(o.x,190-o.h,o.w,o.h));
-    x.fillStyle='#fff'; x.font='bold 16px sans-serif'; x.fillText('HI '+hi+'   '+(sc|0),500,24);
-    if(over){ x.font='bold 24px sans-serif'; x.fillText('GAME OVER — tap to restart',150,100); }
-  })();
-}
-function flappy(){
-  const c=$('gc'), x=c.getContext('2d'); c.width=320; c.height=480;
-  let by=220,vy=0,pipes=[],sc=0,over=false,go=false,f=0,hi=+localStorage.getItem('flapHi')||0;
-  G.input=()=>{ if(over){ by=220;vy=0;pipes=[];sc=0;over=false;go=false;f=0; } else { go=true; vy=-7; } };
-  (function loop(){
-    G.raf=requestAnimationFrame(loop);
-    x.fillStyle='#140404'; x.fillRect(0,0,320,480);
-    if(go&&!over){
-      vy+=.45; by+=vy; f++;
-      if(f%95===1) pipes.push({x:330,top:70+Math.random()*240,p:false});
-      pipes.forEach(p=>p.x-=2.4); pipes=pipes.filter(p=>p.x>-60);
-      if(by<12||by>468) over=true;
-      pipes.forEach(p=>{ if(92>p.x&&68<p.x+52&&(by-12<p.top||by+12>p.top+130)) over=true; if(!p.p&&p.x+52<80){ p.p=true; sc++; } });
-      if(over){ hi=Math.max(hi,sc); localStorage.setItem('flapHi',hi); }
-    }
-    x.fillStyle='#4caf50'; pipes.forEach(p=>{ x.fillRect(p.x,0,52,p.top); x.fillRect(p.x,p.top+130,52,480-p.top-130); });
-    x.fillStyle='#ffb300'; x.beginPath(); x.arc(80,by,12,0,7); x.fill();
-    x.fillStyle='#fff'; x.font='bold 26px sans-serif'; x.fillText(sc,150,44); x.font='12px sans-serif'; x.fillText('Best '+hi,10,20);
-    if(!go&&!over) x.fillText('Tap to start',124,300);
-    if(over){ x.font='bold 22px sans-serif'; x.fillText('GAME OVER — tap to restart',28,240); }
-  })();
+  const isXO=t==='xo';
+  $('frameWrap').style.display=isXO?'none':'flex';
+  $('xoWrap').style.display=isXO?'block':'none';
+  if(isXO){ stopGame(); showModeUI(); renderXO(); return; }
+  if(!navigator.onLine) toast('📴 This game needs internet');
+  $('gframe').src=GAME_URLS[t];
+  $('gameOpen').innerHTML='Not loading? <a href="'+GAME_URLS[t]+'" target="_blank" rel="noopener">Open in a new tab</a>';
 }
 
 // ---- Tic-Tac-Toe: vs AI / same device / online app friend ----
