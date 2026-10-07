@@ -6,7 +6,6 @@ const fs = require('fs');
 const crypto = require('crypto');
 let OAuth2Client = null;
 try { ({ OAuth2Client } = require('google-auth-library')); } catch (e) {}
-const metaOf = () => ({ totalVisits: db.totalVisits, visitors: db.visitors, users: db.users, friends: db.friends, requests: db.requests, profiles: db.profiles, blocks: db.blocks, accounts: db.accounts, sessions: db.sessions });
 
 const app = express();
 const server = http.createServer(app);
@@ -14,10 +13,16 @@ const io = new Server(server, { maxHttpBufferSize: 5e7, cors: { origin: '*' } })
 
 // ================= STORAGE (MongoDB Atlas, falls back to db.json) =================
 const DB_FILE = path.join(process.env.DATA_DIR || __dirname, 'db.json');
-let db = { totalVisits: 0, visitors: [], users: [], friends: {}, requests: {}, global: [], dms: {}, files: [] };
+let db = {
+  totalVisits: 0, visitors: [], users: [], friends: {}, requests: {},
+  global: [], dms: {}, files: [], profiles: {}, blocks: {}, accounts: {}, sessions: {}
+};
 let M = null; // MongoDB collections when connected
 const logErr = e => console.error('Storage error:', e.message);
-const metaOf = () => ({ totalVisits: db.totalVisits, visitors: db.visitors, users: db.users, friends: db.friends, requests: db.requests });
+const metaOf = () => ({
+  totalVisits: db.totalVisits, visitors: db.visitors, users: db.users, friends: db.friends,
+  requests: db.requests, profiles: db.profiles, blocks: db.blocks, accounts: db.accounts, sessions: db.sessions
+});
 
 async function initStorage() {
   if (process.env.MONGODB_URI) {
@@ -39,7 +44,7 @@ async function initStorage() {
     } catch (e) { console.error('MongoDB failed, using local file:', e.message); M = null; }
   }
   try { Object.assign(db, JSON.parse(fs.readFileSync(DB_FILE, 'utf8'))); } catch (e) {}
-  console.log('Storage: local file (data is lost on Render redeploy unless you use MongoDB or a disk)');
+  console.log('Storage: local file (data is lost on a free Render redeploy unless you use MongoDB)');
 }
 
 async function flushMeta() {
@@ -63,22 +68,48 @@ async function fullSave() { // used after /restore
   if (db.files.length) await M.files.insertMany(db.files.map(f => ({ ...f, _id: f.id })));
   await flushMeta();
 }
-
 process.on('SIGTERM', async () => { clearTimeout(metaTimer); await flushMeta(); process.exit(0); });
 
 // ================= HELPERS =================
 const online = {}; // username -> socket.id
 const MAX_BYTES = 14e6; // ~10 MB file as base64
-const clean = n => String(n || '').replace(/[|<>]/g, '').trim().slice(0, 24);
-const findUser = n => db.users.find(u => u.toLowerCase() === String(n || '').trim().toLowerCase());
+const A = () => io.to('authed'); // only logged-in sockets
+const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+const arr = (o, k) => (hasOwn(o, k) ? o[k] : (o[k] = []));
+const prof = n => (hasOwn(db.profiles, n) ? db.profiles[n] : (db.profiles[n] = { lastSeen: 0, visits: 0, status: '', emoji: '😀' }));
+const directory = () => db.users.map(n => ({ name: n, ...prof(n) }));
 const key = (a, b) => [a, b].sort().join('|');
 const uid = () => Date.now().toString() + Math.random().toString(36).slice(2, 6);
-const arr = (o, k) => (o[k] = o[k] || []);
 const to = (name, ev, data) => { if (online[name]) io.to(online[name]).emit(ev, data); };
+const findUser = n => db.users.find(u => u.toLowerCase() === String(n || '').trim().toLowerCase());
+const isBlocked = (a, b) => arr(db.blocks, a).includes(b) || arr(db.blocks, b).includes(a);
+
+// ---- accounts ----
+const gClient = (OAuth2Client && process.env.GOOGLE_CLIENT_ID) ? new OAuth2Client(process.env.GOOGLE_CLIENT_ID) : null;
+const akey = n => n.toLowerCase();
+const getAcc = k => (hasOwn(db.accounts, k) ? db.accounts[k] : null);
+const cleanName = n => String(n || '').replace(/[|<>.$]/g, '').replace(/\s+/g, ' ').trim().slice(0, 24);
+const badName = n => n.length < 2 || ['global', '__proto__'].includes(n.toLowerCase());
+const hashPw = (pw, salt) => crypto.scryptSync(pw, salt, 32).toString('hex');
+const sha = s => crypto.createHash('sha256').update(s).digest('hex');
+const nameOfToken = t => (hasOwn(db.sessions, sha(String(t || ''))) ? db.sessions[sha(String(t))] : null);
+const newSession = name => {
+  Object.keys(db.sessions).forEach(h => { if (db.sessions[h] === name) delete db.sessions[h]; }); // one device at a time
+  const t = crypto.randomBytes(32).toString('hex');
+  db.sessions[sha(t)] = name; pMeta(); return t;
+};
+const fails = {};
+const tooMany = k => fails[k] && fails[k].n >= 5 && Date.now() - fails[k].t < 300000;
+const addFail = k => {
+  const f = fails[k];
+  if (!f || Date.now() - f.t > 300000) fails[k] = { n: 1, t: Date.now() };
+  else { f.n++; f.t = Date.now(); }
+};
 
 function stats() {
-  io.emit('stats', { online: Object.keys(online).length, totalVisits: db.totalVisits, uniqueVisitors: db.visitors.length });
-  io.emit('user_list', Object.keys(online));
+  A().emit('stats', { online: Object.keys(online).length, totalVisits: db.totalVisits, uniqueVisitors: db.visitors.length });
+  A().emit('user_list', Object.keys(online));
+  A().emit('directory', directory());
 }
 function social(name) { to(name, 'social', { friends: arr(db.friends, name), requests: arr(db.requests, name) }); }
 function dmsFor(name) {
@@ -92,6 +123,7 @@ function dmsFor(name) {
 
 // ================= ROUTES =================
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/config', (req, res) => { res.set('Access-Control-Allow-Origin', '*'); res.json({ googleClientId: process.env.GOOGLE_CLIENT_ID || '' }); });
 app.get('/backup', (req, res) => {
   if (!process.env.ADMIN_KEY || req.query.key !== process.env.ADMIN_KEY) return res.status(403).send('forbidden');
   res.setHeader('Content-Disposition', 'attachment; filename="db-backup.json"');
@@ -107,68 +139,155 @@ app.post('/restore', express.json({ limit: '200mb' }), async (req, res) => {
 
 // ================= SOCKETS =================
 io.on('connection', (socket) => {
-  let me = null;
-  let counted = false;
+  let me = null, counted = false, clientId = null;
 
-  socket.on('register_user', ({ name, clientId } = {}) => {
-    name = clean(name);
-    if (!name) return;
-    if (online[name] && online[name] !== socket.id && io.sockets.sockets.get(online[name])) return socket.emit('name_taken', name);
-    const wasOnline = !!online[name];
-    if (me && me !== name && online[me] === socket.id) delete online[me];
-    me = name;
-    online[me] = socket.id;
-    if (!db.users.includes(me)) { db.users.push(me); pMeta(); }
+  // ---------- Accounts ----------
+  function enter(name) {
+    const oldId = online[name];
+    const oldSock = oldId && io.sockets.sockets.get(oldId);
+    if (oldSock && oldSock.id !== socket.id) { oldSock.emit('kicked'); oldSock.disconnect(true); }
+    const wasOnline = !!oldSock;
+    me = name; online[me] = socket.id;
+    socket.join('authed');
+    if (!db.users.includes(me)) db.users.push(me);
+    const p = prof(me); p.lastSeen = Date.now();
     if (!counted) {
-      counted = true;
-      db.totalVisits++;
+      counted = true; db.totalVisits++; p.visits++;
       if (clientId && !db.visitors.includes(clientId)) db.visitors.push(clientId);
-      pMeta();
     }
+    pMeta();
     if (!wasOnline) arr(db.friends, me).forEach(f => to(f, 'toast', '🟢 ' + me + ' is online'));
     socket.emit('init', { global: db.global, dms: dmsFor(me), files: db.files });
     social(me);
+    socket.emit('blocks', arr(db.blocks, me));
     stats();
+  }
+  const ok = (name, token) => { socket.emit('auth_ok', { name, token }); enter(name); };
+
+  socket.on('auth_token', ({ token, clientId: c } = {}) => {
+    clientId = c || clientId;
+    const name = nameOfToken(token);
+    if (!name || !getAcc(akey(name))) return socket.emit('auth_fail');
+    ok(name, token);
   });
 
-  // ---- Messages ----
+  socket.on('signup', ({ name, password, clientId: c } = {}) => {
+    clientId = c || clientId;
+    name = cleanName(name); password = String(password || '');
+    if (badName(name)) return socket.emit('auth_error', 'Choose another name (2–24 characters)');
+    if (password.length < 6) return socket.emit('auth_error', 'Password must be at least 6 characters');
+    if (getAcc(akey(name))) return socket.emit('auth_exists', name);
+    const display = findUser(name) || name; // claims an old name from before accounts existed
+    const salt = crypto.randomBytes(16).toString('hex');
+    db.accounts[akey(display)] = { name: display, salt, hash: hashPw(password, salt), created: Date.now() };
+    ok(display, newSession(display));
+  });
+
+  socket.on('login', ({ name, password, clientId: c } = {}) => {
+    clientId = c || clientId;
+    name = cleanName(name); const k = akey(name);
+    if (tooMany(k)) return socket.emit('auth_error', 'Too many tries. Wait 5 minutes.');
+    const acc = getAcc(k);
+    if (acc && !acc.hash) return socket.emit('auth_error', 'This name uses Google sign-in');
+    let good = false;
+    if (acc) {
+      try { good = crypto.timingSafeEqual(Buffer.from(hashPw(String(password || ''), acc.salt), 'hex'), Buffer.from(acc.hash, 'hex')); } catch (e) {}
+    }
+    if (!good) { addFail(k); return socket.emit('auth_error', 'Wrong name or password'); }
+    delete fails[k];
+    ok(acc.name, newSession(acc.name));
+  });
+
+  socket.on('google_auth', async ({ credential, name, clientId: c } = {}) => {
+    clientId = c || clientId;
+    if (!gClient) return socket.emit('auth_error', 'Google sign-in is not set up');
+    let p;
+    try { p = (await gClient.verifyIdToken({ idToken: credential, audience: process.env.GOOGLE_CLIENT_ID })).getPayload(); }
+    catch (e) { return socket.emit('auth_error', 'Google sign-in failed'); }
+    const acc = Object.values(db.accounts).find(a => a.google === p.sub);
+    if (acc) return ok(acc.name, newSession(acc.name));
+    name = cleanName(name);
+    if (!name) return socket.emit('google_need_name', { suggested: cleanName(p.name || '') });
+    if (badName(name)) return socket.emit('google_need_name', { suggested: name, error: 'Choose another name (2–24 characters)' });
+    if (getAcc(akey(name))) return socket.emit('google_need_name', { suggested: name, error: 'That name is already taken' });
+    const display = findUser(name) || name;
+    db.accounts[akey(display)] = { name: display, google: p.sub, email: p.email, created: Date.now() };
+    ok(display, newSession(display));
+  });
+
+  socket.on('logout', ({ token } = {}) => {
+    const h = sha(String(token || ''));
+    if (hasOwn(db.sessions, h)) delete db.sessions[h];
+    if (me && online[me] === socket.id) { delete online[me]; prof(me).lastSeen = Date.now(); }
+    socket.leave('authed');
+    me = null; pMeta(); stats();
+  });
+
+  // ---------- Messages ----------
   socket.on('send_message', (data) => {
     if (!me || !data) return;
     if ((data.image && data.image.length > MAX_BYTES) || (data.audio && data.audio.length > MAX_BYTES)) return socket.emit('toast', 'File too big (max 10 MB)');
     const m = { user: me, id: uid(), t: Date.now(), timestamp: data.timestamp || '', text: data.text ? String(data.text).slice(0, 2000) : undefined, image: data.image, audio: data.audio };
     if (data.to) {
-      m.to = String(data.to); m.chat = key(me, m.to);
+      const target = findUser(data.to);
+      if (!target) return socket.emit('toast', 'User not found');
+      if (isBlocked(me, target)) return socket.emit('toast', '🚫 You cannot message this user');
+      m.to = target; m.chat = key(me, target);
       arr(db.dms, m.chat).push(m);
       to(me, 'receive_message', m);
-      if (m.to !== me) to(m.to, 'receive_message', m);
+      if (target !== me) to(target, 'receive_message', m);
     } else {
       m.chat = 'global';
       db.global.push(m);
       if (db.global.length > 300) pMsgDel(db.global.shift().id);
-      io.emit('receive_message', m);
+      A().emit('receive_message', m);
     }
     pMsg(m);
   });
 
   socket.on('delete_message', ({ id, chat } = {}) => {
     if (!me) return;
-    const list = chat === 'global' ? db.global : db.dms[key(me, chat)];
+    const list = chat === 'global' ? db.global : db.dms[key(me, String(chat))];
     if (!list) return;
     const i = list.findIndex(m => m.id === id && m.user === me);
     if (i < 0) return;
     list.splice(i, 1);
     pMsgDel(id);
-    if (chat === 'global') io.emit('message_deleted', { id });
+    if (chat === 'global') A().emit('message_deleted', { id });
     else { to(me, 'message_deleted', { id }); to(chat, 'message_deleted', { id }); }
   });
 
   socket.on('typing_status', (d = {}) => {
     if (!me) return;
     if (d.to) to(d.to, 'user_typing', { user: me, to: d.to, isTyping: d.isTyping });
-    else socket.broadcast.emit('user_typing', { user: me, isTyping: d.isTyping });
+    else socket.to('authed').emit('user_typing', { user: me, isTyping: d.isTyping });
   });
 
-  // ---- Friends ----
+  // ---------- Profile & blocking ----------
+  socket.on('set_profile', (d = {}) => {
+    if (!me) return;
+    const p = prof(me);
+    p.status = String(d.status || '').replace(/[<>]/g, '').slice(0, 60);
+    p.emoji = Array.from(String(d.emoji || '😀')).slice(0, 2).join('');
+    pMeta(); stats();
+  });
+  socket.on('block_user', (u) => {
+    u = findUser(u);
+    if (!me || !u || u === me) return;
+    if (!arr(db.blocks, me).includes(u)) db.blocks[me].push(u);
+    db.friends[me] = arr(db.friends, me).filter(x => x !== u);
+    db.friends[u] = arr(db.friends, u).filter(x => x !== me);
+    db.requests[me] = arr(db.requests, me).filter(x => x !== u);
+    db.requests[u] = arr(db.requests, u).filter(x => x !== me);
+    pMeta(); socket.emit('blocks', db.blocks[me]); social(me); social(u);
+  });
+  socket.on('unblock_user', (u) => {
+    if (!me) return;
+    db.blocks[me] = arr(db.blocks, me).filter(x => x !== u);
+    pMeta(); socket.emit('blocks', db.blocks[me]);
+  });
+
+  // ---------- Friends ----------
   function acceptFriend(a, b) {
     db.requests[a] = arr(db.requests, a).filter(x => x !== b);
     db.requests[b] = arr(db.requests, b).filter(x => x !== a);
@@ -183,6 +302,7 @@ io.on('connection', (socket) => {
     const target = findUser(input);
     if (!target) return socket.emit('toast', 'User "' + String(input).trim() + '" not found');
     if (target === me) return socket.emit('toast', "You can't add yourself");
+    if (isBlocked(me, target)) return socket.emit('toast', '🚫 Not possible');
     if (arr(db.friends, me).includes(target)) return socket.emit('toast', 'Already friends with ' + target);
     if (arr(db.requests, me).includes(target)) return acceptFriend(me, target);
     if (arr(db.requests, target).includes(me)) return socket.emit('toast', 'Request already sent');
@@ -200,32 +320,40 @@ io.on('connection', (socket) => {
     pMeta(); social(me); social(other);
   });
 
-  // ---- Cloud drive ----
+  // ---------- Cloud drive ----------
   socket.on('upload_cloud_file', (f) => {
     if (!me || !f || !f.url) return;
     if (f.url.length > MAX_BYTES) return socket.emit('toast', 'File too big (max 10 MB)');
     const file = { id: uid(), t: Date.now(), name: String(f.name || 'file').slice(0, 100), type: String(f.type || 'application/octet-stream'), url: f.url, uploader: me };
     db.files.push(file); pFile(file);
-    io.emit('new_cloud_file', file);
+    A().emit('new_cloud_file', file);
   });
   socket.on('delete_cloud_file', (id) => {
     const f = db.files.find(x => x.id === id);
     if (!me || !f || f.uploader !== me) return;
     db.files = db.files.filter(x => x.id !== id); pFileDel(id);
-    io.emit('cloud_file_deleted', id);
+    A().emit('cloud_file_deleted', id);
   });
 
-  // ---- Call signaling ----
+  // ---------- Call signaling ----------
   socket.on('call_user', (d = {}) => {
     if (!me) return;
-    if (online[d.userToCall]) to(d.userToCall, 'incoming_call', { signalData: d.signalData, from: me, isVideo: d.isVideo });
-    else socket.emit('call_failed', { reason: 'User "' + d.userToCall + '" is offline.' });
+    const target = findUser(d.userToCall);
+    if (!target) return socket.emit('call_failed', { reason: 'User not found' });
+    if (isBlocked(me, target)) return socket.emit('call_failed', { reason: 'Call not possible' });
+    if (online[target]) return to(target, 'incoming_call', { signalData: d.signalData, from: me, isVideo: d.isVideo });
+    const m = { user: me, id: uid(), t: Date.now(), timestamp: '', to: target, chat: key(me, target), text: '📞 Missed ' + (d.isVideo ? 'video ' : '') + 'call from ' + me };
+    arr(db.dms, m.chat).push(m); pMsg(m);
+    to(me, 'receive_message', m);
+    socket.emit('call_failed', { reason: '"' + target + '" is offline. A missed-call note was left.' });
   });
-  socket.on('answer_call', (d = {}) => to(d.to, 'call_accepted', { signal: d.signal, from: me }));
-  socket.on('send_candidate', (d = {}) => to(d.to, 'receive_candidate', { candidate: d.candidate, from: me }));
-  socket.on('end_call', (d) => { if (d && d.to) to(d.to, 'call_ended'); });
+  socket.on('answer_call', (d = {}) => { if (me) to(d.to, 'call_accepted', { signal: d.signal, from: me }); });
+  socket.on('send_candidate', (d = {}) => { if (me) to(d.to, 'receive_candidate', { candidate: d.candidate, from: me }); });
+  socket.on('end_call', (d) => { if (me && d && d.to) to(d.to, 'call_ended'); });
 
-  socket.on('disconnect', () => { if (me && online[me] === socket.id) { delete online[me]; stats(); } });
+  socket.on('disconnect', () => {
+    if (me && online[me] === socket.id) { delete online[me]; prof(me).lastSeen = Date.now(); pMeta(); stats(); }
+  });
 });
 
 const PORT = process.env.PORT || 3000;
