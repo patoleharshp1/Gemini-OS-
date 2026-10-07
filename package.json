@@ -1,12 +1,13 @@
 {
   "name": "gemini-os",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "main": "server.js",
+  "engines": { "node": ">=18" },
   "scripts": { "start": "node server.js" },
   "dependencies": {
     "express": "^4.19.2",
     "socket.io": "^4.7.5",
-    "mongodb": "^6.8.0"
+    "mongodb": "^6.8.0",
     "google-auth-library": "^9.14.0"
   }
 }
