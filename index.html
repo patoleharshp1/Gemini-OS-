@@ -177,7 +177,6 @@ h4{color:var(--hi);margin:14px 0 8px}
   <div id="ctrls">
     <button class="cb" id="muteBtn" onclick="toggleMute()" title="Mute">🎙️</button>
     <button class="cb" id="camBtn" onclick="toggleCam()" title="Camera">📹</button>
-    <button class="nav more" onclick="openBrowser()">🌐<span>Browser</span></button>
     <button class="cb" id="shareBtn" onclick="shareScreen()" title="Share screen">🖥️</button>
     <button class="cb" id="flipBtn" onclick="flipCam()" title="Flip camera">🔄</button>
     <button class="cb" id="volBtn" onclick="toggleVol()" title="Volume">🔊</button>
@@ -206,6 +205,7 @@ h4{color:var(--hi);margin:14px 0 8px}
     <button class="nav more" onclick="openModal('storageApp')">☁️<span>Drive</span></button>
     <button class="nav more" onclick="openModal('localMusicApp')">🎵<span>Music</span></button>
     <button class="nav more" onclick="openCamera()">📷<span>Camera</span></button>
+    <button class="nav more" onclick="openBrowser()">🌐<span>Browser</span></button>
   </nav>
   <main id="main">
     <div id="offlineBar">📴 Offline — text messages will send when you reconnect</div>
@@ -220,13 +220,13 @@ h4{color:var(--hi);margin:14px 0 8px}
     <div class="hero"><h2>Welcome, <span id="heroName"></span> 👋</h2><p>Chat, call up to 8 people, play games and share files.</p></div>
     <div class="tiles">
       <div class="tile-app" onclick="openModal('chatApp')"><i>💬</i>Messages</div>
-      <div class="tile-app" onclick="openBrowser()"><i>🌐</i>Browser</div>
       <div class="tile-app" onclick="openModal('phoneApp')"><i>📞</i>Calls</div>
       <div class="tile-app" onclick="openModal('usersModal')"><i>👥</i>Friends</div>
       <div class="tile-app" onclick="openGames()"><i>🎮</i>Games</div>
       <div class="tile-app" onclick="openModal('storageApp')"><i>☁️</i>Drive</div>
       <div class="tile-app" onclick="openModal('localMusicApp')"><i>🎵</i>Local MP3</div>
       <div class="tile-app" onclick="openCamera()"><i>📷</i>Camera</div>
+      <div class="tile-app" onclick="openBrowser()"><i>🌐</i>Browser</div>
       <div class="tile-app" onclick="openModal('settingsModal')"><i>⚙️</i>Settings</div>
     </div>
   </main>
@@ -312,7 +312,8 @@ h4{color:var(--hi);margin:14px 0 8px}
     <div class="gtabs">
       <button class="btn" id="gt-dino" onclick="gameTab('dino')">🦖 Dino</button>
       <button class="btn gray" id="gt-flappy" onclick="gameTab('flappy')">🐤 Flappy Bird</button>
-      <button class="btn gray" id="gt-mario" onclick="gameTab('mario')">🍄 Super Mario</button>
+      <button class="btn gray" id="gt-subway" onclick="gameTab('subway')">🏃 Subway Surfers</button>
+      <button class="btn gray" id="gt-candy" onclick="gameTab('candy')">🍬 Candy Crush</button>
       <button class="btn gray" id="gt-xo" onclick="gameTab('xo')">❌⭕ Tic-Tac-Toe</button>
     </div>
     <div id="webGameWrap">
@@ -341,61 +342,34 @@ h4{color:var(--hi);margin:14px 0 8px}
   </div>
 </div>
 
-// ================= BROWSER (DuckDuckGo default, incognito tabs) =================
-const ENGINES = { DuckDuckGo:'https://duckduckgo.com/?q=', Brave:'https://search.brave.com/search?q=', Startpage:'https://www.startpage.com/do/search?q=', Bing:'https://www.bing.com/search?q=' };
-const BR = { tabs:[], cur:null, n:0, engine: localStorage.getItem('brEngine') || 'DuckDuckGo' };
-if(!ENGINES[BR.engine]) BR.engine = 'DuckDuckGo';
-$('brEngine').innerHTML = Object.keys(ENGINES).map(k => '<option'+(k===BR.engine?' selected':'')+'>'+k+'</option>').join('');
-const brHist = () => { try{ return JSON.parse(localStorage.getItem('brHist') || '[]'); }catch(e){ return []; } };
-const curTab = () => BR.tabs.find(t => t.id === BR.cur);
-function openBrowser(){ openModal('browserModal'); if(!BR.tabs.length) newTab(false); else brRender(); }
-function newTab(incog){ const t = { id:++BR.n, incog:!!incog, url:'', stack:[], i:-1 }; BR.tabs.push(t); BR.cur = t.id; brRender(); }
-function resolveUrl(q){
-  q = q.trim(); if(!q) return '';
-  if(/^https?:\/\//i.test(q)) return q;
-  if(!/\s/.test(q) && /\.[a-z]{2,}(\/|$|\?)/i.test(q)) return 'https://' + q;
-  return ENGINES[BR.engine] + encodeURIComponent(q);
-}
-function brGo(q){
-  const t = curTab(), u = resolveUrl(q); if(!t || !u) return;
-  t.stack = t.stack.slice(0, t.i + 1); t.stack.push(u); t.i++; t.url = u;
-  if(!t.incog){ const h = brHist().filter(x => x !== u); h.unshift(u); localStorage.setItem('brHist', JSON.stringify(h.slice(0, 50))); }
-  brRender();
-}
-function brNav(d){ const t = curTab(), i = t.i + d; if(i < -1 || i >= t.stack.length) return; t.i = i; t.url = i >= 0 ? t.stack[i] : ''; brRender(); }
-function brSwitch(id){ BR.cur = id; brRender(); }
-function brCloseTab(id){
-  BR.tabs = BR.tabs.filter(x => x.id !== id);
-  if(!BR.tabs.length) return newTab(false);
-  if(BR.cur === id) BR.cur = BR.tabs[BR.tabs.length - 1].id;
-  brRender();
-}
-function brExternal(){ const t = curTab(); if(t && t.url) window.open(t.url, '_blank', 'noopener,noreferrer'); else toast('Open a page first'); }
-function brClose(){ BR.tabs = BR.tabs.filter(x => !x.incog); BR.cur = BR.tabs.length ? BR.tabs[0].id : null; }
-function brHome(t){
-  const q = ['https://en.wikipedia.org', 'https://duckduckgo.com', 'https://search.brave.com'];
-  let h = '<div style="padding:20px;text-align:center">' + (t.incog
-    ? '<h2>🕶 Incognito tab</h2><p style="color:#aaa;font-size:13px">No history or bookmarks are saved, sites get no referrer, and this tab is deleted when you close the Browser window.</p>'
-    : '<h2>🌐 Search privately</h2>');
-  h += '<div>' + q.map(u => '<button class="btn sm gray" onclick="brGo(\''+u+'\')">'+new URL(u).host+'</button> ').join('') + '</div>';
-  if(!t.incog){
-    const hs = brHist();
-    h += '<h4>Recent</h4>' + (hs.map((u,i) => '<div class="citem" onclick="brGo(brHist()['+i+'])">'+esc(u)+'</div>').join('') || '<small style="color:#888">No history yet</small>');
-    if(hs.length) h += '<br><button class="btn sm gray" onclick="localStorage.removeItem(\'brHist\');brRender()">Clear history</button>';
-  }
-  return h + '</div>';
-}
-function brRender(){
-  const t = curTab(); if(!t) return;
-  $('brTabs').innerHTML = BR.tabs.map(x => '<button class="btn sm'+(x.id===BR.cur?'':' gray')+'" style="white-space:nowrap;'+(x.incog?'background:#5b2a86;':'')+'" onclick="brSwitch('+x.id+')">'+(x.incog?'🕶 ':'')+esc(x.url ? new URL(x.url).host : 'New tab')+' <span onclick="event.stopPropagation();brCloseTab('+x.id+')">✕</span></button>').join('')
-    + '<button class="btn sm green" onclick="newTab(false)" title="New tab">＋</button><button class="btn sm" style="background:#5b2a86" onclick="newTab(true)" title="New incognito tab">🕶＋</button>';
-  $('brUrl').value = t.url;
-  $('brBar').style.borderColor = t.incog ? '#8e44ad' : 'var(--bd)';
-  $('brView').innerHTML = t.url
-    ? '<iframe src="'+esc(t.url)+'" referrerpolicy="no-referrer" '+(t.incog ? 'sandbox="allow-scripts allow-forms allow-popups" ' : '')+'allow="fullscreen" style="width:100%;height:100%;min-height:300px;border:0;background:#fff"></iframe>'
-    : brHome(t);
-}
-  <!-- Settings -->
+<!-- Custom Browser -->
+<div id="browserModal" class="modal">
+  <div class="modal-header"><h3>🌐 Custom Browser</h3><button class="close-btn" onclick="closeModal('browserModal')">X</button></div>
+  <div class="modal-body" style="display:flex;flex-direction:column;gap:10px;overflow:hidden">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <button class="btn sm gray" onclick="browserBack()">←</button>
+      <button class="btn sm gray" onclick="browserForward()">→</button>
+      <button class="btn sm gray" onclick="browserReload()">↻</button>
+      <button class="btn sm gray" onclick="browserHome()">⌂</button>
+      <input id="browserAddress" type="text" placeholder="Search or enter website address..." style="flex:1;min-width:180px" onkeydown="if(event.key==='Enter')browserGo()"/>
+      <button class="btn" onclick="browserGo()">Go</button>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <button class="btn sm" id="browserNormalBtn" onclick="setBrowserMode('normal')">🧭 Normal</button>
+      <button class="btn sm gray" id="browserInnovativeBtn" onclick="setBrowserMode('innovative')">✨ Innovative</button>
+      <span id="browserModeLabel" style="color:#aaa;font-size:12px">Normal mode</span>
+    </div>
+    <div id="browserQuick" style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn sm gray" onclick="browserQuick('https://www.google.com')">Google</button>
+      <button class="btn sm gray" onclick="browserQuick('https://www.youtube.com')">YouTube</button>
+      <button class="btn sm gray" onclick="browserQuick('https://www.wikipedia.org')">Wikipedia</button>
+    </div>
+    <iframe id="browserFrame" title="Custom Browser" allow="fullscreen; autoplay" style="flex:1;width:100%;min-height:320px;border:1px solid var(--bd);border-radius:12px;background:#000"></iframe>
+    <small id="browserHint" style="color:#888">Some websites block iframe embedding. Use their New Tab option or open the site directly if needed.</small>
+  </div>
+</div>
+
+<!-- Settings -->
 <div id="settingsModal" class="modal">
   <div class="modal-header"><h3>Settings</h3><button class="close-btn" onclick="closeModal('settingsModal')">X</button></div>
   <div class="modal-body">
@@ -407,23 +381,7 @@ function brRender(){
   </div>
 </div>
 
-<div id="browserModal" class="modal">
-  <div class="modal-header"><h3>🌐 Browser</h3><button class="close-btn" onclick="closeModal('browserModal')">X</button></div>
-  <div class="modal-body" style="display:flex;flex-direction:column;padding:8px">
-    <div id="brTabs" style="display:flex;gap:4px;overflow-x:auto;margin-bottom:6px"></div>
-    <div id="brBar" style="display:flex;gap:4px;margin-bottom:6px;border:1px solid var(--bd);border-radius:10px;padding:4px">
-      <button class="btn sm gray" onclick="brNav(-1)">◀</button>
-      <button class="btn sm gray" onclick="brNav(1)">▶</button>
-      <input type="text" id="brUrl" placeholder="Search or type a web address" style="flex:1;min-width:0" onkeydown="if(event.key==='Enter')brGo(this.value)"/>
-      <button class="btn sm" onclick="brGo($('brUrl').value)">Go</button>
-      <button class="btn sm gray" onclick="brExternal()" title="Open in a real browser tab">↗</button>
-      <select id="brEngine" onchange="BR.engine=this.value;localStorage.setItem('brEngine',this.value)"></select>
-    </div>
-    <div id="brView" style="flex:1;min-height:300px;border:1px solid var(--bd);border-radius:10px;overflow:auto"></div>
-    <small style="color:#888;margin-top:4px">Many big sites (Google, YouTube, Facebook) refuse to load inside other apps. If a page is blank, tap ↗.</small>
-  </div>
-</div>
-  <!-- Drive -->
+<!-- Drive -->
 <div id="storageApp" class="modal">
   <div class="modal-header"><h3>Cloud Drive</h3><button class="close-btn" onclick="closeModal('storageApp')">X</button></div>
   <div class="modal-body">
@@ -480,7 +438,6 @@ function openModal(id){
   $(id).style.display='flex';
   if(id==='phoneApp') renderCallPicker();
   if(id==='usersModal') renderUsers();
-  if(id==='browserModal') brClose();
 }
 function goHome(){ document.querySelectorAll('.modal').forEach(m=>{ if(m.id!=='authModal' && m.style.display==='flex') closeModal(m.id); }); }
 function addFriendQuick(){ openModal('usersModal'); setTimeout(()=>$('addFriendName').focus(),60); }
@@ -943,7 +900,8 @@ function endCallLocal(){
 const WEB_GAMES = {
   dino:   { urls: ['https://chromedino.com/', 'https://dino-chrome.com/'] },
   flappy: { urls: ['https://flappybird.io/'] },
-  mario:  { urls: ['https://supermarioplay.com/', 'https://www.fullscreenmario.com/'] }
+  subway: { urls: ['https://www.crazygames.com/game/subway-surfers'] },
+  candy:  { urls: ['https://www.crazygames.com/game/candy-crush-saga'] }
 };
 const G = { tab: 'dino', idx: {} };
 function openGames(){ openModal('gamesModal'); gameTab(G.tab); }
@@ -952,7 +910,7 @@ function gameUrl(){ const g = WEB_GAMES[G.tab]; return g.urls[(G.idx[G.tab] || 0
 function loadGame(){ $('gameFrame').src = gameUrl(); $('gameSite').innerText = new URL(gameUrl()).host; }
 function gameTab(t){
   G.tab = t;
-  ['dino','flappy','mario','xo'].forEach(k => $('gt-'+k).className = 'btn' + (k === t ? '' : ' gray'));
+  ['dino','flappy','subway','candy','xo'].forEach(k => $('gt-'+k).className = 'btn' + (k === t ? '' : ' gray'));
   const web = t !== 'xo';
   $('webGameWrap').style.display = web ? 'block' : 'none';
   $('xoWrap').style.display = web ? 'none' : 'block';
@@ -961,6 +919,38 @@ function gameTab(t){
 function nextSite(){ G.idx[G.tab] = (G.idx[G.tab] || 0) + 1; loadGame(); }
 function openGameTab(){ window.open(gameUrl(), '_blank'); }
 function fullGame(){ const f = $('gameFrame'); (f.requestFullscreen || f.webkitRequestFullscreen || function(){ toast('Fullscreen not supported'); }).call(f); }
+
+// ================= CUSTOM BROWSER =================
+const BROWSER_HOME='https://www.google.com';
+const Browser={mode:'normal',history:[],index:-1};
+function openBrowser(){ openModal('browserModal'); if(Browser.index<0) browserNavigate(BROWSER_HOME,false); else updateBrowserUI(); }
+function browserNormalize(v){
+  v=v.trim();
+  if(!v) return BROWSER_HOME;
+  if(/^https?:\/\//i.test(v)) return v;
+  if(/^[a-z0-9.-]+\.[a-z]{2,}([/:?#].*)?$/i.test(v)) return 'https://'+v;
+  return 'https://www.google.com/search?q='+encodeURIComponent(v);
+}
+function browserNavigate(url,push=true){
+  url=browserNormalize(url);
+  if(push){ Browser.history=Browser.history.slice(0,Browser.index+1); Browser.history.push(url); Browser.index++; }
+  $('browserFrame').src=url; $('browserAddress').value=url; updateBrowserUI();
+}
+function browserGo(){ browserNavigate($('browserAddress').value,true); }
+function browserQuick(url){ browserNavigate(url,true); }
+function browserBack(){ if(Browser.index>0){ Browser.index--; browserNavigate(Browser.history[Browser.index],false); } }
+function browserForward(){ if(Browser.index<Browser.history.length-1){ Browser.index++; browserNavigate(Browser.history[Browser.index],false); } }
+function browserReload(){ const f=$('browserFrame'); f.src=f.src; }
+function browserHome(){ browserNavigate(BROWSER_HOME,true); }
+function openBrowserTab(){ window.open($('browserAddress').value,'_blank'); }
+function setBrowserMode(mode){ Browser.mode=mode; updateBrowserUI(); }
+function updateBrowserUI(){
+  $('browserNormalBtn').className='btn sm'+(Browser.mode==='normal'?'':' gray');
+  $('browserInnovativeBtn').className='btn sm'+(Browser.mode==='innovative'?'':' gray');
+  $('browserModeLabel').innerText=Browser.mode==='innovative'?'✨ Innovative mode — quick tools and visual shortcuts':'Normal mode';
+  $('browserQuick').style.display=Browser.mode==='innovative'?'flex':'none';
+  $('browserHint').innerText=Browser.mode==='innovative'?'Innovative mode adds quick-launch shortcuts while keeping normal web navigation.':'Some websites block iframe embedding. Use a normal browser tab if a page cannot be embedded.';
+}
 
 // ---- Tic-Tac-Toe (coded): vs AI / same device / online app friend ----
 const T={mode:'ai',board:Array(9).fill(''),turn:'X',over:false,res:null,id:null,me:'X',x:'',o:''};
