@@ -47,8 +47,7 @@ h4{color:var(--hi);margin:14px 0 8px}
   .brand{display:block;font-size:20px;font-weight:bold;color:var(--hi);padding:4px 12px 16px}
   .more{display:flex}
   .nav{flex:none;flex-direction:row;justify-content:flex-start;gap:12px;padding:11px 14px;font-size:18px;border-radius:10px}
-  .nav span{font-size:14px}
-  .nav:hover{background:#2b0b0b}
+  .nav span{font-size:14px}.nav:hover{background:#2b0b0b}
   .nav b{position:static;margin-left:auto}
   #main{padding:26px 34px}
   .hero{display:block;background:linear-gradient(135deg,#3a0d0d,#1a0505);border:1px solid var(--bd);border-radius:18px;padding:26px 30px;margin-bottom:22px}
@@ -58,12 +57,10 @@ h4{color:var(--hi);margin:14px 0 8px}
   .modal{inset:3vh 3vw 3vh 250px;border:1px solid var(--bd);border-radius:16px;overflow:hidden;box-shadow:0 24px 70px #000}
   .cols{display:grid;grid-template-columns:1fr 1fr;gap:24px}
 }
-
-/* ---------- Auth ---------- */
 #authModal{inset:0!important;border:0!important;border-radius:0!important;z-index:500}
 .auth-card{max-width:420px;width:100%;margin:auto}
 
-/* ---------- Chat (list on laptop, dropdown on phone) ---------- */
+/* ---------- Chat ---------- */
 #chatApp .modal-body{display:flex;flex-direction:column;overflow:hidden}
 #chatList{display:none}
 .chat-pane{flex:1;min-height:0;display:flex;flex-direction:column}
@@ -87,14 +84,13 @@ h4{color:var(--hi);margin:14px 0 8px}
 .delete-btn{background:none;border:0;color:var(--hi);cursor:pointer;margin-left:6px}
 .msg-img{max-width:180px;border-radius:8px;display:block;margin-top:4px}
 #typingNotice{font-size:11px;color:#aaa;font-style:italic;height:16px;margin-bottom:6px}
-
 .user-card,.file-card{display:flex;justify-content:space-between;align-items:center;gap:6px;background:#1a0808;border:1px solid var(--bd);padding:10px;border-radius:8px;margin-bottom:8px;flex-wrap:wrap}
 .user-actions{display:flex;gap:5px;flex-wrap:wrap}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
 .stat{background:#1f0808;border:1px solid var(--bd);border-radius:10px;padding:10px;text-align:center}
 .stat b{display:block;font-size:20px;color:var(--hi)}.stat small{color:var(--tx);font-size:11px}
 
-/* ---------- Full-screen overlays: incoming call, active call ---------- */
+/* ---------- Full-screen call overlays ---------- */
 .overlay{position:fixed;inset:0;display:none;flex-direction:column;z-index:800;background:#101010}
 #incoming{z-index:900;align-items:center;justify-content:center;text-align:center;background:radial-gradient(circle at 50% 30%,#3a1010,#0a0a0a 70%);padding:20px}
 .ring-av{width:130px;height:130px;border-radius:50%;background:#3c4043;font-size:60px;display:flex;align-items:center;justify-content:center;animation:pulse 1.4s infinite;margin-bottom:18px}
@@ -120,11 +116,6 @@ h4{color:var(--hi);margin:14px 0 8px}
 
 /* ---------- Games ---------- */
 .gtabs{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:12px}
-#gamesModal .modal-body{display:flex;flex-direction:column}
-#frameWrap{flex:1;min-height:320px;display:flex;flex-direction:column}
-#gframe{flex:1;width:100%;min-height:300px;border:1px solid var(--bd);border-radius:12px;background:#000}
-.gnote{font-size:11px;color:#aaa;text-align:center;margin:8px 0 0}
-.gnote a{color:#8ab4f8}
 .board{display:grid;grid-template-columns:repeat(3,92px);gap:6px;justify-content:center}
 .cell{width:92px;height:92px;font-size:44px;background:#1f0808;border:1px solid #441515;border-radius:12px;cursor:pointer}
 .cell.win{background:#1b4d24}
@@ -171,7 +162,7 @@ h4{color:var(--hi);margin:14px 0 8px}
   </div>
 </div>
 
-<!-- ============ ACTIVE CALL (group, full screen) ============ -->
+<!-- ============ ACTIVE CALL ============ -->
 <div id="callScreen" class="overlay">
   <div id="callHead">
     <div><b id="callTitle" style="font-size:18px">Call</b><br><small id="callStatus" style="color:#9aa0a6">Calling…</small></div>
@@ -221,6 +212,7 @@ h4{color:var(--hi);margin:14px 0 8px}
       <span>👥 <span id="onlineCount" class="badge">0</span> 👁 <span id="visitCount" class="badge">0</span></span>
       <span style="display:flex;gap:8px;align-items:center">
         <button class="btn sm green" onclick="addFriendQuick()">➕ Add friend</button>
+        <button class="btn sm gray" onclick="openModal('settingsModal')">⚙️</button>
         <span id="display-username" onclick="logout()"></span>
       </span>
     </div>
@@ -233,6 +225,7 @@ h4{color:var(--hi);margin:14px 0 8px}
       <div class="tile-app" onclick="openModal('storageApp')"><i>☁️</i>Drive</div>
       <div class="tile-app" onclick="openModal('localMusicApp')"><i>🎵</i>Local MP3</div>
       <div class="tile-app" onclick="openCamera()"><i>📷</i>Camera</div>
+      <div class="tile-app" onclick="openModal('settingsModal')"><i>⚙️</i>Settings</div>
     </div>
   </main>
 </div>
@@ -283,10 +276,12 @@ h4{color:var(--hi);margin:14px 0 8px}
       </div>
       <div id="chat-box"></div>
       <div id="typingNotice"></div>
+      <div id="emojiRow" style="display:none;gap:6px;flex-wrap:wrap;margin-bottom:6px"></div>
       <div class="chat-controls">
         <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="sendImage(this)"/>
         <button class="btn btn-icon" onclick="$('imageInput').click()">📷</button>
         <button class="btn btn-icon" id="recordBtn" onclick="toggleRecord()">🎙️</button>
+        <button class="btn btn-icon" onclick="toggleEmoji()">😊</button>
         <input type="text" id="messageInput" placeholder="Type a message..." oninput="emitTyping()" onkeydown="if(event.key==='Enter')sendMessage()"/>
         <button class="btn" onclick="sendMessage()">Send</button>
       </div>
@@ -294,7 +289,7 @@ h4{color:var(--hi);margin:14px 0 8px}
   </div>
 </div>
 
-<!-- Calls (pick one or many people) -->
+<!-- Calls -->
 <div id="phoneApp" class="modal">
   <div class="modal-header"><h3>Calls</h3><button class="close-btn" onclick="closeModal('phoneApp')">X</button></div>
   <div class="modal-body">
@@ -308,18 +303,25 @@ h4{color:var(--hi);margin:14px 0 8px}
   </div>
 </div>
 
-<!-- Games: Dino + Flappy run from hosted web pages (iframe), Tic-Tac-Toe is the app's own code -->
+<!-- Games -->
 <div id="gamesModal" class="modal">
   <div class="modal-header"><h3>Games</h3><button class="close-btn" onclick="closeModal('gamesModal')">X</button></div>
   <div class="modal-body">
     <div class="gtabs">
       <button class="btn" id="gt-dino" onclick="gameTab('dino')">🦖 Dino</button>
-      <button class="btn gray" id="gt-flappy" onclick="gameTab('flappy')">🐤 Flappy</button>
+      <button class="btn gray" id="gt-flappy" onclick="gameTab('flappy')">🐤 Flappy Bird</button>
+      <button class="btn gray" id="gt-mario" onclick="gameTab('mario')">🍄 Super Mario</button>
       <button class="btn gray" id="gt-xo" onclick="gameTab('xo')">❌⭕ Tic-Tac-Toe</button>
     </div>
-    <div id="frameWrap">
-      <iframe id="gframe" src="about:blank" title="Game" allow="autoplay; fullscreen" referrerpolicy="no-referrer"></iframe>
-      <p class="gnote">Click or tap inside the game once, then use Space / ↑ / tap to play. <span id="gameOpen"></span></p>
+    <div id="webGameWrap">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+        <small style="color:#aaa">From: <span id="gameSite"></span></small>
+        <button class="btn sm gray" onclick="nextSite()">🔄 Try another site</button>
+        <button class="btn sm gray" onclick="openGameTab()">↗ New tab</button>
+        <button class="btn sm gray" onclick="fullGame()">⛶ Fullscreen</button>
+      </div>
+      <iframe id="gameFrame" allow="fullscreen; autoplay; gamepad" style="width:100%;height:calc(100vh - 230px);min-height:360px;border:1px solid var(--bd);border-radius:12px;background:#000"></iframe>
+      <small style="color:#888">If the game stays blank, that site blocks embedding: use "Try another site" or "New tab".</small>
     </div>
     <div id="xoWrap" style="display:none;text-align:center">
       <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:10px">
@@ -330,9 +332,22 @@ h4{color:var(--hi);margin:14px 0 8px}
       <select id="aiLevel"><option value="easy">AI: Easy</option><option value="medium">AI: Medium</option><option value="hard" selected>AI: Hard</option></select>
       <div id="onlinePick" style="display:none;margin:8px"><select id="oppSel"></select> <button class="btn" onclick="inviteOpp()">Invite</button></div>
       <div id="xoStatus" style="margin:14px;font-weight:bold"></div>
+      <div id="xoScore" style="color:#aaa;font-size:12px;margin-bottom:8px"></div>
       <div class="board" id="board"></div>
       <button class="btn" id="xoAgain" style="display:none;margin-top:14px" onclick="xoAgain()">Play again</button>
     </div>
+  </div>
+</div>
+
+<!-- Settings -->
+<div id="settingsModal" class="modal">
+  <div class="modal-header"><h3>Settings</h3><button class="close-btn" onclick="closeModal('settingsModal')">X</button></div>
+  <div class="modal-body">
+    <h4>🎨 Accent color</h4>
+    <div id="themeRow" style="display:flex;gap:10px;flex-wrap:wrap"></div>
+    <h4>🔔 Notifications</h4>
+    <label><input type="checkbox" id="notifChk" onchange="setNotif(this.checked)"> Notify me of messages and calls, even when the app is closed</label>
+    <p style="color:#888;font-size:12px">Turn this on once on every phone and laptop you use. A call notification has Pick up and Dismiss buttons.</p>
   </div>
 </div>
 
@@ -370,10 +385,9 @@ h4{color:var(--hi);margin:14px 0 8px}
   </div>
 </div>
 
-<!-- Hosted on Render: keep this line. For a bundled APK/ZIP use: <script src="socket.io.min.js"></script> -->
 <script src="/socket.io/socket.io.js"></script>
 <script>
-// Leave '' when served by Render. For a bundled APK/ZIP app, put your Render address here.
+// Leave '' when served by Render. (Bundled APK/ZIP apps cannot use push notifications.)
 const SERVER_URL = '';
 const socket = io(SERVER_URL || undefined, { reconnection: true, reconnectionDelay: 2000, reconnectionDelayMax: 10000 });
 
@@ -424,6 +438,10 @@ let outbox=[]; try{ outbox=JSON.parse(localStorage.getItem('outbox')||'[]'); }ca
 const saveOutbox = () => localStorage.setItem('outbox', JSON.stringify(outbox));
 function cacheChats(){ try{ localStorage.setItem('chat_cache', JSON.stringify({g:globalMsgs.slice(-100), d:dms, f:friends})); }catch(e){} }
 function refreshLists(){ renderUsers(); buildChatSelect(); renderCallPicker(); fillOpp(); }
+// values from a tapped notification that opened the app
+const _L = new URLSearchParams(location.search);
+const L_ANS=_L.get('answer'), L_VID=_L.get('video')==='1', L_FROM=_L.get('from'), L_CHAT=_L.get('chat');
+if(location.search) history.replaceState(null,'',location.pathname);
 
 // ================= accounts =================
 function showName(){ $('display-username').innerText = me ? '👤 '+me+' · Log out' : ''; $('heroName').innerText = me; }
@@ -454,7 +472,6 @@ function submitAuth(){
 }
 socket.on('auth_ok',({name,token})=>{
   me=name; localStorage.setItem('token',token); localStorage.setItem('saved_name',name);
-  // Ask the browser to save the password in its own password manager (Chrome / Google Password Manager)
   if(pendingCred && window.PasswordCredential){ try{ navigator.credentials.store(new PasswordCredential({id:pendingCred.name,password:pendingCred.password,name})); }catch(e){} }
   pendingCred=null;
   $('authModal').style.display='none'; $('authPass').value=''; $('authPass2').value=''; showName();
@@ -463,11 +480,12 @@ socket.on('auth_fail',()=>{ ['token','saved_name','chat_cache'].forEach(k=>local
 socket.on('auth_error',m=>{ pendingCred=null; $('authMsg').innerText=m; });
 socket.on('auth_exists',n=>{ pendingCred=null; setAuthMode('login','"'+n+'" is already registered. If that is you, enter its password. Otherwise tap Sign up and pick another name.'); });
 socket.on('kicked',()=>{ ['token','saved_name'].forEach(k=>localStorage.removeItem(k)); endCallLocal(); me=''; showName(); setAuthMode('login','This account was opened on another device.'); showAuth(); });
-function logout(){
+async function logout(){
   if(!me || !confirm('Log out of '+me+'?')) return;
+  let ep=null; try{ const reg=await navigator.serviceWorker.getRegistration(); const s=reg&&await reg.pushManager.getSubscription(); if(s){ ep=s.endpoint; await s.unsubscribe(); } }catch(e){}
   if(call) leaveCall();
   if(T.mode==='online' && T.id) socket.emit('ttt_leave',T.id);
-  socket.emit('logout',{token:localStorage.getItem('token')});
+  socket.emit('logout',{token:localStorage.getItem('token'),endpoint:ep});
   ['token','saved_name','chat_cache','outbox'].forEach(k=>localStorage.removeItem(k));
   outbox=[]; me=''; globalMsgs=[]; dms={}; friends=[]; requests=[]; blocks=[]; directory=[]; dirMap={}; unread={}; cur='global'; profileLoaded=false;
   goHome(); showName(); refreshLists(); renderChat(); setAuthMode('signup'); showAuth();
@@ -531,7 +549,7 @@ function renderDirectory(){
     const on=onlineUsers.includes(u.name), isF=friends.includes(u.name), bl=blocks.includes(u.name), n=enc(u.name);
     return '<div class="user-card"><div><span>'+(on?'🟢':'⚪')+' '+esc(u.emoji||'👤')+' '+esc(u.name)+'</span>'
       +(u.status?'<br><small style="color:#aaa">'+esc(u.status)+'</small>':'')
-      +'<br><small style="color:#888">'+(on?'online now':'last seen '+timeAgo(u.lastSeen))+' · 👁 '+(u.visits||0)+' visits</small></div><div class="user-actions">'
+      +'<br><small style="color:#888">'+(on?'online now':'last seen '+timeAgo(u.lastSeen))+' · 👁 '+(u.visits||0)+' visits'+(u.wins?' · 🏆 '+u.wins+' wins':'')+'</small></div><div class="user-actions">'
       +(bl?'':'<button class="btn sm" onclick="act(\'chat\',\''+n+'\')">💬</button>')
       +(on&&!bl?'<button class="btn sm blue" onclick="act(\'call\',\''+n+'\')">📞</button>':'')
       +(!isF&&!bl?'<button class="btn sm green" onclick="act(\'add\',\''+n+'\')">➕</button>':'')
@@ -618,6 +636,10 @@ async function toggleRecord(){
     }catch(e){ alert('Microphone permission required'); }
   } else { audioRecorder.stop(); recording=false; btn.style.background='#2b0b0b'; }
 }
+const EMOJIS=['😀','😂','😍','😎','🥳','😭','😡','👍','👎','🙏','🔥','❤️','🎉','🤔','😴','🤝'];
+$('emojiRow').innerHTML=EMOJIS.map(e=>'<button class="btn sm btn-icon" onclick="addEmoji(\''+e+'\')">'+e+'</button>').join('');
+function toggleEmoji(){ const r=$('emojiRow'); r.style.display=r.style.display==='flex'?'none':'flex'; }
+function addEmoji(e){ const i=$('messageInput'); i.value+=e; i.focus(); }
 
 // ================= drive / mp3 / camera =================
 socket.on('new_cloud_file',renderCloudFile);
@@ -672,16 +694,13 @@ const peers={}, tiles={};
 function getMedia(video){
   return navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}, video: video?{facingMode:facing,width:{ideal:640},height:{ideal:480}}:false});
 }
-// ---- picking who to call ----
 function renderCallPicker(){
-  if(!$('callPicker')) return;
   const names=[...new Set([...onlineUsers.filter(u=>u!==me),...friends])];
   $('callPicker').innerHTML = names.map(u=>'<label class="user-card" style="cursor:pointer"><span><input type="checkbox" '+(callSel.has(u)?'checked ':'')+'onchange="togSel(\''+enc(u)+'\',this.checked)"> '+(onlineUsers.includes(u)?'🟢 ':'⚪ ')+esc((dirMap[u]&&dirMap[u].emoji)||'👤')+' '+esc(u)+'</span></label>').join('') || '<small style="color:#888">Nobody to pick yet — add friends first, or type names below.</small>';
 }
 function togSel(e,on){ const u=decodeURIComponent(e); on?callSel.add(u):callSel.delete(u); }
 function quickCall(name,video){ callSel=new Set([name]); $('targetUser').value=''; startCall(video); }
 
-// ---- starting / receiving ----
 async function startCall(video){
   if(call) return toast('You are already in a call — use ➕ inside the call to add people');
   const typed=$('targetUser').value.split(',').map(s=>s.trim()).filter(Boolean);
@@ -719,11 +738,7 @@ socket.on('call_ended',d=>{ if(call && (!call.room||!d.room||call.room===d.room)
 socket.on('call_failed',d=>{ alert(d.reason); endCallLocal(); });
 socket.on('rtc_signal',d=>{ if(call&&call.room===d.room) onSignal(d); });
 
-// ---- call screen / tiles ----
-function showCall(){
-  $('callScreen').style.display='flex'; $('miniCall').style.display='none';
-  ensureTile(me,true); setLocalTile(); refreshCtrls(); updateCallUI();
-}
+function showCall(){ $('callScreen').style.display='flex'; $('miniCall').style.display='none'; ensureTile(me,true); setLocalTile(); refreshCtrls(); updateCallUI(); }
 function minimizeCall(){ $('callScreen').style.display='none'; $('miniCall').style.display='flex'; updateCallUI(); }
 function expandCall(){ $('miniCall').style.display='none'; $('callScreen').style.display='flex'; }
 function ensureTile(name,isMe){
@@ -759,7 +774,6 @@ function refreshCtrls(){
 }
 function needTap(){ toast('🔇 Tap the screen to hear the call'); document.addEventListener('click',()=>Object.values(tiles).forEach(t=>t.a&&t.a.play().catch(()=>{})),{once:true}); }
 
-// ---- peer connections (perfect negotiation, so cameras / screen share can be added mid-call) ----
 function sig(to,data){ if(call&&call.room) socket.emit('rtc_signal',{room:call.room,to,data}); }
 function getPeer(name,polite){
   if(peers[name]) return peers[name];
@@ -776,10 +790,7 @@ function getPeer(name,polite){
     if(t.a) t.a.play().catch(needTap); t.v.play().catch(()=>{});
     if(tr.kind==='video'){ tr.onunmute=()=>showVid(name,true); tr.onmute=()=>showVid(name,false); showVid(name,!tr.muted); }
   };
-  pc.onconnectionstatechange=()=>{
-    if(pc.connectionState==='connected') markConnected();
-    if(pc.connectionState==='failed' && pc.restartIce) pc.restartIce();
-  };
+  pc.onconnectionstatechange=()=>{ if(pc.connectionState==='connected') markConnected(); if(pc.connectionState==='failed' && pc.restartIce) pc.restartIce(); };
   return p;
 }
 async function onSignal({from,data}){
@@ -798,17 +809,14 @@ async function onSignal({from,data}){
 }
 function closePeer(n){ const p=peers[n]; if(p){ try{ p.pc.close(); }catch(e){} delete peers[n]; } removeTile(n); }
 
-// ---- call controls ----
 function toggleMute(){ const t=localStream&&localStream.getAudioTracks()[0]; if(!t) return; muted=!muted; t.enabled=!muted; refreshCtrls(); }
 function toggleVol(){ vol=vol===1?0.4:1; Object.values(tiles).forEach(t=>{ if(t.a) t.a.volume=vol; }); refreshCtrls(); }
 async function toggleCam(){
   if(!localStream) return;
   let vt=localStream.getVideoTracks()[0];
   if(!vt){
-    try{
-      const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing}}); vt=s.getVideoTracks()[0];
-      localStream.addTrack(vt); Object.values(peers).forEach(p=>p.pc.addTrack(vt,localStream));
-    }catch(e){ return toast('Camera blocked'); }
+    try{ const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing}}); vt=s.getVideoTracks()[0]; localStream.addTrack(vt); Object.values(peers).forEach(p=>p.pc.addTrack(vt,localStream)); }
+    catch(e){ return toast('Camera blocked'); }
   } else vt.enabled=!vt.enabled;
   setLocalTile(); refreshCtrls();
 }
@@ -829,10 +837,7 @@ async function shareScreen(){
   if(sharing) return stopShare();
   let s; try{ s=await navigator.mediaDevices.getDisplayMedia({video:true}); }catch(e){ return toast('Screen share cancelled'); }
   const track=s.getVideoTracks()[0]; sharing={track,stream:s};
-  Object.values(peers).forEach(p=>{
-    const snd=p.pc.getSenders().find(x=>x.track&&x.track.kind==='video');
-    if(snd) snd.replaceTrack(track); else p.pc.addTrack(track,s);
-  });
+  Object.values(peers).forEach(p=>{ const snd=p.pc.getSenders().find(x=>x.track&&x.track.kind==='video'); if(snd) snd.replaceTrack(track); else p.pc.addTrack(track,s); });
   track.onended=stopShare; setLocalTile(); refreshCtrls();
 }
 function stopShare(){
@@ -851,43 +856,46 @@ function addToCall(e){ const n=decodeURIComponent(e); if(call&&call.room){ socke
 function addTyped(){ const v=$('addCallName').value.trim(); if(v){ addToCall(enc(v)); $('addCallName').value=''; } }
 function leaveCall(){ if(call&&call.room) socket.emit('call_leave',{room:call.room}); endCallLocal(); }
 function endCallLocal(){
-  clearInterval(callTimer); stopRing();
+  clearInterval(callTimer); hideIncoming();
   Object.keys(peers).forEach(n=>closePeer(n));
   if(sharing){ sharing.track.stop(); sharing=null; }
   if(localStream){ localStream.getTracks().forEach(t=>t.stop()); localStream=null; }
   Object.keys(tiles).forEach(n=>removeTile(n));
-  call=null; muted=false; vol=1; hideIncomingIfAny();
+  call=null; muted=false; vol=1;
   $('callScreen').style.display='none'; $('miniCall').style.display='none'; $('addPanel').style.display='none';
 }
-function hideIncomingIfAny(){}
 
 // ================= GAMES =================
-// Dino and Flappy Bird run from hosted web pages inside an iframe. Tic-Tac-Toe below is the app's own code.
-// To swap a game, just change its URL here.
-const GAME_URLS={
-  dino:'https://wayou.github.io/t-rex-runner/',
-  flappy:'https://nebez.github.io/floppybird/'
+// Edit these addresses if a site stops working or blocks embedding. Add more addresses to an array to get extra "Try another site" options.
+const WEB_GAMES = {
+  dino:   { urls: ['https://chromedino.com/', 'https://dino-chrome.com/'] },
+  flappy: { urls: ['https://flappybird.io/'] },
+  mario:  { urls: ['https://supermarioplay.com/', 'https://www.fullscreenmario.com/'] }
 };
-const G={tab:'dino'};
+const G = { tab: 'dino', idx: {} };
 function openGames(){ openModal('gamesModal'); gameTab(G.tab); }
-function stopGame(){ const f=$('gframe'); if(f) f.src='about:blank'; }   // stops the game and its sound when you leave
+function stopGame(){ $('gameFrame').src = 'about:blank'; }
+function gameUrl(){ const g = WEB_GAMES[G.tab]; return g.urls[(G.idx[G.tab] || 0) % g.urls.length]; }
+function loadGame(){ $('gameFrame').src = gameUrl(); $('gameSite').innerText = new URL(gameUrl()).host; }
 function gameTab(t){
-  G.tab=t;
-  ['dino','flappy','xo'].forEach(k=>$('gt-'+k).className='btn'+(k===t?'':' gray'));
-  const isXO=t==='xo';
-  $('frameWrap').style.display=isXO?'none':'flex';
-  $('xoWrap').style.display=isXO?'block':'none';
-  if(isXO){ stopGame(); showModeUI(); renderXO(); return; }
-  if(!navigator.onLine) toast('📴 This game needs internet');
-  $('gframe').src=GAME_URLS[t];
-  $('gameOpen').innerHTML='Not loading? <a href="'+GAME_URLS[t]+'" target="_blank" rel="noopener">Open in a new tab</a>';
+  G.tab = t;
+  ['dino','flappy','mario','xo'].forEach(k => $('gt-'+k).className = 'btn' + (k === t ? '' : ' gray'));
+  const web = t !== 'xo';
+  $('webGameWrap').style.display = web ? 'block' : 'none';
+  $('xoWrap').style.display = web ? 'none' : 'block';
+  if(web) loadGame(); else { stopGame(); showModeUI(); renderXO(); }
 }
+function nextSite(){ G.idx[G.tab] = (G.idx[G.tab] || 0) + 1; loadGame(); }
+function openGameTab(){ window.open(gameUrl(), '_blank'); }
+function fullGame(){ const f = $('gameFrame'); (f.requestFullscreen || f.webkitRequestFullscreen || function(){ toast('Fullscreen not supported'); }).call(f); }
 
-// ---- Tic-Tac-Toe: vs AI / same device / online app friend ----
+// ---- Tic-Tac-Toe (coded): vs AI / same device / online app friend ----
 const T={mode:'ai',board:Array(9).fill(''),turn:'X',over:false,res:null,id:null,me:'X',x:'',o:''};
 const WL=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
 const winnerOf=b=>{ for(const l of WL) if(b[l[0]]&&b[l[0]]===b[l[1]]&&b[l[0]]===b[l[2]]) return {w:b[l[0]],line:l}; return b.every(Boolean)?{w:'draw',line:[]}:null; };
 const nameOf=s=>s==='X'?T.x:T.o;
+let XS=JSON.parse(localStorage.getItem('xoScore')||'{"w":0,"l":0,"d":0}');
+function scoreXO(r){ if(T.mode!=='ai') return; if(r.w==='draw') XS.d++; else if(r.w==='X') XS.w++; else XS.l++; localStorage.setItem('xoScore',JSON.stringify(XS)); }
 function showModeUI(){
   ['ai','local','online'].forEach(m=>$('m-'+m).className='btn'+(T.mode===m?'':' gray'));
   $('onlinePick').style.display=T.mode==='online'?'block':'none'; $('aiLevel').style.display=T.mode==='ai'?'inline-block':'none';
@@ -909,7 +917,9 @@ function renderXO(){
   if(T.mode==='online' && !T.id) s='Pick an online friend and send an invite';
   else if(T.res) s=T.res.w==='draw'?"🤝 It's a draw!":'🏆 '+nameOf(T.res.w)+' wins!';
   else s='Turn: '+nameOf(T.turn)+' '+(T.turn==='X'?'❌':'⭕')+(T.mode==='online'&&T.turn===T.me?' — your move':'');
-  $('xoStatus').innerText=s; $('xoAgain').style.display=(T.res&&(T.mode!=='online'||T.id))?'inline-block':'none';
+  $('xoStatus').innerText=s;
+  $('xoScore').innerText = T.mode==='ai' ? 'vs AI — Won '+XS.w+' · Lost '+XS.l+' · Draw '+XS.d : '';
+  $('xoAgain').style.display=(T.res&&(T.mode!=='online'||T.id))?'inline-block':'none';
 }
 function cellClick(i){
   if(T.over||T.board[i]) return;
@@ -917,7 +927,7 @@ function cellClick(i){
   if(T.mode==='ai'&&T.turn!=='X') return;
   play(i); if(T.mode==='ai'&&!T.over) setTimeout(aiMove,350);
 }
-function play(i){ T.board[i]=T.turn; const r=winnerOf(T.board); if(r){ T.res=r; T.over=true; } else T.turn=T.turn==='X'?'O':'X'; renderXO(); }
+function play(i){ T.board[i]=T.turn; const r=winnerOf(T.board); if(r){ T.res=r; T.over=true; scoreXO(r); } else T.turn=T.turn==='X'?'O':'X'; renderXO(); }
 function mm(b,pl,d){
   const r=winnerOf(b); if(r) return r.w==='O'?10-d:r.w==='X'?d-10:0;
   let best=pl==='O'?-99:99;
@@ -933,7 +943,7 @@ function aiMove(){
 }
 function xoAgain(){ if(T.mode==='online'){ if(T.id) socket.emit('ttt_again',T.id); } else newXO(); }
 function fillOpp(){
-  const sel=$('oppSel'); if(!sel) return; const prev=sel.value;
+  const sel=$('oppSel'); const prev=sel.value;
   const names=[...new Set([...friends.filter(f=>onlineUsers.includes(f)),...onlineUsers.filter(u=>u!==me)])];
   sel.innerHTML=names.length?names.map(n=>'<option value="'+esc(n)+'">'+(friends.includes(n)?'⭐ ':'')+esc(n)+'</option>').join(''):'<option value="">No one online</option>';
   if(names.includes(prev)) sel.value=prev;
@@ -948,6 +958,55 @@ socket.on('ttt_state',s=>{
   if(G.tab!=='xo') gameTab('xo'); else { showModeUI(); renderXO(); }
 });
 socket.on('ttt_closed',d=>{ if(T.id===d.id){ T.id=null; T.board=Array(9).fill(''); T.res=null; T.over=false; toast('Your opponent left the game'); renderXO(); } });
+
+// ================= SETTINGS: accent colors =================
+const THEMES={Red:['#e05656','#ff8a8a'],Blue:['#1a73e8','#8ab4f8'],Green:['#34a853','#81c995'],Purple:['#8e44ad','#c39bd3'],Orange:['#e67e22','#f5b041']};
+function applyTheme(n){ const t=THEMES[n]||THEMES.Red; document.documentElement.style.setProperty('--ac',t[0]); document.documentElement.style.setProperty('--hi',t[1]); localStorage.setItem('theme',n); }
+$('themeRow').innerHTML=Object.keys(THEMES).map(n=>'<button class="btn sm" style="background:'+THEMES[n][0]+'" onclick="applyTheme(\''+n+'\')">'+n+'</button>').join('');
+applyTheme(localStorage.getItem('theme')||'Red');
+
+// ================= PUSH NOTIFICATIONS =================
+function b64(s){ const p='='.repeat((4-s.length%4)%4), r=(s+p).replace(/-/g,'+').replace(/_/g,'/'); return Uint8Array.from(atob(r),c=>c.charCodeAt(0)); }
+async function enablePush(ask){
+  if(!('serviceWorker' in navigator) || !('PushManager' in window) || !window.Notification) return ask && toast('Notifications are not supported here. Use Chrome/Edge/Firefox (iPhone: add to Home Screen first).');
+  try{
+    const k=(await (await fetch((SERVER_URL||'')+'/vapid')).json()).key;
+    if(!k) return ask && toast('Server notifications are not set up yet');
+    if(Notification.permission==='default' && ask) await Notification.requestPermission();
+    if(Notification.permission!=='granted') return ask && toast('Allow notifications in your browser settings');
+    const reg=await navigator.serviceWorker.register('/sw.js'); await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64(k)});
+    socket.emit('push_subscribe',sub.toJSON());
+    localStorage.setItem('push','1'); $('notifChk').checked=true;
+    if(ask) toast('🔔 Notifications are on');
+  }catch(e){ if(ask) toast('Could not turn on notifications'); }
+}
+async function disablePush(){
+  try{ const reg=await navigator.serviceWorker.getRegistration(); const s=reg&&await reg.pushManager.getSubscription(); if(s) await s.unsubscribe(); }catch(e){}
+  localStorage.setItem('push','0');
+}
+function setNotif(on){ on ? enablePush(true) : disablePush(); }
+$('notifChk').checked = !!window.Notification && Notification.permission==='granted' && localStorage.getItem('push')!=='0';
+socket.on('init',()=>{ if(window.Notification && Notification.permission==='granted' && localStorage.getItem('push')!=='0') enablePush(false); });
+
+// What happens when you tap a notification
+function launchAnswer(m){
+  if(call) return toast('You are already in a call');
+  incoming={room:m.room,video:!!m.video,from:m.from,members:[m.from]}; acceptIncoming();
+}
+if('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message',e=>{
+  const m=e.data||{};
+  if(m.type==='answer') launchAnswer(m);
+  if(m.type==='decline'){ socket.emit('call_leave',{room:m.room}); if(incoming&&incoming.room===m.room) hideIncoming(); }
+  if(m.type==='chat'){ openModal('chatApp'); switchChat(m.from); }
+});
+// App opened from a notification while it was closed
+let launchDone=false;
+socket.on('init',()=>{ if(launchDone) return; launchDone=true; setTimeout(()=>{
+  if(L_ANS) launchAnswer({room:L_ANS,video:L_VID,from:L_FROM||'Caller'});
+  else if(L_CHAT){ openModal('chatApp'); switchChat(L_CHAT); }
+},400); });
 
 // ================= boot =================
 showName();
