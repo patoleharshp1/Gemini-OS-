@@ -380,6 +380,22 @@ h4{color:var(--hi);margin:14px 0 8px}
     <p style="color:#888;font-size:12px">Turn this on once on every phone and laptop you use. A call notification has Pick up and Dismiss buttons.</p>
   </div>
 </div>
+  <div id="recModal" class="modal">
+  <div class="modal-header"><h3>🎬 Screen Recorder</h3><button class="close-btn" onclick="closeModal('recModal')">X</button></div>
+  <div class="modal-body">
+    <label><input type="checkbox" id="recSys" checked> 🔊 Device sound</label><br>
+    <label><input type="checkbox" id="recMic"> 🎙️ Microphone</label>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin:12px 0">
+      <button class="btn green" onclick="recStart()">⏺ Start</button>
+      <button class="btn gray" onclick="recPause()">⏯ Pause</button>
+      <button class="btn gray" onclick="recMic()">🎙️ Mic on/off</button>
+      <button class="btn gray" onclick="recScreen()">🖥️ Screen on/off</button>
+      <button class="btn" onclick="recStop()">⏹ Stop &amp; save</button>
+    </div>
+    <div id="recInfo" style="color:#aaa;font-size:13px"></div><div id="recResult"></div>
+    <small style="color:#888">Saved to your personal drive (max ~10 MB, about 2 min, then it stops automatically). Phones cannot record the screen.</small>
+  </div>
+</div>
 
 <!-- Drive -->
 <div id="storageApp" class="modal">
