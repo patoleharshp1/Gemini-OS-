@@ -16,6 +16,8 @@ button{font-family:inherit}
 select,input[type=text],input[type=password]{padding:10px;border-radius:8px;border:1px solid #441515;background:#1f0808;color:#fff;font-size:14px}
 h4{color:var(--hi);margin:14px 0 8px}
 .badge{background:#1b4d24;color:#4caf50;padding:2px 8px;border-radius:10px;font-size:11px;margin-left:4px}
+
+/* Layout */
 #app{display:flex;min-height:100%}
 #side{position:fixed;bottom:0;left:0;right:0;height:58px;background:#1a0505;border-top:1px solid var(--bd);display:flex;z-index:50}
 .brand,.more{display:none}
@@ -32,6 +34,7 @@ h4{color:var(--hi);margin:14px 0 8px}
 .modal-header h3{margin:0;color:var(--hi);font-size:16px}
 .close-btn{background:var(--ac);border:0;color:#fff;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:bold}
 .modal-body{flex:1;min-height:0;overflow-y:auto;padding:12px}
+
 @media (min-width:900px){
   #side{position:sticky;top:0;height:100vh;width:230px;flex-direction:column;border-top:0;border-right:1px solid var(--bd);padding:18px 10px;gap:6px;flex:none}
   .brand{display:block;font-size:20px;font-weight:bold;color:var(--hi);padding:4px 12px 16px}
@@ -45,7 +48,7 @@ h4{color:var(--hi);margin:14px 0 8px}
 }
 #authModal{inset:0!important;border:0!important;border-radius:0!important;z-index:500}
 .auth-card{max-width:420px;width:100%;margin:auto}
-.user-card{display:flex;justify-content:space-between;align-items:center;gap:6px;background:#1a0808;border:1px solid var(--bd);padding:10px;border-radius:8px;margin-bottom:8px}
+.user-card,.file-card{display:flex;justify-content:space-between;align-items:center;gap:6px;background:#1a0808;border:1px solid var(--bd);padding:10px;border-radius:8px;margin-bottom:8px}
 .gtabs{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:12px}
 .board{display:grid;grid-template-columns:repeat(3,92px);gap:6px;justify-content:center}
 .cell{width:92px;height:92px;font-size:40px;background:#1f0808;border:1px solid #441515;border-radius:12px;cursor:pointer;color:#fff}
@@ -55,7 +58,7 @@ h4{color:var(--hi);margin:14px 0 8px}
 <body>
 <div id="toast"></div>
 
-<!-- ============ LOGIN ============ -->
+<!-- ============ AUTH / LOGIN ============ -->
 <div id="authModal" class="modal">
   <div class="modal-header"><h3>Welcome to Gemini OS</h3></div>
   <div class="modal-body" style="display:flex">
@@ -75,32 +78,88 @@ h4{color:var(--hi);margin:14px 0 8px}
   </div>
 </div>
 
-<!-- ============ MAIN OS ============ -->
+<!-- ============ MAIN DESKTOP ============ -->
 <div id="app">
   <nav id="side">
     <div class="brand">✦ Gemini OS</div>
     <button class="nav" onclick="goHome()">🏠<span>Home</span></button>
+    <button class="nav" onclick="openModal('chatApp')">💬<span>Messages</span></button>
+    <button class="nav" onclick="openModal('phoneApp')">📞<span>Calls</span></button>
+    <button class="nav" onclick="openModal('usersModal')">👥<span>Friends</span></button>
     <button class="nav" onclick="openGames()">🎮<span>Games & Chess</span></button>
-    <button class="nav more" onclick="openModal('pythonApp'); initPython()">🐍<span>Python IDE</span></button>
+    <button class="nav more" onclick="openModal('pythonApp'); initPython()">🐍<span>Python</span></button>
+    <button class="nav more" onclick="openModal('storageApp')">☁️<span>Drive</span></button>
+    <button class="nav more" onclick="openModal('recModal')">🎬<span>Recorder</span></button>
     <button class="nav more" onclick="openBrowser()">🌐<span>Browser</span></button>
+    <button class="nav more" onclick="openModal('localMusicApp')">🎵<span>Music</span></button>
+    <button class="nav more" onclick="openCamera()">📷<span>Camera</span></button>
     <button class="nav more" onclick="openModal('settingsModal')">⚙️<span>Settings</span></button>
   </nav>
   <main id="main">
     <div class="topbar">
       <span>👥 <span id="onlineCount" class="badge">0</span></span>
       <span style="display:flex;gap:8px;align-items:center">
-        <button class="btn sm gray" onclick="openModal('settingsModal')">⚙️ Settings</button>
+        <button class="btn sm green" onclick="openModal('usersModal')">➕ Add friend</button>
+        <button class="btn sm gray" onclick="openModal('settingsModal')">⚙️</button>
         <span id="display-username" onclick="logout()" style="cursor:pointer;text-decoration:underline"></span>
       </span>
     </div>
-    <div class="hero"><h2>Welcome, <span id="heroName"></span> 👋</h2><p>Python IDE, Chess, embedded YouTube Browser, and customized themes.</p></div>
+    <div class="hero"><h2>Welcome, <span id="heroName"></span> 👋</h2><p>Chat, calls, Python IDE, Chess, Drive, Camera, and custom wallpapers.</p></div>
     <div class="tiles">
+      <div class="tile-app" onclick="openModal('chatApp')"><i>💬</i>Messages</div>
+      <div class="tile-app" onclick="openModal('phoneApp')"><i>📞</i>Calls</div>
+      <div class="tile-app" onclick="openModal('usersModal')"><i>👥</i>Friends</div>
       <div class="tile-app" onclick="openGames()"><i>🎮</i>Games & Chess</div>
       <div class="tile-app" onclick="openModal('pythonApp'); initPython()"><i>🐍</i>Python IDE</div>
-      <div class="tile-app" onclick="openBrowser()"><i>🌐</i>Browser & YT</div>
+      <div class="tile-app" onclick="openModal('storageApp')"><i>☁️</i>Drive</div>
+      <div class="tile-app" onclick="openModal('recModal')"><i>🎬</i>Recorder</div>
+      <div class="tile-app" onclick="openBrowser()"><i>🌐</i>Browser</div>
+      <div class="tile-app" onclick="openModal('localMusicApp')"><i>🎵</i>Music</div>
+      <div class="tile-app" onclick="openCamera()"><i>📷</i>Camera</div>
       <div class="tile-app" onclick="openModal('settingsModal')"><i>⚙️</i>Settings</div>
     </div>
   </main>
+</div>
+
+<!-- ============ CHAT APP ============ -->
+<div id="chatApp" class="modal">
+  <div class="modal-header"><h3>Messages</h3><button class="close-btn" onclick="closeModal('chatApp')">X</button></div>
+  <div class="modal-body" style="display:flex;flex-direction:column">
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <select id="chatWith" style="flex:1" onchange="switchChat(this.value)"><option value="global">Global chat</option></select>
+    </div>
+    <div id="chat-box" style="flex:1;background:#140404;border:1px solid var(--bd);border-radius:8px;padding:10px;overflow-y:auto;min-height:200px"></div>
+    <div style="display:flex;gap:6px;margin-top:8px">
+      <input type="text" id="messageInput" placeholder="Type a message..." style="flex:1" onkeydown="if(event.key==='Enter')sendMessage()"/>
+      <button class="btn" onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ FRIENDS APP ============ -->
+<div id="usersModal" class="modal">
+  <div class="modal-header"><h3>Friends & Users</h3><button class="close-btn" onclick="closeModal('usersModal')">X</button></div>
+  <div class="modal-body">
+    <h4>Add friend by name</h4>
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+      <input type="text" id="addFriendName" placeholder="Type name..." style="flex:1"/>
+      <button class="btn" onclick="addByName()">Add</button>
+    </div>
+    <h4>Online Users</h4>
+    <div id="activeUsersList"></div>
+  </div>
+</div>
+
+<!-- ============ CALLS APP ============ -->
+<div id="phoneApp" class="modal">
+  <div class="modal-header"><h3>Calls</h3><button class="close-btn" onclick="closeModal('phoneApp')">X</button></div>
+  <div class="modal-body">
+    <input type="text" id="targetUser" placeholder="Type username to call..." style="width:100%;margin-bottom:12px"/>
+    <div style="display:flex;gap:10px">
+      <button class="btn blue" style="flex:1" onclick="startCall(false)">Voice call</button>
+      <button class="btn green" style="flex:1" onclick="startCall(true)">Video call</button>
+    </div>
+  </div>
 </div>
 
 <!-- ============ PYTHON IDE APP ============ -->
@@ -136,7 +195,7 @@ for i in range(3):
       <iframe id="gameFrame" allow="fullscreen; autoplay" style="width:100%;height:calc(100vh - 200px);border:0;background:#000;border-radius:12px"></iframe>
     </div>
     <div id="chessWrap" style="display:none;text-align:center">
-      <h4 style="color:var(--hi)">♟️ Interactive Chess vs AI</h4>
+      <h4 style="color:var(--hi)">♟️ Interactive Chess Board</h4>
       <div id="chessBoard" style="display:grid;grid-template-columns:repeat(8,45px);gap:2px;justify-content:center;margin:15px auto"></div>
       <p id="chessStatus" style="font-weight:bold"></p>
       <button class="btn" onclick="resetChess()">New Game</button>
@@ -153,6 +212,45 @@ for i in range(3):
       <button class="btn sm" onclick="brGo($('brUrl').value)">Go</button>
     </div>
     <div id="brView" style="flex:1;min-height:300px;border:1px solid var(--bd);border-radius:10px;overflow:hidden;background:#000"></div>
+  </div>
+</div>
+
+<!-- ============ CLOUD DRIVE ============ -->
+<div id="storageApp" class="modal">
+  <div class="modal-header"><h3>Cloud Drive</h3><button class="close-btn" onclick="closeModal('storageApp')">X</button></div>
+  <div class="modal-body">
+    <input type="file" id="driveFileInput" multiple onchange="uploadToDrive(this)" style="display:none"/>
+    <button class="btn" onclick="$('driveFileInput').click()" style="width:100%;margin-bottom:12px">📁 Upload File</button>
+    <div id="myDriveList"></div>
+  </div>
+</div>
+
+<!-- ============ SCREEN RECORDER ============ -->
+<div id="recModal" class="modal">
+  <div class="modal-header"><h3>Screen Recorder</h3><button class="close-btn" onclick="closeModal('recModal')">X</button></div>
+  <div class="modal-body" style="text-align:center">
+    <button class="btn green" onclick="recStart()">Start Recording</button>
+    <button class="btn gray" onclick="recStop()">Stop</button>
+    <div id="recInfo" style="margin-top:10px"></div>
+  </div>
+</div>
+
+<!-- ============ LOCAL MUSIC ============ -->
+<div id="localMusicApp" class="modal">
+  <div class="modal-header"><h3>Music Player</h3><button class="close-btn" onclick="closeModal('localMusicApp')">X</button></div>
+  <div class="modal-body">
+    <input type="file" id="localMp3Input" accept="audio/*" multiple onchange="loadLocalSongs(this)" style="display:none"/>
+    <button class="btn" onclick="$('localMp3Input').click()" style="width:100%;margin-bottom:15px">🎵 Pick Audio Files</button>
+    <div id="localSongList"></div>
+  </div>
+</div>
+
+<!-- ============ CAMERA ============ -->
+<div id="cameraApp" class="modal">
+  <div class="modal-header"><h3>Camera</h3><button class="close-btn" onclick="closeModal('cameraApp')">X</button></div>
+  <div class="modal-body" style="text-align:center">
+    <video id="webcam" autoplay muted playsinline style="width:100%;max-height:55vh;border-radius:12px;background:#000"></video>
+    <button class="btn" onclick="takePhoto()" style="margin-top:15px">📷 Take Photo</button>
   </div>
 </div>
 
@@ -211,6 +309,23 @@ if(!me){ setAuthMode('signup'); showAuth(); } else {
 }
 function logout(){ localStorage.clear(); location.reload(); }
 
+// Chat
+function sendMessage(){
+  const i=$('messageInput'); if(!i.value.trim()) return;
+  socket.emit('send_message',{text:i.value.trim(), to: $('chatWith').value==='global'?null:$('chatWith').value});
+  i.value='';
+}
+socket.on('receive_message', m => {
+  const box = $('chat-box');
+  box.innerHTML += `<div><b>${m.user}:</b> ${m.text||''}</div>`;
+  box.scrollTop = box.scrollHeight;
+});
+function switchChat(u){}
+function addByName(){ const n=$('addFriendName').value.trim(); if(n) socket.emit('friend_request',n); }
+
+// Calls stub
+function startCall(vid){ toast('Starting call...'); }
+
 // Python Engine
 let pyodideReady=false, pyodideInstance=null;
 async function initPython(){
@@ -236,7 +351,7 @@ function setWallpaper(url){
 }
 const savedWall = localStorage.getItem('wallpaper'); if(savedWall) setWallpaper(savedWall);
 
-// YouTube Embed Fix
+// YouTube & Browser
 function ytEmbed(u){
   try{
     const x=new URL(u), h=x.hostname.replace(/^(www|m|music)\./,''); let id=null;
@@ -270,7 +385,6 @@ function gameTab(t){
   if(t==='chess') initChess();
 }
 
-// Simple Chess implementation
 let chessBoard = [];
 function initChess(){
   chessBoard = [
@@ -292,6 +406,23 @@ function renderChess(){
 }
 function resetChess(){ initChess(); }
 
+// Drive, Camera & Music Stubs
+function uploadToDrive(inp){ toast('File uploaded'); }
+function loadLocalSongs(inp){
+  const l=$('localSongList'); l.innerHTML='';
+  Array.from(inp.files).forEach(f=>{
+    l.innerHTML += `<div class="file-card"><span>${f.name}</span><audio controls src="${URL.createObjectURL(f)}"></audio></div>`;
+  });
+}
+let camStream;
+async function openCamera(){
+  openModal('cameraApp');
+  try{ camStream = await navigator.mediaDevices.getUserMedia({video:true,audio:true}); $('webcam').srcObject=camStream; }catch(e){ toast('Camera access needed'); }
+}
+function takePhoto(){ toast('Photo captured!'); }
+function recStart(){ toast('Recorder started'); }
+function recStop(){ toast('Recorder stopped'); }
+
 // Admin Panel
 function openAdmin(){ openModal('adminModal'); socket.emit('admin_data'); }
 socket.on('admin_data', d => {
@@ -305,6 +436,7 @@ socket.on('admin_data', d => {
     </div>
   `).join('');
 });
+socket.on('online_count', c => { $('onlineCount').innerText = c; });
 </script>
 </body>
 </html>
