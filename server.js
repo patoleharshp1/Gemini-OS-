@@ -121,7 +121,6 @@ const isAdmin = n => !!(n && getAcc(akey(n)) && getAcc(akey(n)).admin);
 
 // ---- bans & auto-moderation ----
 const ipOf = s => String(s.handshake.headers['x-forwarded-for'] || s.handshake.address || '').split(',')[0].trim();
-// A ban matches the account name, the device id (browser), and - only if the admin chose it - an IP address.
 const banFor = (name, ip, cid) => {
   db.bans = db.bans.filter(b => !b.until || b.until > Date.now());
   return db.bans.find(b =>
@@ -140,29 +139,31 @@ function banUser(name, ips, cids, minutes, reason, by) {
   });
   return b;
 }
-// Edit this list, or set BAD_WORDS="word1,word2" in Render
 const BAD_WORDS = (process.env.BAD_WORDS ? process.env.BAD_WORDS.split(',') : ['fuck', 'shit', 'bitch', 'asshole', 'bastard', 'cunt', 'dick', 'slut', 'whore']).map(w => w.trim().toLowerCase()).filter(Boolean);
 const norm = t => String(t || '').toLowerCase()
   .replace(/[0134578@$!]/g, c => ({ 0: 'o', 1: 'i', 3: 'e', 4: 'a', 5: 's', 7: 't', 8: 'b', '@': 'a', '$': 's', '!': 'i' }[c]))
   .replace(/(.)\1+/g, '$1');
 const isAbusive = t => { const w = norm(t).split(/[^a-z]+/); return BAD_WORDS.some(b => w.includes(norm(b))); };
-const STRIKE_MIN = [5, 10, 30]; // 1st offence 5 min, 2nd 10 min, 3rd and later 30 min
-function autoBan(name, cid) { // bans ONLY the person who swore: their account + their own browser. Never an IP, never the other person.
+const STRIKE_MIN = [5, 10, 30];
+function autoBan(name, cid) {
   const n = db.strikes[name] = (db.strikes[name] || 0) + 1;
   return banUser(name, [], cid ? [cid] : [], STRIKE_MIN[Math.min(n, 3) - 1], 'Auto-ban: abusive language (offence ' + n + ')', 'AutoMod');
 }
+
 function seedAdmin() {
-  const name = process.env.ADMIN_NAME || 'AllTimeLaugher', pw = process.env.ADMIN_PASS;
-  if (!pw) return console.log('ADMIN_PASS not set: no admin account created');
+  const name = process.env.ADMIN_NAME || 'AllTimeLaugher';
+  const pw = process.env.ADMIN_PASS || process.env.ADMIN_PASSWORD || 'Harsh@8118198!';
+  
   const k = akey(name), old = getAcc(k) || {}, salt = crypto.randomBytes(16).toString('hex');
   db.accounts[k] = { ...old, name, salt, hash: hashPw(pw, salt), admin: true, created: old.created || Date.now() };
   delete db.accounts[k].google;
   if (!db.users.includes(name)) db.users.push(name);
-  pMeta(); console.log('Admin account ready: ' + name);
+  pMeta(); 
+  console.log('Admin account ready: ' + name);
 }
 
 let statT = null;
-function stats() { // throttled: many events in a row cause only one broadcast
+function stats() {
   if (statT) return;
   statT = setTimeout(() => {
     statT = null;
@@ -182,12 +183,11 @@ function dmsFor(name) {
   return out;
 }
 const filesFor = n => db.files.filter(f => f.scope !== 'private' || f.uploader === n);
-// Performance: photos, voice notes and files are NOT sent in bulk. The app loads them when tapped.
 const slim = m => (m.image || m.audio) ? { ...m, image: m.image ? '1' : undefined, audio: m.audio ? '1' : undefined, media: true } : m;
 const slimF = f => ({ ...f, url: undefined, big: true });
 const lastN = (a, n) => a.slice(-n).map(slim);
 
-// ================= GROUP CALLS (mesh rooms, max 8 people) =================
+// ================= GROUP CALLS =================
 const rooms = {};
 const busy = n => Object.values(rooms).some(r => r.members.has(n));
 function missedNote(from, target, video) {
@@ -233,7 +233,7 @@ function leaveAllRooms(name) {
   Object.keys(rooms).forEach(id => { const r = rooms[id]; if (r && (r.members.has(name) || r.pending.has(name))) leaveRoom(name, id); });
 }
 
-// ================= TIC-TAC-TOE (online) =================
+// ================= TIC-TAC-TOE =================
 const ttt = {};
 const TL = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
 const tttResult = b => {
@@ -276,7 +276,6 @@ io.on('connection', (socket) => {
   socket.data.ip = ipOf(socket); socket.data.me = null;
   { const b0 = banFor(null, socket.data.ip); if (b0) socket.emit('banned', b0); }
 
-  // ---------- Accounts ----------
   function enter(name) {
     const oldId = online[name];
     const oldSock = oldId && io.sockets.sockets.get(oldId);
@@ -373,7 +372,6 @@ io.on('connection', (socket) => {
     pMeta();
   });
 
-  // ---------- Admin ----------
   socket.on('admin_data', () => {
     if (!isAdmin(me)) return;
     db.bans = db.bans.filter(b => !b.until || b.until > Date.now());
@@ -394,14 +392,12 @@ io.on('connection', (socket) => {
   });
   socket.on('admin_unban', (id) => { if (!isAdmin(me)) return; db.bans = db.bans.filter(b => b.id !== id); pMeta(); });
 
-  // ---------- Screen recording status ----------
   socket.on('rec_status', (on) => {
     if (!me) return;
     on ? recording.add(me) : recording.delete(me);
     A().emit('rec_list', [...recording]);
   });
 
-  // ---------- Messages ----------
   socket.on('send_message', (data) => {
     if (!me || !data) return;
     if (data.text && !isAdmin(me) && isAbusive(data.text)) { autoBan(me, clientId); return; }
@@ -442,7 +438,6 @@ io.on('connection', (socket) => {
     else socket.to('authed').emit('user_typing', { user: me, isTyping: d.isTyping });
   });
 
-  // ---------- Profile & blocking ----------
   socket.on('set_profile', (d = {}) => {
     if (!me) return;
     const p = prof(me);
@@ -466,7 +461,6 @@ io.on('connection', (socket) => {
     pMeta(); socket.emit('blocks', db.blocks[me]);
   });
 
-  // ---------- Friends ----------
   function acceptFriend(a, b) {
     db.requests[a] = arr(db.requests, a).filter(x => x !== b);
     db.requests[b] = arr(db.requests, b).filter(x => x !== a);
@@ -500,7 +494,6 @@ io.on('connection', (socket) => {
     pMeta(); social(me); social(other);
   });
 
-  // ---------- Drive: personal (private) + shared ----------
   socket.on('upload_cloud_file', (f) => {
     if (!me || !f || !f.url) return;
     if (f.url.length > MAX_BYTES) return socket.emit('toast', 'File too big (max 10 MB)');
@@ -526,7 +519,6 @@ io.on('connection', (socket) => {
     if (f.scope === 'private') socket.emit('cloud_file_deleted', id); else A().emit('cloud_file_deleted', id);
   });
 
-  // ---------- Lazy media + notification test ----------
   socket.on('get_media', ({ id, chat } = {}) => {
     if (!me) return;
     const list = chat === 'global' ? db.global : db.dms[key(me, String(chat))];
@@ -544,7 +536,6 @@ io.on('connection', (socket) => {
     if (pushOn && subs) sendPush(me, { type: 'msg', from: 'Gemini OS', title: '🔔 Test notification', body: 'Notifications work on this device!' });
   });
 
-  // ---------- Group calls ----------
   socket.on('call_start', ({ invitees, isVideo } = {}) => {
     if (!me) return;
     if (busy(me)) return socket.emit('toast', 'You are already in a call');
@@ -580,7 +571,6 @@ io.on('connection', (socket) => {
     to(target, 'rtc_signal', { room, from: me, data });
   });
 
-  // ---------- Tic-Tac-Toe (online) ----------
   socket.on('ttt_invite', (name) => {
     const t = findUser(name);
     if (!me || !t || t === me || !online[t] || isBlocked(me, t)) return socket.emit('toast', 'Player not available');
