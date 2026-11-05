@@ -12,70 +12,189 @@ body{margin:0;font-family:Roboto,'Segoe UI',sans-serif;background:var(--bg) var(
 button{font-family:inherit}
 .btn{padding:10px 14px;border:0;background:var(--ac);color:#fff;border-radius:8px;font-size:13px;font-weight:bold;cursor:pointer}
 .btn.sm{padding:5px 9px;font-size:11px}
+.btn-icon{background:#2b0b0b;border:1px solid #441515;color:var(--hi)}
 .blue{background:#1a73e8}.green{background:#34a853}.gray{background:#444}
 select,input[type=text],input[type=password]{padding:10px;border-radius:8px;border:1px solid #441515;background:#1f0808;color:#fff;font-size:14px}
 h4{color:var(--hi);margin:14px 0 8px}
 .badge{background:#1b4d24;color:#4caf50;padding:2px 8px;border-radius:10px;font-size:11px;margin-left:4px}
 
-/* Layout */
+/* ---------- PHONE LAYOUT ---------- */
 #app{display:flex;min-height:100%}
 #side{position:fixed;bottom:0;left:0;right:0;height:58px;background:#1a0505;border-top:1px solid var(--bd);display:flex;z-index:50}
 .brand,.more{display:none}
 .nav{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;background:none;border:0;color:var(--tx);font-size:19px;cursor:pointer;position:relative}
 .nav span{font-size:10px}
+.nav b{position:absolute;top:4px;right:20%;color:#ffb300;font-size:11px}
 #main{flex:1;min-width:0;padding:12px 12px 76px}
 .topbar{display:flex;justify-content:space-between;align-items:center;gap:8px;background:#230a0a;border:1px solid var(--bd);padding:10px 12px;border-radius:12px;margin-bottom:12px;font-size:13px;font-weight:bold;color:var(--tx)}
+#display-username{cursor:pointer;text-decoration:underline}
 .hero{display:none}
 .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .tile-app{background:#1e0808;border:1px solid #421818;border-radius:16px;padding:16px 4px;text-align:center;cursor:pointer;color:var(--tx);font-size:12px}
 .tile-app i{display:block;font-style:normal;font-size:34px;margin-bottom:6px}
+.tile-app:active{transform:scale(.94)}
+#offlineBar{display:none;background:#8a1c1c;text-align:center;padding:6px;border-radius:8px;margin-bottom:10px;font-size:12px}
+#recBanner{display:none;background:#7a1212;padding:6px;border-radius:8px;margin-bottom:8px;text-align:center;font-size:13px}
 .modal{display:none;position:fixed;inset:0;background:var(--bg);z-index:100;flex-direction:column}
 .modal-header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--pn);border-bottom:1px solid var(--bd)}
 .modal-header h3{margin:0;color:var(--hi);font-size:16px}
 .close-btn{background:var(--ac);border:0;color:#fff;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:bold}
 .modal-body{flex:1;min-height:0;overflow-y:auto;padding:12px}
+.cols{display:block}
 
+/* ---------- LAPTOP LAYOUT ---------- */
 @media (min-width:900px){
   #side{position:sticky;top:0;height:100vh;width:230px;flex-direction:column;border-top:0;border-right:1px solid var(--bd);padding:18px 10px;gap:6px;flex:none}
   .brand{display:block;font-size:20px;font-weight:bold;color:var(--hi);padding:4px 12px 16px}
   .more{display:flex}
   .nav{flex:none;flex-direction:row;justify-content:flex-start;gap:12px;padding:11px 14px;font-size:18px;border-radius:10px}
-  .nav span{font-size:14px}
+  .nav span{font-size:14px}.nav:hover{background:#2b0b0b}
+  .nav b{position:static;margin-left:auto}
   #main{padding:26px 34px}
   .hero{display:block;background:linear-gradient(135deg,#3a0d0d,#1a0505);border:1px solid var(--bd);border-radius:18px;padding:26px 30px;margin-bottom:22px}
+  .hero h2{margin:0 0 6px;font-size:26px}.hero p{margin:0;color:var(--tx)}
   .tiles{grid-template-columns:repeat(4,1fr);gap:16px}
-  .modal{inset:3vh 3vw 3vh 250px;border:1px solid var(--bd);border-radius:16px;overflow:hidden}
+  .tile-app{padding:28px 8px;font-size:14px}.tile-app i{font-size:44px}
+  .modal{inset:3vh 3vw 3vh 250px;border:1px solid var(--bd);border-radius:16px;overflow:hidden;box-shadow:0 24px 70px #000}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:24px}
 }
 #authModal{inset:0!important;border:0!important;border-radius:0!important;z-index:500}
 .auth-card{max-width:420px;width:100%;margin:auto}
-.user-card,.file-card{display:flex;justify-content:space-between;align-items:center;gap:6px;background:#1a0808;border:1px solid var(--bd);padding:10px;border-radius:8px;margin-bottom:8px}
+
+/* Chat Styling */
+#chatApp .modal-body{display:flex;flex-direction:column;overflow:hidden}
+#chatList{display:none}
+.chat-pane{flex:1;min-height:0;display:flex;flex-direction:column}
+.chat-top,.chat-controls{display:flex;gap:6px;align-items:center}
+.chat-top select,.chat-controls input{flex:1}
+#chatTitle{font-weight:bold;color:var(--hi);display:none;flex:1}
+#chat-box{flex:1;min-height:150px;overflow-y:auto;border:1px solid var(--bd);padding:10px;margin:8px 0 5px;border-radius:12px;background:#140404;display:flex;flex-direction:column;gap:10px}
+@media (min-width:900px){
+  #chatApp .modal-body{flex-direction:row;gap:12px}
+  #chatList{display:block;width:230px;flex:none;overflow-y:auto;border-right:1px solid var(--bd);padding-right:10px}
+  #chatWith{display:none}#chatTitle{display:block}
+}
+.citem{padding:10px 12px;border-radius:10px;cursor:pointer;color:var(--tx);font-size:14px;margin-bottom:4px}
+.citem:hover{background:#2b0b0b}.citem.active{background:#5c1818;color:#fff}
+.msg-wrapper{display:flex;flex-direction:column;max-width:80%}
+.my-msg{align-self:flex-end;align-items:flex-end}.other-msg{align-self:flex-start;align-items:flex-start}
+.msg-author{font-size:11px;color:var(--hi);margin-bottom:2px;font-weight:bold}
+.bubble{padding:8px 12px;border-radius:14px;font-size:14px;word-break:break-word}
+.my-msg .bubble{background:#5c1818}.other-msg .bubble{background:#260a0a;color:var(--tx);border:1px solid var(--bd)}
+.msg-time{font-size:9px;opacity:.6;margin-left:6px}
+.delete-btn{background:none;border:0;color:var(--hi);cursor:pointer;margin-left:6px}
+.msg-img{max-width:180px;border-radius:8px;display:block;margin-top:4px}
+#typingNotice{font-size:11px;color:#aaa;font-style:italic;height:16px;margin-bottom:6px}
+.user-card,.file-card{display:flex;justify-content:space-between;align-items:center;gap:6px;background:#1a0808;border:1px solid var(--bd);padding:10px;border-radius:8px;margin-bottom:8px;flex-wrap:wrap}
+.user-actions{display:flex;gap:5px;flex-wrap:wrap}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.stat{background:#1f0808;border:1px solid var(--bd);border-radius:10px;padding:10px;text-align:center}
+.stat b{display:block;font-size:20px;color:var(--hi)}.stat small{color:var(--tx);font-size:11px}
+
+/* Overlays & Call Controls */
+.overlay{position:fixed;inset:0;display:none;flex-direction:column;z-index:800;background:#101010}
+#incoming{z-index:900;align-items:center;justify-content:center;text-align:center;background:radial-gradient(circle at 50% 30%,#3a1010,#0a0a0a 70%);padding:20px}
+#banScreen{z-index:2000;align-items:center;justify-content:center;text-align:center;padding:20px;background:#1a0000}
+.ring-av{width:130px;height:130px;border-radius:50%;background:#3c4043;font-size:60px;display:flex;align-items:center;justify-content:center;animation:pulse 1.4s infinite;margin-bottom:18px}
+@keyframes pulse{0%{box-shadow:0 0 0 0 #e0565688}100%{box-shadow:0 0 0 40px #e0565600}}
+.ring-btns{display:flex;gap:70px;margin-top:50px}
+.ring-btns button{width:78px;height:78px;border-radius:50%;border:0;font-size:32px;cursor:pointer;color:#fff}
+#callHead{display:flex;justify-content:space-between;align-items:flex-start;padding:14px 16px}
+#tiles{flex:1;min-height:0;display:grid;gap:8px;padding:8px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));grid-auto-rows:minmax(130px,1fr)}
+@media (min-width:900px){#tiles{grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;padding:14px}}
+.tile{position:relative;background:#222;border-radius:14px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.tile video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none}
+.tile.vid video{display:block}.tile.vid .av{display:none}
+.av{font-size:44px;width:90px;height:90px;border-radius:50%;background:#3c4043;display:flex;align-items:center;justify-content:center}
+.tname{position:absolute;left:8px;bottom:6px;background:#000a;padding:2px 8px;border-radius:8px;font-size:12px}
+#audios{position:absolute;width:0;height:0;overflow:hidden}
+#addPanel{display:none;background:#1a1a1a;padding:10px 12px;border-top:1px solid #333}
+#ctrls{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;padding:12px 10px 20px}
+.cb{width:50px;height:50px;border-radius:50%;border:0;background:#2c2f33;color:#fff;font-size:20px;cursor:pointer}
+.cb.on{background:#ea4335}.cb.end{background:#ea4335;width:62px;height:62px}
+#miniCall{position:fixed;right:18px;bottom:18px;z-index:700;display:none;align-items:center;gap:8px;background:#14361b;border:1px solid #4caf50;padding:8px 12px;border-radius:30px;box-shadow:0 6px 24px #000a;font-size:13px}
+#miniCall button{border:0;border-radius:50%;width:34px;height:34px;cursor:pointer;color:#fff;background:#2c5a35;font-size:15px}
+
+/* Games & Chess */
 .gtabs{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:12px}
 .board{display:grid;grid-template-columns:repeat(3,92px);gap:6px;justify-content:center}
-.cell{width:92px;height:92px;font-size:40px;background:#1f0808;border:1px solid #441515;border-radius:12px;cursor:pointer;color:#fff}
-#toast{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:#5c1818;border:1px solid var(--hi);padding:10px 16px;border-radius:10px;z-index:3000;display:none;font-size:13px}
+.cell{width:92px;height:92px;font-size:44px;background:#1f0808;border:1px solid #441515;border-radius:12px;cursor:pointer}
+.cell.win{background:#1b4d24}
+#inviteBar{display:none;position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:950;background:#1b3d22;border:1px solid #4caf50;padding:10px 14px;border-radius:12px;gap:10px;align-items:center;font-size:13px;box-shadow:0 8px 30px #000}
+#toast{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:#5c1818;border:1px solid var(--hi);padding:10px 16px;border-radius:10px;z-index:3000;display:none;font-size:13px;max-width:90%;text-align:center}
 </style>
 </head>
 <body>
 <div id="toast"></div>
+<div id="inviteBar"><span id="invText"></span><button class="btn sm green" onclick="invAnswer(true)">Play</button><button class="btn sm gray" onclick="invAnswer(false)">No</button></div>
 
-<!-- ============ AUTH / LOGIN ============ -->
+<!-- ============ BAN SCREEN ============ -->
+<div id="banScreen" class="overlay"><h1>🚫 You are banned</h1><p id="banReason"></p><p id="banUntil" style="color:#aaa"></p></div>
+
+<!-- ============ LOGIN / SIGN UP ============ -->
 <div id="authModal" class="modal">
   <div class="modal-header"><h3>Welcome to Gemini OS</h3></div>
   <div class="modal-body" style="display:flex">
     <div class="auth-card">
+      <div id="storeWarn" style="display:none;background:#7a1212;padding:8px;border-radius:8px;font-size:12px;margin-bottom:10px">⚠ Server storage is temporary: accounts will be erased when the server restarts. The owner must set up MongoDB.</div>
       <div style="display:flex;gap:6px;margin-bottom:12px">
-        <button class="btn" id="tabSignup" style="flex:1" onclick="setAuthMode('signup')">Sign up</button>
-        <button class="btn gray" id="tabLogin" style="flex:1" onclick="setAuthMode('login')">Log in</button>
+        <button type="button" class="btn" id="tabSignup" style="flex:1" onclick="setAuthMode('signup')">Sign up</button>
+        <button type="button" class="btn gray" id="tabLogin" style="flex:1" onclick="setAuthMode('login')">Log in</button>
       </div>
       <div id="authMsg" style="color:#ffb300;font-size:13px;min-height:18px;margin-bottom:8px"></div>
       <form onsubmit="submitAuth();return false">
-        <input type="text" id="authName" placeholder="Name" maxlength="24" style="width:100%;margin-bottom:8px"/>
-        <input type="password" id="authPass" placeholder="Password (min 6 chars)" style="width:100%;margin-bottom:8px"/>
-        <input type="password" id="authPass2" placeholder="Repeat password" style="width:100%;margin-bottom:8px"/>
+        <input type="text" id="authName" name="username" placeholder="Name (spaces allowed)" maxlength="24" autocomplete="username" style="width:100%;margin-bottom:8px"/>
+        <input type="password" id="authPass" name="password" placeholder="Password (min 6 characters)" autocomplete="new-password" style="width:100%;margin-bottom:8px"/>
+        <input type="password" id="authPass2" placeholder="Repeat password" autocomplete="new-password" style="width:100%;margin-bottom:8px"/>
         <button type="submit" class="btn" style="width:100%" id="authBtn">Create account</button>
       </form>
     </div>
   </div>
+</div>
+
+<!-- ============ INCOMING CALL OVERLAY ============ -->
+<div id="incoming" class="overlay">
+  <div class="ring-av">👤</div>
+  <h1 id="incName" style="margin:0 0 6px">Someone</h1>
+  <div id="incSub" style="color:#bbb">Incoming call</div>
+  <div class="ring-btns">
+    <button style="background:#ea4335" onclick="declineIncoming()">📵</button>
+    <button style="background:#34a853" onclick="acceptIncoming()">📞</button>
+  </div>
+</div>
+
+<!-- ============ ACTIVE CALL SCREEN ============ -->
+<div id="callScreen" class="overlay">
+  <div id="callHead">
+    <div><b id="callTitle" style="font-size:18px">Call</b><br><small id="callStatus" style="color:#9aa0a6">Calling…</small></div>
+    <div style="display:flex;gap:6px">
+      <button class="close-btn" onclick="minimizeCallWindow()">Minimize</button>
+      <button class="close-btn" style="background:#ea4335" onclick="closeActiveCall(call ? call.room : null)">Close</button>
+    </div>
+  </div>
+  <div id="tiles"></div>
+  <div id="audios"></div>
+  <div id="addPanel">
+    <div style="display:flex;gap:6px;margin-bottom:8px"><input type="text" id="addCallName" placeholder="Type a name to add..." style="flex:1" onkeydown="if(event.key==='Enter')addTyped()"/><button class="btn" onclick="addTyped()">Add</button></div>
+    <div id="addList" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+  </div>
+  <div id="ctrls">
+    <button class="cb" id="muteBtn" onclick="toggleMute()" title="Mute">🎙️</button>
+    <button class="cb" id="camBtn" onclick="toggleCam()" title="Camera">📹</button>
+    <button class="cb" id="shareBtn" onclick="shareScreen()" title="Share screen">🖥️</button>
+    <button class="cb" id="flipBtn" onclick="flipCam()" title="Flip camera">🔄</button>
+    <button class="cb" id="volBtn" onclick="toggleVol()" title="Volume">🔊</button>
+    <button class="cb" onclick="toggleAdd()" title="Add person">➕</button>
+    <button class="cb end" onclick="leaveCall()" title="Hang up">📵</button>
+  </div>
+</div>
+<div id="miniCall">
+  <span>📞 <span id="miniText">In call</span></span>
+  <span style="display:flex;gap:6px">
+    <button onclick="expandCall()">⤢</button>
+    <button onclick="toggleMute()">🎙️</button>
+    <button style="background:#ea4335" onclick="leaveCall()">📵</button>
+  </span>
 </div>
 
 <!-- ============ MAIN DESKTOP ============ -->
@@ -83,28 +202,29 @@ h4{color:var(--hi);margin:14px 0 8px}
   <nav id="side">
     <div class="brand">✦ Gemini OS</div>
     <button class="nav" onclick="goHome()">🏠<span>Home</span></button>
-    <button class="nav" onclick="openModal('chatApp')">💬<span>Messages</span></button>
+    <button class="nav" onclick="openModal('chatApp')">💬<span>Messages</span><b id="unreadTotal"></b></button>
     <button class="nav" onclick="openModal('phoneApp')">📞<span>Calls</span></button>
-    <button class="nav" onclick="openModal('usersModal')">👥<span>Friends</span></button>
-    <button class="nav" onclick="openGames()">🎮<span>Games & Chess</span></button>
+    <button class="nav" onclick="openModal('usersModal')">👥<span>Friends</span><b id="reqBadge"></b></button>
+    <button class="nav" onclick="openGames()">🎮<span>Games</span></button>
     <button class="nav more" onclick="openModal('pythonApp'); initPython()">🐍<span>Python</span></button>
     <button class="nav more" onclick="openModal('storageApp')">☁️<span>Drive</span></button>
     <button class="nav more" onclick="openModal('recModal')">🎬<span>Recorder</span></button>
     <button class="nav more" onclick="openBrowser()">🌐<span>Browser</span></button>
     <button class="nav more" onclick="openModal('localMusicApp')">🎵<span>Music</span></button>
     <button class="nav more" onclick="openCamera()">📷<span>Camera</span></button>
-    <button class="nav more" onclick="openModal('settingsModal')">⚙️<span>Settings</span></button>
   </nav>
   <main id="main">
+    <div id="recBanner"></div>
+    <div id="offlineBar">📴 Offline — text messages will send when you reconnect</div>
     <div class="topbar">
-      <span>👥 <span id="onlineCount" class="badge">0</span></span>
+      <span>👥 <span id="onlineCount" class="badge">0</span> 👁 <span id="visitCount" class="badge">0</span></span>
       <span style="display:flex;gap:8px;align-items:center">
-        <button class="btn sm green" onclick="openModal('usersModal')">➕ Add friend</button>
+        <button class="btn sm green" onclick="addFriendQuick()">➕ Add friend</button>
         <button class="btn sm gray" onclick="openModal('settingsModal')">⚙️</button>
-        <span id="display-username" onclick="logout()" style="cursor:pointer;text-decoration:underline"></span>
+        <span id="display-username" onclick="logout()"></span>
       </span>
     </div>
-    <div class="hero"><h2>Welcome, <span id="heroName"></span> 👋</h2><p>Chat, calls, Python IDE, Chess, Drive, Camera, and custom wallpapers.</p></div>
+    <div class="hero"><h2>Welcome, <span id="heroName"></span> 👋</h2><p>Chat, call up to 8 people, record screen, write Python code, and play games.</p></div>
     <div class="tiles">
       <div class="tile-app" onclick="openModal('chatApp')"><i>💬</i>Messages</div>
       <div class="tile-app" onclick="openModal('phoneApp')"><i>📞</i>Calls</div>
@@ -114,39 +234,69 @@ h4{color:var(--hi);margin:14px 0 8px}
       <div class="tile-app" onclick="openModal('storageApp')"><i>☁️</i>Drive</div>
       <div class="tile-app" onclick="openModal('recModal')"><i>🎬</i>Recorder</div>
       <div class="tile-app" onclick="openBrowser()"><i>🌐</i>Browser</div>
-      <div class="tile-app" onclick="openModal('localMusicApp')"><i>🎵</i>Music</div>
+      <div class="tile-app" onclick="openModal('localMusicApp')"><i>🎵</i>Local MP3</div>
       <div class="tile-app" onclick="openCamera()"><i>📷</i>Camera</div>
       <div class="tile-app" onclick="openModal('settingsModal')"><i>⚙️</i>Settings</div>
     </div>
   </main>
 </div>
 
-<!-- ============ CHAT APP ============ -->
-<div id="chatApp" class="modal">
-  <div class="modal-header"><h3>Messages</h3><button class="close-btn" onclick="closeModal('chatApp')">X</button></div>
-  <div class="modal-body" style="display:flex;flex-direction:column">
-    <div style="display:flex;gap:6px;margin-bottom:8px">
-      <select id="chatWith" style="flex:1" onchange="switchChat(this.value)"><option value="global">Global chat</option></select>
+<!-- ============ FRIENDS APP ============ -->
+<div id="usersModal" class="modal">
+  <div class="modal-header"><h3>Users & Friends</h3><button class="close-btn" onclick="closeModal('usersModal')">X</button></div>
+  <div class="modal-body">
+    <div class="stats">
+      <div class="stat"><b id="stOnline">0</b><small>Online now</small></div>
+      <div class="stat"><b id="stVisits">0</b><small>Total visits</small></div>
+      <div class="stat"><b id="stUnique">0</b><small>Unique visitors</small></div>
     </div>
-    <div id="chat-box" style="flex:1;background:#140404;border:1px solid var(--bd);border-radius:8px;padding:10px;overflow-y:auto;min-height:200px"></div>
-    <div style="display:flex;gap:6px;margin-top:8px">
-      <input type="text" id="messageInput" placeholder="Type a message..." style="flex:1" onkeydown="if(event.key==='Enter')sendMessage()"/>
-      <button class="btn" onclick="sendMessage()">Send</button>
+    <div class="cols">
+      <div>
+        <h4>➕ Add friend by name</h4>
+        <div style="display:flex;gap:6px"><input type="text" id="addFriendName" placeholder="Type name..." style="flex:1" onkeydown="if(event.key==='Enter')addByName()"/><button class="btn" onclick="addByName()">Add</button></div>
+        <h4>🙂 My profile</h4>
+        <div style="display:flex;gap:6px">
+          <select id="profEmoji"><option>😀</option><option>😎</option><option>🤖</option><option>🦊</option><option>👑</option></select>
+          <input type="text" id="profStatus" placeholder="Your status..." maxlength="60" style="flex:1"/>
+          <button class="btn" onclick="saveProfile()">Save</button>
+        </div>
+        <h4>Friend requests</h4><div id="requestList"></div>
+        <h4>My friends</h4><div id="friendList"></div>
+      </div>
+      <div>
+        <h4>Online users</h4><div id="activeUsersList"></div>
+        <h4>📜 All visitors (<span id="dirCount">0</span>)</h4>
+        <input type="text" id="dirSearch" placeholder="Search visitors..." style="width:100%;margin-bottom:8px" oninput="dirQuery=this.value;renderDirectory()"/>
+        <div id="allUsersList"></div>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- ============ FRIENDS APP ============ -->
-<div id="usersModal" class="modal">
-  <div class="modal-header"><h3>Friends & Users</h3><button class="close-btn" onclick="closeModal('usersModal')">X</button></div>
+<!-- ============ MESSAGES APP ============ -->
+<div id="chatApp" class="modal">
+  <div class="modal-header"><h3>Messages</h3><button class="close-btn" onclick="closeModal('chatApp')">X</button></div>
   <div class="modal-body">
-    <h4>Add friend by name</h4>
-    <div style="display:flex;gap:6px;margin-bottom:12px">
-      <input type="text" id="addFriendName" placeholder="Type name..." style="flex:1"/>
-      <button class="btn" onclick="addByName()">Add</button>
+    <div id="chatList"></div>
+    <div class="chat-pane">
+      <div class="chat-top">
+        <select id="chatWith" onchange="switchChat(this.value)"></select>
+        <span id="chatTitle"></span>
+        <button class="btn green sm" onclick="callCurrent(false)">📞</button>
+        <button class="btn blue sm" onclick="callCurrent(true)">📹</button>
+      </div>
+      <div id="chat-box"></div>
+      <div id="typingNotice"></div>
+      <div id="emojiRow" style="display:none;gap:6px;flex-wrap:wrap;margin-bottom:6px"></div>
+      <div class="chat-controls">
+        <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="sendImage(this)"/>
+        <button class="btn btn-icon" onclick="$('imageInput').click()">📷</button>
+        <button class="btn btn-icon" id="recordBtn" onclick="toggleRecord()">🎙️</button>
+        <button class="btn btn-icon" onclick="toggleEmoji()">😊</button>
+        <input type="text" id="messageInput" placeholder="Type a message..." oninput="emitTyping()" onkeydown="if(event.key==='Enter')sendMessage()"/>
+        <button class="btn" onclick="sendMessage()">Send</button>
+      </div>
     </div>
-    <h4>Online Users</h4>
-    <div id="activeUsersList"></div>
   </div>
 </div>
 
@@ -154,19 +304,21 @@ h4{color:var(--hi);margin:14px 0 8px}
 <div id="phoneApp" class="modal">
   <div class="modal-header"><h3>Calls</h3><button class="close-btn" onclick="closeModal('phoneApp')">X</button></div>
   <div class="modal-body">
-    <input type="text" id="targetUser" placeholder="Type username to call..." style="width:100%;margin-bottom:12px"/>
+    <p style="color:#aaa;font-size:13px;margin-top:0">Tick one or more people (up to 7) for a group call, or type names separated by commas.</p>
+    <div id="callPicker"></div>
+    <input type="text" id="targetUser" placeholder="Or type names: Ann, Bob Smith" style="width:100%;margin:8px 0 14px"/>
     <div style="display:flex;gap:10px">
-      <button class="btn blue" style="flex:1" onclick="startCall(false)">Voice call</button>
-      <button class="btn green" style="flex:1" onclick="startCall(true)">Video call</button>
+      <button class="btn blue" style="flex:1" onclick="startCall(false)">📞 Voice call</button>
+      <button class="btn green" style="flex:1" onclick="startCall(true)">📹 Video call</button>
     </div>
   </div>
 </div>
 
-<!-- ============ PYTHON IDE APP ============ -->
+<!-- ============ PYTHON APP ============ -->
 <div id="pythonApp" class="modal">
   <div class="modal-header"><h3>🐍 Python & Pygame Code Runner</h3><button class="close-btn" onclick="closeModal('pythonApp')">X</button></div>
   <div class="modal-body" style="display:flex;flex-direction:column;gap:10px">
-    <p style="color:#aaa;font-size:12px;margin:0">Write Python code and run it directly inside Gemini OS!</p>
+    <p style="color:#aaa;font-size:12px;margin:0">Write Python or Pygame code below and run it directly inside Gemini OS!</p>
     <textarea id="pythonCode" style="width:100%;height:180px;background:#140404;color:#7ec699;border:1px solid var(--bd);border-radius:8px;padding:10px;font-family:monospace;font-size:13px">
 import sys
 print("Hello from Gemini OS Python Engine!")
@@ -175,7 +327,7 @@ for i in range(3):
 </textarea>
     <div style="display:flex;gap:6px">
       <button class="btn green" onclick="runPythonCode()">▶ Run Code</button>
-      <button class="btn gray" onclick="$('pythonOutput').innerText=''">Clear Output</button>
+      <button class="btn gray" onclick="clearPythonOutput()">Clear Output</button>
     </div>
     <h4>Console Output:</h4>
     <pre id="pythonOutput" style="flex:1;background:#050101;color:#fff;border:1px solid var(--bd);border-radius:8px;padding:10px;font-family:monospace;font-size:12px;overflow-y:auto;min-height:120px"></pre>
@@ -184,34 +336,63 @@ for i in range(3):
 
 <!-- ============ GAMES & CHESS ============ -->
 <div id="gamesModal" class="modal">
-  <div class="modal-header"><h3>Games & Chess</h3><button class="close-btn" onclick="closeModal('gamesModal')">X</button></div>
+  <div class="modal-header"><h3>Games</h3><button class="close-btn" onclick="closeModal('gamesModal')">X</button></div>
   <div class="modal-body">
     <div class="gtabs">
       <button class="btn" id="gt-dino" onclick="gameTab('dino')">🦖 Dino</button>
+      <button class="btn gray" id="gt-flappy" onclick="gameTab('flappy')">🐤 Flappy Bird</button>
+      <button class="btn gray" id="gt-mario" onclick="gameTab('mario')">🍄 Super Mario</button>
+      <button class="btn gray" id="gt-xo" onclick="gameTab('xo')">❌⭕ Tic-Tac-Toe</button>
       <button class="btn gray" id="gt-chess" onclick="gameTab('chess')">♟️ Chess</button>
-      <button class="btn gray" id="gt-flappy" onclick="gameTab('flappy')">🐤 Flappy</button>
     </div>
     <div id="webGameWrap">
-      <iframe id="gameFrame" allow="fullscreen; autoplay" style="width:100%;height:calc(100vh - 200px);border:0;background:#000;border-radius:12px"></iframe>
+      <iframe id="gameFrame" allow="fullscreen; autoplay; gamepad" style="width:100%;height:calc(100vh - 230px);min-height:360px;border:1px solid var(--bd);border-radius:12px;background:#000"></iframe>
     </div>
     <div id="chessWrap" style="display:none;text-align:center">
-      <h4 style="color:var(--hi)">♟️ Interactive Chess Board</h4>
+      <h4 style="color:var(--hi)">♟️ Interactive Chess vs AI</h4>
       <div id="chessBoard" style="display:grid;grid-template-columns:repeat(8,45px);gap:2px;justify-content:center;margin:15px auto"></div>
       <p id="chessStatus" style="font-weight:bold"></p>
       <button class="btn" onclick="resetChess()">New Game</button>
     </div>
+    <div id="xoWrap" style="display:none;text-align:center">
+      <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:10px">
+        <button class="btn" id="m-ai" onclick="setMode('ai')">🤖 vs AI</button>
+        <button class="btn gray" id="m-local" onclick="setMode('local')">👥 Same device</button>
+        <button class="btn gray" id="m-online" onclick="setMode('online')">🌐 Online friend</button>
+      </div>
+      <div id="xoStatus" style="margin:14px;font-weight:bold"></div>
+      <div class="board" id="board"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SCREEN RECORDER ============ -->
+<div id="recModal" class="modal">
+  <div class="modal-header"><h3>🎬 Screen Recorder</h3><button class="close-btn" onclick="closeModal('recModal')">X</button></div>
+  <div class="modal-body">
+    <label><input type="checkbox" id="recSys" checked> 🔊 Device sound</label><br>
+    <label><input type="checkbox" id="recMic" checked> 🎙️ Microphone</label><br>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin:12px 0">
+      <button class="btn green" onclick="recStart()">⏺ Start</button>
+      <button class="btn gray" onclick="recPause()">⏯ Pause</button>
+      <button class="btn gray" onclick="recMic()">🎙️ Mic on/off</button>
+      <button class="btn gray" onclick="recScreen()">🖥️ Screen on/off</button>
+      <button class="btn" onclick="recStop()">⏹ Stop &amp; save</button>
+    </div>
+    <div id="recInfo" style="color:#aaa;font-size:13px"></div><div id="recResult"></div>
   </div>
 </div>
 
 <!-- ============ BROWSER (YT EMBED FIXED) ============ -->
 <div id="browserModal" class="modal">
-  <div class="modal-header"><h3>🌐 Browser & YouTube Player</h3><button class="close-btn" onclick="closeModal('browserModal')">X</button></div>
+  <div class="modal-header"><h3>🌐 Browser</h3><button class="close-btn" onclick="closeModal('browserModal')">X</button></div>
   <div class="modal-body" style="display:flex;flex-direction:column;padding:8px">
-    <div style="display:flex;gap:4px;margin-bottom:6px;border:1px solid var(--bd);border-radius:10px;padding:4px">
-      <input type="text" id="brUrl" placeholder="Paste a YouTube link or search..." style="flex:1" onkeydown="if(event.key==='Enter')brGo(this.value)"/>
+    <div id="brTabs" style="display:flex;gap:4px;overflow-x:auto;margin-bottom:6px"></div>
+    <div id="brBar" style="display:flex;gap:4px;margin-bottom:6px;border:1px solid var(--bd);border-radius:10px;padding:4px">
+      <input type="text" id="brUrl" placeholder="Search or paste a YouTube link..." style="flex:1" onkeydown="if(event.key==='Enter')brGo(this.value)"/>
       <button class="btn sm" onclick="brGo($('brUrl').value)">Go</button>
     </div>
-    <div id="brView" style="flex:1;min-height:300px;border:1px solid var(--bd);border-radius:10px;overflow:hidden;background:#000"></div>
+    <div id="brView" style="flex:1;min-height:300px;border:1px solid var(--bd);border-radius:10px;overflow:auto"></div>
   </div>
 </div>
 
@@ -219,25 +400,19 @@ for i in range(3):
 <div id="storageApp" class="modal">
   <div class="modal-header"><h3>Cloud Drive</h3><button class="close-btn" onclick="closeModal('storageApp')">X</button></div>
   <div class="modal-body">
-    <input type="file" id="driveFileInput" multiple onchange="uploadToDrive(this)" style="display:none"/>
-    <button class="btn" onclick="$('driveFileInput').click()" style="width:100%;margin-bottom:12px">📁 Upload File</button>
-    <div id="myDriveList"></div>
-  </div>
-</div>
-
-<!-- ============ SCREEN RECORDER ============ -->
-<div id="recModal" class="modal">
-  <div class="modal-header"><h3>Screen Recorder</h3><button class="close-btn" onclick="closeModal('recModal')">X</button></div>
-  <div class="modal-body" style="text-align:center">
-    <button class="btn green" onclick="recStart()">Start Recording</button>
-    <button class="btn gray" onclick="recStop()">Stop</button>
-    <div id="recInfo" style="margin-top:10px"></div>
+    <input type="file" id="driveFileInput" multiple onchange="uploadToDrive(this,upTarget)" style="display:none"/>
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+      <button class="btn" style="flex:1" onclick="upTarget=false;$('driveFileInput').click()">🔒 Upload to My Drive</button>
+      <button class="btn green" style="flex:1" onclick="upTarget=true;$('driveFileInput').click()">🌍 Upload for everyone</button>
+    </div>
+    <h4>🔒 My Drive (private)</h4><div id="myDriveList"></div>
+    <h4>🌍 Shared Drive</h4><div id="cloudDriveList"></div>
   </div>
 </div>
 
 <!-- ============ LOCAL MUSIC ============ -->
 <div id="localMusicApp" class="modal">
-  <div class="modal-header"><h3>Music Player</h3><button class="close-btn" onclick="closeModal('localMusicApp')">X</button></div>
+  <div class="modal-header"><h3>Local MP3 Player</h3><button class="close-btn" onclick="closeModal('localMusicApp')">X</button></div>
   <div class="modal-body">
     <input type="file" id="localMp3Input" accept="audio/*" multiple onchange="loadLocalSongs(this)" style="display:none"/>
     <button class="btn" onclick="$('localMp3Input').click()" style="width:100%;margin-bottom:15px">🎵 Pick Audio Files</button>
@@ -245,20 +420,25 @@ for i in range(3):
   </div>
 </div>
 
-<!-- ============ CAMERA ============ -->
+<!-- ============ CAMERA APP ============ -->
 <div id="cameraApp" class="modal">
   <div class="modal-header"><h3>Camera</h3><button class="close-btn" onclick="closeModal('cameraApp')">X</button></div>
   <div class="modal-body" style="text-align:center">
     <video id="webcam" autoplay muted playsinline style="width:100%;max-height:55vh;border-radius:12px;background:#000"></video>
-    <button class="btn" onclick="takePhoto()" style="margin-top:15px">📷 Take Photo</button>
+    <canvas id="photoCanvas" style="display:none"></canvas>
+    <div style="display:flex;gap:10px;justify-content:center;margin-top:15px">
+      <button class="btn" onclick="takePhoto()">📷 Photo</button>
+      <button class="btn" id="camRecordBtn" style="background:#c00" onclick="toggleCameraRecording()">⏺️ Record</button>
+      <button class="btn btn-icon" onclick="switchCameraFacing()">🔄</button>
+    </div>
   </div>
 </div>
 
-<!-- ============ SETTINGS (WALLPAPER & ADMIN) ============ -->
+<!-- ============ SETTINGS (WALLPAPER & THEME) ============ -->
 <div id="settingsModal" class="modal">
-  <div class="modal-header"><h3>Settings & Themes</h3><button class="close-btn" onclick="closeModal('settingsModal')">X</button></div>
+  <div class="modal-header"><h3>Settings</h3><button class="close-btn" onclick="closeModal('settingsModal')">X</button></div>
   <div class="modal-body">
-    <button id="adminBtn" class="btn gray" style="display:none;margin-bottom:14px" onclick="openAdmin()">🛡 Admin Panel</button>
+    <button id="adminBtn" class="btn gray" style="display:none;margin-bottom:10px" onclick="openAdmin()">🛡 Admin panel</button>
     <h4>🖼️ Custom Wallpaper</h4>
     <div style="display:flex;gap:6px;margin-bottom:14px">
       <input type="text" id="wallInput" placeholder="Paste Image URL for wallpaper..." style="flex:1"/>
@@ -270,10 +450,11 @@ for i in range(3):
 
 <!-- ============ ADMIN MODAL ============ -->
 <div id="adminModal" class="modal">
-  <div class="modal-header"><h3>🛡 Admin Panel</h3><button class="close-btn" onclick="closeModal('adminModal')">X</button></div>
+  <div class="modal-header"><h3>🛡 Admin</h3><button class="close-btn" onclick="closeModal('adminModal')">X</button></div>
   <div class="modal-body">
-    <h4>Registered Users & Permanent Admin Control</h4>
+    <h4>Users & Admin Management</h4>
     <div id="admUsers"></div>
+    <h4>Active bans</h4><div id="admBans"></div>
   </div>
 </div>
 
@@ -281,12 +462,22 @@ for i in range(3):
 <script>
 const socket = io();
 const $ = id => document.getElementById(id);
-const toast = t => { const e=$('toast'); e.innerText=t; e.style.display='block'; setTimeout(()=>e.style.display='none',3500); };
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const enc = s => encodeURIComponent(s);
+const MAX_FILE = 10 * 1024 * 1024;
+function toast(t){ const e=$('toast'); e.innerText=t; e.style.display='block'; setTimeout(()=>e.style.display='none',3500); }
 function closeModal(id){ $(id).style.display='none'; }
-function openModal(id){ $(id).style.display='flex'; }
-function goHome(){ document.querySelectorAll('.modal').forEach(m=>m.style.display='none'); }
+function openModal(id){
+  document.querySelectorAll('.modal').forEach(m=>{ if(m.id!==id && m.id!=='authModal') closeModal(m.id); });
+  $(id).style.display='flex';
+}
+function goHome(){ document.querySelectorAll('.modal').forEach(m=>{ if(m.id!=='authModal') closeModal(m.id); }); }
+function addFriendQuick(){ openModal('usersModal'); }
 
-let me = localStorage.getItem('token') ? localStorage.getItem('saved_name') : '';
+let me = localStorage.getItem('token') ? (localStorage.getItem('saved_name')||'') : '';
+let onlineUsers=[], friends=[], requests=[], directory=[], dirMap={}, cur='global', globalMsgs=[], dms={}, unread={}, upTarget=false;
+
+function showName(){ $('display-username').innerText = me ? '👤 '+me+' · Log out' : ''; $('heroName').innerText = me; }
 function showAuth(msg){ $('authModal').style.display='flex'; if(msg) $('authMsg').innerText=msg; }
 let authMode='signup';
 function setAuthMode(m){ authMode=m; $('authBtn').innerText = m==='signup'?'Create account':'Log in'; }
@@ -297,46 +488,46 @@ function submitAuth(){
 }
 socket.on('auth_ok',({name,token,admin})=>{
   me=name; localStorage.setItem('token',token); localStorage.setItem('saved_name',name);
-  $('authModal').style.display='none';
-  if(admin) $('adminBtn').style.display='block';
-  $('display-username').innerText='👤 '+name+' · Log out';
-  $('heroName').innerText=name;
+  $('adminBtn').style.display = admin ? 'block' : 'none';
+  $('authModal').style.display='none'; showName();
 });
 socket.on('auth_error',m=>$('authMsg').innerText=m);
+function logout(){ localStorage.clear(); me=''; showName(); setAuthMode('signup'); showAuth(); }
+if(!me){ setAuthMode('signup'); showAuth(); } else { socket.emit('auth_token',{token:localStorage.getItem('token')}); }
 
-if(!me){ setAuthMode('signup'); showAuth(); } else {
-  socket.emit('auth_token',{token:localStorage.getItem('token')});
+// Messages
+function switchChat(name){ cur=name; buildChatSelect(); renderChat(); }
+function buildChatSelect(){
+  const names=[...new Set([...friends,cur].filter(n=>n&&n!=='global'))];
+  $('chatWith').innerHTML='<option value="global">🌍 Global chat</option>'+names.map(n=>'<option value="'+esc(n)+'">'+esc(n)+'</option>').join('');
+  $('chatWith').value=cur;
+  $('chatList').innerHTML='<div class="citem" onclick="switchChat(\'global\')">🌍 Global chat</div>'+names.map(n=>'<div class="citem" onclick="switchChat(\''+esc(n)+'\')">'+esc(n)+'</div>').join('');
 }
-function logout(){ localStorage.clear(); location.reload(); }
-
-// Chat
-function sendMessage(){
-  const i=$('messageInput'); if(!i.value.trim()) return;
-  socket.emit('send_message',{text:i.value.trim(), to: $('chatWith').value==='global'?null:$('chatWith').value});
-  i.value='';
-}
-socket.on('receive_message', m => {
-  const box = $('chat-box');
-  box.innerHTML += `<div><b>${m.user}:</b> ${m.text||''}</div>`;
-  box.scrollTop = box.scrollHeight;
+function sendMessage(){ const i=$('messageInput'); if(!i.value.trim()) return; socket.emit('send_message',{text:i.value.trim(), to: cur==='global'?null:cur}); i.value=''; }
+socket.on('receive_message', d => {
+  const bucket = d.to ? (d.user === me ? d.to : d.user) : 'global';
+  if(bucket==='global') globalMsgs.push(d); else (dms[bucket]=dms[bucket]||[]).push(d);
+  if(bucket===cur) renderMsg(d);
 });
-function switchChat(u){}
-function addByName(){ const n=$('addFriendName').value.trim(); if(n) socket.emit('friend_request',n); }
+function renderChat(){ $('chat-box').innerHTML=''; (cur==='global'?globalMsgs:(dms[cur]||[])).forEach(renderMsg); }
+function renderMsg(d){
+  const mine=d.user===me, w=document.createElement('div');
+  w.className='msg-wrapper '+(mine?'my-msg':'other-msg');
+  w.innerHTML=`<div class="msg-author">${esc(d.user)}</div><div class="bubble">${esc(d.text||'')}</div>`;
+  $('chat-box').appendChild(w); $('chat-box').scrollTop=$('chat-box').scrollHeight;
+}
 
-// Calls stub
-function startCall(vid){ toast('Starting call...'); }
-
-// Python Engine
+// Python IDE Engine
 let pyodideReady=false, pyodideInstance=null;
 async function initPython(){
   if(pyodideReady) return;
   toast('Loading Python engine…');
   const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js';
-  s.onload=async()=>{ pyodideInstance=await loadPyodide(); pyodideReady=true; toast('Python ready!'); };
+  s.onload=async()=>{ pyodideInstance=await loadPyodide(); pyodideReady=true; toast('Python engine ready!'); };
   document.head.appendChild(s);
 }
 function runPythonCode(){
-  if(!pyodideReady) return toast('Python still loading...');
+  if(!pyodideReady) return toast('Python engine still loading...');
   try {
     pyodideInstance.runPython('import sys, io\nsys.stdout = io.StringIO()');
     pyodideInstance.runPython($('pythonCode').value);
@@ -344,10 +535,10 @@ function runPythonCode(){
   } catch(err){ $('pythonOutput').innerText = err; }
 }
 
-// Wallpaper
+// Wallpaper engine
 function setWallpaper(url){
-  if(url) { document.documentElement.style.setProperty('--wallpaper', 'url('+url+')'); localStorage.setItem('wallpaper', url); toast('Wallpaper updated!'); }
-  else { document.documentElement.style.setProperty('--wallpaper', 'none'); localStorage.removeItem('wallpaper'); toast('Wallpaper removed.'); }
+  if(url){ document.documentElement.style.setProperty('--wallpaper', 'url('+url+')'); localStorage.setItem('wallpaper', url); toast('Wallpaper applied!'); }
+  else { document.documentElement.style.setProperty('--wallpaper', 'none'); localStorage.removeItem('wallpaper'); toast('Wallpaper reset'); }
 }
 const savedWall = localStorage.getItem('wallpaper'); if(savedWall) setWallpaper(savedWall);
 
@@ -367,21 +558,20 @@ function ytEmbed(u){
 function openBrowser(){ openModal('browserModal'); }
 function brGo(q){
   const emb = ytEmbed(q);
-  if(emb){
-    $('brView').innerHTML = '<iframe src="'+emb+'" allow="autoplay; encrypted-media; fullscreen" style="width:100%;height:100%;border:0"></iframe>';
-  } else {
-    $('brView').innerHTML = '<iframe src="https://en.wikipedia.org/wiki/'+encodeURIComponent(q)+'" style="width:100%;height:100%;border:0;background:#fff"></iframe>';
-  }
+  if(emb){ $('brView').innerHTML = `<iframe src="${emb}" allow="autoplay; encrypted-media; fullscreen" style="width:100%;height:100%;border:0"></iframe>`; }
+  else { $('brView').innerHTML = `<iframe src="https://en.wikipedia.org/wiki/${encodeURIComponent(q)}" style="width:100%;height:100%;border:0;background:#fff"></iframe>`; }
 }
 
 // Games & Chess
 function openGames(){ openModal('gamesModal'); gameTab('dino'); }
 function gameTab(t){
-  ['dino','chess','flappy'].forEach(k=>$('gt-'+k).className='btn'+(k===t?'':' gray'));
-  $('webGameWrap').style.display = t==='chess'?'none':'block';
+  ['dino','flappy','mario','xo','chess'].forEach(k=>$('gt-'+k).className='btn'+(k===t?'':' gray'));
+  $('webGameWrap').style.display = (t==='xo'||t==='chess')?'none':'block';
+  $('xoWrap').style.display = t==='xo'?'block':'none';
   $('chessWrap').style.display = t==='chess'?'block':'none';
   if(t==='dino') $('gameFrame').src='https://chromedino.com/';
   if(t==='flappy') $('gameFrame').src='https://flappybird.io/';
+  if(t==='mario') $('gameFrame').src='https://supermarioplay.com/';
   if(t==='chess') initChess();
 }
 
@@ -402,41 +592,52 @@ function initChess(){
 function renderChess(){
   const pMap = {r:'♜',n:'♞',b:'♝',q:'♛',k:'♚',p:'♟',R:'♖',N:'♘',B:'♗',Q:'♕',K:'♔',P:'♙','':''};
   $('chessBoard').innerHTML = chessBoard.flat().map((p,i)=>`<div style="width:45px;height:45px;background:${(Math.floor(i/8)+i)%2===0?'#b58863':'#f0d9b5'};display:flex;align-items:center;justify-content:center;font-size:26px;cursor:pointer">${pMap[p]}</div>`).join('');
-  $('chessStatus').innerText = "White's turn (Chess ready)";
+  $('chessStatus').innerText = "White's turn";
 }
 function resetChess(){ initChess(); }
 
-// Drive, Camera & Music Stubs
-function uploadToDrive(inp){ toast('File uploaded'); }
-function loadLocalSongs(inp){
-  const l=$('localSongList'); l.innerHTML='';
+// Drive, Recorder, Camera, Admin
+function uploadToDrive(inp,shared){
   Array.from(inp.files).forEach(f=>{
-    l.innerHTML += `<div class="file-card"><span>${f.name}</span><audio controls src="${URL.createObjectURL(f)}"></audio></div>`;
+    const r=new FileReader(); r.onload=e=>socket.emit('upload_cloud_file',{name:f.name,type:f.type,url:e.target.result,shared}); r.readAsDataURL(f);
   });
 }
-let camStream;
-async function openCamera(){
-  openModal('cameraApp');
-  try{ camStream = await navigator.mediaDevices.getUserMedia({video:true,audio:true}); $('webcam').srcObject=camStream; }catch(e){ toast('Camera access needed'); }
+socket.on('new_cloud_file', f => {
+  const d=document.createElement('div'); d.className='file-card';
+  d.innerHTML=`<span>${esc(f.name)}</span><a href="${f.url}" download="${esc(f.name)}" style="color:#8ab4f8">⬇️</a>`;
+  $(f.scope==='private'?'myDriveList':'cloudDriveList').appendChild(d);
+});
+let camStream, camFacing='user';
+async function openCamera(){ openModal('cameraApp'); startCam(); }
+async function startCam(){
+  if(camStream) camStream.getTracks().forEach(t=>t.stop());
+  try{ camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:camFacing},audio:true}); $('webcam').srcObject=camStream; }catch(e){}
 }
-function takePhoto(){ toast('Photo captured!'); }
-function recStart(){ toast('Recorder started'); }
-function recStop(){ toast('Recorder stopped'); }
+function switchCameraFacing(){ camFacing=camFacing==='user'?'environment':'user'; startCam(); }
 
-// Admin Panel
+let REC=null;
+async function recStart(){
+  const screen=await navigator.mediaDevices.getDisplayMedia({video:true,audio:$('recSys').checked});
+  const mime='video/webm'; const rec=new MediaRecorder(screen,{mimeType:mime}); const chunks=[];
+  rec.ondataavailable=e=>chunks.push(e.data);
+  rec.onstop=()=>{ const blob=new Blob(chunks,{type:'video/webm'}); $('recResult').innerHTML=`<video controls src="${URL.createObjectURL(blob)}" style="max-width:100%"></video>`; };
+  rec.start(); REC={rec,screen}; $('recInfo').innerText='🔴 Recording…';
+}
+function recStop(){ if(REC){ REC.rec.stop(); REC.screen.getTracks().forEach(t=>t.stop()); REC=null; $('recInfo').innerText='Saved'; } }
+
 function openAdmin(){ openModal('adminModal'); socket.emit('admin_data'); }
 socket.on('admin_data', d => {
   $('admUsers').innerHTML = d.users.map(u => `
     <div class="user-card">
-      <div>${u.online?'🟢':'⚪'} ${u.name} ${u.admin?'👑 <span style="color:#ffb300">[Admin]</span>':''}</div>
+      <div>${u.online?'🟢':'⚪'} ${esc(u.name)} ${u.admin?'👑 <span style="color:#ffb300">[Admin]</span>':''}</div>
       <div>
-        ${u.admin ? `<button class="btn sm gray" onclick="socket.emit('remove_admin','${u.name}')">Demote</button>` 
-                  : `<button class="btn sm blue" onclick="socket.emit('make_admin','${u.name}')">👑 Make Admin</button>`}
+        ${u.admin ? `<button class="btn sm gray" onclick="socket.emit('remove_admin','${enc(u.name)}')">Demote</button>` 
+                  : `<button class="btn sm blue" onclick="socket.emit('make_admin','${enc(u.name)}')">👑 Make Admin</button>`}
       </div>
     </div>
   `).join('');
 });
-socket.on('online_count', c => { $('onlineCount').innerText = c; });
+socket.on('stats', s => { $('onlineCount').innerText=s.online; $('visitCount').innerText=s.totalVisits; });
 </script>
 </body>
 </html>
