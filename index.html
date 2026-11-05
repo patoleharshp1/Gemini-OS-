@@ -116,6 +116,9 @@ h4{color:var(--hi);margin:14px 0 8px}
 #miniCall button{border:0;border-radius:50%;width:34px;height:34px;cursor:pointer;color:#fff;background:#2c5a35;font-size:15px}
 @media (max-width:899px){#miniCall{bottom:70px;left:12px;right:12px;justify-content:space-between}}
 
+/* Minimized call widget layout styling */
+.minimized-call-widget{position:fixed!important;bottom:20px;right:20px;width:180px!important;height:120px!important;z-index:9999;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.4);overflow:hidden;background:#1e1e1e}
+
 /* ---------- Games ---------- */
 .gtabs{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:12px}
 .board{display:grid;grid-template-columns:repeat(3,92px);gap:6px;justify-content:center}
@@ -169,10 +172,13 @@ h4{color:var(--hi);margin:14px 0 8px}
 </div>
 
 <!-- ============ ACTIVE CALL ============ -->
-<div id="callScreen" class="overlay">
+<div id="callScreen" class="overlay" id="active-call-container">
   <div id="callHead">
     <div><b id="callTitle" style="font-size:18px">Call</b><br><small id="callStatus" style="color:#9aa0a6">Calling…</small></div>
-    <button class="close-btn" title="Minimize (call keeps running)" onclick="minimizeCall()">X</button>
+    <div style="display:flex;gap:6px">
+      <button class="close-btn" title="Minimize (call keeps running)" onclick="minimizeCallWindow()">Minimize</button>
+      <button class="close-btn" style="background:#ea4335" title="Close call completely" onclick="closeActiveCall(call ? call.room : null)">Close</button>
+    </div>
   </div>
   <div id="tiles"></div>
   <div id="audios"></div>
@@ -827,7 +833,7 @@ function recFinish(chunks){
 // ================= ADMIN + BAN =================
 function openAdmin(){ openModal('adminModal'); socket.emit('admin_data'); }
 socket.on('admin_data',d=>{
-  $('admUsers').innerHTML=d.users.map(u=>'<div class="user-card"><div>'+(u.online?'🟢 ':'⚪ ')+esc(u.name)+'<br><small style="color:#888">IP: '+esc(u.ips.join(', ')||'unknown')+' · strikes '+u.strikes+'</small></div><button class="btn sm" onclick="admBan(\''+enc(u.name)+'\')">🔨 Ban</button></div>').join('');
+  $('admUsers').innerHTML=d.users.map(u=>'<div class="user-card"><div>'+(u.online?'🟢 ':'⚪ ')+esc(u.name)+'<br><small style="color:#888">IP: '+esc(u.ips.join(', ')||'unknown')+' · strikes '+u.strikes+'</small></div><div style="display:flex;gap:4px"><button class="btn sm" onclick="admBan(\''+enc(u.name)+'\')">🔨 Ban</button><button class="btn sm blue" onclick="socket.emit(\'make_admin\',\''+enc(u.name)+'\')">👑 Admin</button></div></div>').join('');
   $('admBans').innerHTML=d.bans.map(b=>'<div class="user-card"><div>'+esc(b.name||'?')+' · '+(((b.ips&&b.ips.length)||b.ip)?'name + device + IP':'name + device only')+'<br><small style="color:#888">'+esc(b.reason)+' · '+(b.until?'until '+new Date(b.until).toLocaleString():'permanent')+'</small></div><button class="btn sm green" onclick="admUnban(\''+b.id+'\')">Unban</button></div>').join('')||'<small style="color:#888">No active bans</small>';
 });
 function admBan(e){ socket.emit('admin_ban',{name:decodeURIComponent(e),minutes:$('admMins').value,reason:$('admReason').value.trim()||'No reason given',ipToo:!!$('admIp').value}); setTimeout(()=>socket.emit('admin_data'),400); }
@@ -842,7 +848,6 @@ socket.on('banned',b=>{
 // ================= GROUP CALLS (WebRTC mesh, up to 8 people) =================
 const rtcConfig={iceServers:[
   {urls:'stun:stun.cloudflare.com:3478'},
-  // Public TURN relay (helps on mobile data). For reliable calls, replace with your own TURN service.
   {urls:['turn:openrelay.metered.ca:80','turn:openrelay.metered.ca:443','turn:openrelay.metered.ca:443?transport=tcp'],username:'openrelayproject',credential:'openrelayproject'}
 ]};
 let call=null, incoming=null, localStream=null, sharing=null, muted=false, vol=1, facing='user', callSel=new Set(), callTimer=null;
@@ -876,6 +881,7 @@ socket.on('call_invite',d=>{
   $('incName').innerText=d.from+(d.members.length>1?' + '+(d.members.length-1)+' more':'');
   $('incSub').innerText=(d.video?'📹 Video':'📞 Voice')+' call'+(d.members.length>1?' with '+d.members.join(', '):'');
   $('incoming').style.display='flex'; startRing();
+  showDesktopNotification('Incoming Call', `Incoming ${d.video ? 'video' : 'voice'} call from ${d.from}`);
 });
 socket.on('call_cancelled',d=>{ if(incoming&&incoming.room===d.room) hideIncoming(); });
 function hideIncoming(){ incoming=null; $('incoming').style.display='none'; stopRing(); }
@@ -891,12 +897,13 @@ socket.on('peer_joined',d=>{ if(!call||call.room!==d.room) return; ensureTile(d.
 socket.on('peer_left',d=>{ if(!call||call.room!==d.room) return; closePeer(d.name); toast(d.name+' left'); updateCallUI(); });
 socket.on('call_declined',d=>toast(d.name+(d.busy?' is busy':' declined')));
 socket.on('call_missed',d=>toast('No answer from '+d.name));
-socket.on('call_ended',d=>{ if(call && (!call.room||!d.room||call.room===d.room)){ toast(d.reason||'Call ended'); endCallLocal(); } });
+socket.on('call_ended',d=>{ if(call && (!call.room||!d.room||call.room===d.room)){ showDesktopNotification('Call Ended', d.reason || 'The call has ended.'); endCallLocal(); } });
 socket.on('call_failed',d=>{ alert(d.reason); endCallLocal(); });
 socket.on('rtc_signal',d=>{ if(call&&call.room===d.room) onSignal(d); });
 
 function showCall(){ $('callScreen').style.display='flex'; $('miniCall').style.display='none'; ensureTile(me,true); setLocalTile(); refreshCtrls(); updateCallUI(); }
-function minimizeCall(){ $('callScreen').style.display='none'; $('miniCall').style.display='flex'; updateCallUI(); }
+function minimizeCallWindow(){ const callBox=$('callScreen'); if(callBox){ callBox.classList.toggle('minimized-call-widget'); } }
+function closeActiveCall(roomId){ if(roomId) socket.emit('call_leave',{room:roomId}); endCallLocal(); }
 function expandCall(){ $('miniCall').style.display='none'; $('callScreen').style.display='flex'; }
 function ensureTile(name,isMe){
   if(tiles[name]) return tiles[name];
@@ -1019,11 +1026,11 @@ function endCallLocal(){
   if(localStream){ localStream.getTracks().forEach(t=>t.stop()); localStream=null; }
   Object.keys(tiles).forEach(n=>removeTile(n));
   call=null; muted=false; vol=1;
+  const callBox=$('callScreen'); if(callBox) callBox.classList.remove('minimized-call-widget');
   $('callScreen').style.display='none'; $('miniCall').style.display='none'; $('addPanel').style.display='none';
 }
 
 // ================= GAMES =================
-// Edit these addresses if a site stops working or blocks embedding. Add more addresses to an array to get extra "Try another site" options.
 const WEB_GAMES = {
   dino:   { urls: ['https://chromedino.com/', 'https://dino-chrome.com/'] },
   flappy: { urls: ['https://flappybird.io/'] },
@@ -1046,7 +1053,6 @@ function nextSite(){ G.idx[G.tab] = (G.idx[G.tab] || 0) + 1; loadGame(); }
 function openGameTab(){ window.open(gameUrl(), '_blank'); }
 function fullGame(){ const f = $('gameFrame'); (f.requestFullscreen || f.webkitRequestFullscreen || function(){ toast('Fullscreen not supported'); }).call(f); }
 
-// ---- Tic-Tac-Toe (coded): vs AI / same device / online app friend ----
 const T={mode:'ai',board:Array(9).fill(''),turn:'X',over:false,res:null,id:null,me:'X',x:'',o:''};
 const WL=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
 const winnerOf=b=>{ for(const l of WL) if(b[l[0]]&&b[l[0]]===b[l[1]]&&b[l[0]]===b[l[2]]) return {w:b[l[0]],line:l}; return b.every(Boolean)?{w:'draw',line:[]}:null; };
@@ -1117,8 +1123,6 @@ socket.on('ttt_state',s=>{
 socket.on('ttt_closed',d=>{ if(T.id===d.id){ T.id=null; T.board=Array(9).fill(''); T.res=null; T.over=false; toast('Your opponent left the game'); renderXO(); } });
 
 // ================= BROWSER =================
-// Google, Facebook, X, Instagram, Netflix... forbid being shown inside other apps (their rule, not a bug here).
-// YouTube links are converted to YouTube's official embedded player, so videos play inside the app.
 const ENGINES={
   'Wikipedia (in app)':{u:'https://en.wikipedia.org/w/index.php?search='},
   'DuckDuckGo (new tab)':{u:'https://duckduckgo.com/?q='},
@@ -1159,7 +1163,7 @@ function brGo(q){
   try{ new URL(u); }catch(e){ return toast('Invalid address'); }
   t.stack=t.stack.slice(0,t.i+1); t.stack.push(u); t.i++; t.url=u;
   if(!t.incog){ const h=brHist().filter(x=>x!==u); h.unshift(u); localStorage.setItem('brHist',JSON.stringify(h.slice(0,50))); }
-  if(isExt(u)) window.open(u,'_blank','noopener,noreferrer'); // these sites cannot be shown inside the app
+  if(isExt(u)) window.open(u,'_blank','noopener,noreferrer');
   brRender();
 }
 function brNav(d){ const t=curTab(), i=t.i+d; if(i<-1||i>=t.stack.length) return; t.i=i; t.url=i>=0?t.stack[i]:''; brRender(); }
@@ -1195,7 +1199,7 @@ function brRender(){
   else $('brView').innerHTML='<iframe src="'+esc(t.url)+'" referrerpolicy="no-referrer" '+(t.incog?'sandbox="allow-scripts allow-forms allow-popups" ':'')+'allow="fullscreen" style="width:100%;height:100%;min-height:300px;border:0;background:#fff"></iframe><small style="color:#888;padding:4px;display:block">Blank page? That site blocks embedding — press ↗.</small>';
 }
 
-// ================= PERFORMANCE: load photos/voice/files only when tapped, redraw less =================
+// ================= PERFORMANCE =================
 function loadMedia(id){ socket.emit('get_media',{id,chat:cur}); }
 socket.on('media_data',({id,image,audio})=>{
   const m=[...globalMsgs,...Object.values(dms).flat()].find(x=>x.id===id);
@@ -1261,7 +1265,6 @@ socket.on('push_info',i=>{
   else if(!i.subs) toast('This device is not subscribed yet. Press "Turn on".');
   else toast('Push sent — it should arrive within seconds.');
 });
-// alerts while the app is in the background (no server keys needed)
 socket.on('receive_message',d=>{ if(document.hidden && d.user!==me && d.to) localNotify(d.user,{body:d.text||'📷 Photo / 🎙️ Voice note',tag:'msg-'+d.user,renotify:true,vibrate:[120],data:{type:'msg',from:d.user}}); });
 socket.on('call_invite',d=>{ if(document.hidden) localNotify('📞 '+d.from,{body:(d.video?'Video':'Voice')+' call — incoming',tag:'call-'+d.room,renotify:true,requireInteraction:true,vibrate:[400,200,400,200,400],data:{type:'call',room:d.room,from:d.from,video:d.video},actions:[{action:'answer',title:'✅ Pick up'},{action:'dismiss',title:'❌ Dismiss'}]}); });
 let pushDone=false;
