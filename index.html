@@ -210,6 +210,7 @@ h4{color:var(--hi);margin:14px 0 8px}
     <button class="nav" onclick="openGames()">🎮<span>Games</span></button>
     <button class="nav more" onclick="openModal('storageApp')">☁️<span>Drive</span></button>
     <button class="nav more" onclick="openModal('recModal')">🎬<span>Recorder</span></button>
+    <button class="nav more" onclick="openBrowser()">🌐<span>Browser</span></button>
     <button class="nav more" onclick="openModal('localMusicApp')">🎵<span>Music</span></button>
     <button class="nav more" onclick="openCamera()">📷<span>Camera</span></button>
   </nav>
@@ -232,6 +233,7 @@ h4{color:var(--hi);margin:14px 0 8px}
       <div class="tile-app" onclick="openGames()"><i>🎮</i>Games</div>
       <div class="tile-app" onclick="openModal('storageApp')"><i>☁️</i>Drive</div>
       <div class="tile-app" onclick="openModal('recModal')"><i>🎬</i>Recorder</div>
+      <div class="tile-app" onclick="openBrowser()"><i>🌐</i>Browser</div>
       <div class="tile-app" onclick="openModal('localMusicApp')"><i>🎵</i>Local MP3</div>
       <div class="tile-app" onclick="openCamera()"><i>📷</i>Camera</div>
       <div class="tile-app" onclick="openModal('settingsModal')"><i>⚙️</i>Settings</div>
@@ -353,7 +355,7 @@ h4{color:var(--hi);margin:14px 0 8px}
   <div class="modal-header"><h3>🎬 Screen Recorder</h3><button class="close-btn" onclick="closeModal('recModal')">X</button></div>
   <div class="modal-body">
     <label><input type="checkbox" id="recSys" checked> 🔊 Device sound</label><br>
-    <label><input type="checkbox" id="recMic"> 🎙️ Microphone</label>
+    <label><input type="checkbox" id="recMic" checked> 🎙️ Microphone</label><br><small style="color:#888">Device sound: in the browser's share window tick "Also share tab audio" / "Share system audio".</small>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin:12px 0">
       <button class="btn green" onclick="recStart()">⏺ Start</button>
       <button class="btn gray" onclick="recPause()">⏯ Pause</button>
@@ -366,6 +368,23 @@ h4{color:var(--hi);margin:14px 0 8px}
   </div>
 </div>
 
+<!-- Browser -->
+<div id="browserModal" class="modal">
+  <div class="modal-header"><h3>🌐 Browser</h3><button class="close-btn" onclick="closeModal('browserModal')">X</button></div>
+  <div class="modal-body" style="display:flex;flex-direction:column;padding:8px">
+    <div id="brTabs" style="display:flex;gap:4px;overflow-x:auto;margin-bottom:6px"></div>
+    <div id="brBar" style="display:flex;gap:4px;margin-bottom:6px;border:1px solid var(--bd);border-radius:10px;padding:4px">
+      <button class="btn sm gray" onclick="brNav(-1)">◀</button>
+      <button class="btn sm gray" onclick="brNav(1)">▶</button>
+      <input type="text" id="brUrl" placeholder="Search, paste a YouTube link, or type a web address" style="flex:1;min-width:0" onkeydown="if(event.key==='Enter')brGo(this.value)"/>
+      <button class="btn sm" onclick="brGo($('brUrl').value)">Go</button>
+      <button class="btn sm gray" onclick="brExternal()" title="Open in a real browser tab">↗</button>
+      <select id="brEngine" onchange="BR.engine=this.value;localStorage.setItem('brEngine',this.value)"></select>
+    </div>
+    <div id="brView" style="flex:1;min-height:300px;border:1px solid var(--bd);border-radius:10px;overflow:auto"></div>
+  </div>
+</div>
+
 <!-- Settings -->
 <div id="settingsModal" class="modal">
   <div class="modal-header"><h3>Settings</h3><button class="close-btn" onclick="closeModal('settingsModal')">X</button></div>
@@ -374,8 +393,13 @@ h4{color:var(--hi);margin:14px 0 8px}
     <h4>🎨 Accent color</h4>
     <div id="themeRow" style="display:flex;gap:10px;flex-wrap:wrap"></div>
     <h4>🔔 Notifications</h4>
-    <label><input type="checkbox" id="notifChk" onchange="setNotif(this.checked)"> Notify me of messages and calls, even when the app is closed</label>
-    <p style="color:#888;font-size:12px">Turn this on once on every phone and laptop you use. A call notification has Pick up and Dismiss buttons.</p>
+    <div id="notifStatus" style="font-size:13px;color:#ffb300;margin-bottom:8px"></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn green" onclick="enablePush(true)">🔔 Turn on</button>
+      <button class="btn gray" onclick="testPush()">🧪 Send test</button>
+      <button class="btn gray" onclick="disablePush()">🔕 Turn off</button>
+    </div>
+    <p style="color:#888;font-size:12px">Do this once on every phone and laptop. Messages and calls then appear as notifications (calls have Pick up / Dismiss). Alerts while the app is fully closed also need the server push keys (VAPID).</p>
   </div>
 </div>
 
@@ -385,7 +409,8 @@ h4{color:var(--hi);margin:14px 0 8px}
   <div class="modal-body">
     <input type="text" id="admReason" placeholder="Ban reason" style="width:100%;margin-bottom:6px"/>
     <select id="admMins"><option value="5">5 min</option><option value="30">30 min</option><option value="60">1 hour</option><option value="1440">1 day</option><option value="0">Permanent</option></select>
-    <h4>Users (press Ban to ban by name + IP)</h4><div id="admUsers"></div>
+    <select id="admIp"><option value="">Ban: account + device (safe)</option><option value="1">Ban: account + device + IP (may hit others on the same network)</option></select>
+    <h4>Users</h4><div id="admUsers"></div>
     <h4>Active bans</h4><div id="admBans"></div>
   </div>
 </div>
@@ -447,6 +472,7 @@ function closeModal(id){
   $(id).style.display='none';
   if(id==='cameraApp' && camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
   if(id==='gamesModal') stopGame();
+  if(id==='browserModal') brClose();
 }
 function openModal(id){
   document.querySelectorAll('.modal').forEach(m=>{ if(m.id!==id && m.id!=='authModal' && m.style.display==='flex') closeModal(m.id); });
@@ -482,7 +508,12 @@ let authMode='signup', pendingGoogle=null, pendingCred=null;
 let REC=null, recList=[], upTarget=false;
 let outbox=[]; try{ outbox=JSON.parse(localStorage.getItem('outbox')||'[]'); }catch(e){}
 const saveOutbox = () => localStorage.setItem('outbox', JSON.stringify(outbox));
-function cacheChats(){ try{ localStorage.setItem('chat_cache', JSON.stringify({g:globalMsgs.slice(-100), d:dms, f:friends})); }catch(e){} }
+let ccT;
+function cacheChats(){ clearTimeout(ccT); ccT=setTimeout(()=>{ try{
+  const sl=m=>(m.media||m.image||m.audio)?{...m,image:m.image?'1':undefined,audio:m.audio?'1':undefined,media:true}:m;
+  const d={}; Object.keys(dms).forEach(k=>d[k]=dms[k].slice(-30).map(sl));
+  localStorage.setItem('chat_cache',JSON.stringify({g:globalMsgs.slice(-50).map(sl),d,f:friends}));
+}catch(e){} },1000); }
 function refreshLists(){ renderUsers(); buildChatSelect(); renderCallPicker(); fillOpp(); }
 // values from a tapped notification that opened the app
 const _L = new URLSearchParams(location.search);
@@ -649,8 +680,8 @@ function renderMsg(d){
   w.id='msg-'+d.id; w.className='msg-wrapper '+(mine?'my-msg':'other-msg');
   let h='<div class="msg-author">'+esc(d.user)+'</div><div class="bubble">';
   if(d.text) h+=esc(d.text);
-  if(d.image) h+='<br><img class="msg-img" src="'+d.image+'"/>';
-  if(d.audio) h+='<br><audio controls src="'+d.audio+'" style="width:200px;height:35px"></audio>';
+  if(d.image) h+= d.image==='1' ? '<br><button class="btn sm gray" onclick="loadMedia(\''+d.id+'\')">📷 Tap to load</button>' : '<br><img class="msg-img" src="'+d.image+'"/>';
+  if(d.audio) h+= d.audio==='1' ? '<br><button class="btn sm gray" onclick="loadMedia(\''+d.id+'\')">🎙️ Tap to load</button>' : '<br><audio controls src="'+d.audio+'" style="width:200px;height:35px"></audio>';
   h+='<span class="msg-time">'+esc(d.timestamp||'')+'</span>';
   if(mine) h+='<button class="delete-btn" onclick="delMsg(\''+d.id+'\')">🗑️</button>';
   w.innerHTML=h+'</div>'; chatBox.appendChild(w); chatBox.scrollTop=chatBox.scrollHeight;
@@ -700,12 +731,16 @@ function addEmoji(e){ const i=$('messageInput'); i.value+=e; i.focus(); }
 // ================= drive (personal + shared) / mp3 / camera =================
 socket.on('new_cloud_file',renderCloudFile);
 socket.on('cloud_file_deleted',id=>{ const e=$('drive-file-'+id); if(e) e.remove(); });
+const FILES={};
 function renderCloudFile(f){
+  FILES[f.id]=f;
   const priv=f.scope==='private', d=document.createElement('div'); d.id='drive-file-'+f.id; d.className='file-card'; let m='';
-  if(f.type.startsWith('audio/')) m='<audio controls src="'+f.url+'" style="height:35px;width:100%"></audio>';
+  if(f.big||!f.url) m='<br><button class="btn sm gray" onclick="socket.emit(\'get_file\',\''+f.id+'\')">▶ Load preview / download</button>';
+  else if(f.type.startsWith('audio/')) m='<audio controls src="'+f.url+'" style="height:35px;width:100%"></audio>';
   else if(f.type.startsWith('image/')) m='<br><img src="'+f.url+'" style="max-width:120px;border-radius:6px"/>';
   else if(f.type.startsWith('video/')) m='<br><video controls src="'+f.url+'" style="max-width:180px;border-radius:6px"></video>';
-  d.innerHTML='<div><strong>'+esc(f.name)+'</strong>'+(priv?'':' (by '+esc(f.uploader)+')')+m+'</div><div style="display:flex;gap:6px;align-items:center"><a href="'+f.url+'" download="'+esc(f.name)+'" style="color:#8ab4f8;text-decoration:none">⬇️</a>'
+  d.innerHTML='<div><strong>'+esc(f.name)+'</strong>'+(priv?'':' (by '+esc(f.uploader)+')')+m+'</div><div style="display:flex;gap:6px;align-items:center">'
+    +(f.url?'<a href="'+f.url+'" download="'+esc(f.name)+'" style="color:#8ab4f8;text-decoration:none">⬇️</a>':'')
     +(priv?'<button class="btn sm green" onclick="socket.emit(\'share_file\',\''+f.id+'\')">🌍 Share</button>':'')
     +(f.uploader===me?'<button onclick="socket.emit(\'delete_cloud_file\',\''+f.id+'\')" style="background:none;border:0;color:#ff8a8a;cursor:pointer">🗑</button>':'')+'</div>';
   $(priv?'myDriveList':'cloudDriveList').appendChild(d);
@@ -745,20 +780,33 @@ function recInfo(t){ $('recInfo').innerText=t; }
 async function recStart(){
   if(REC) return toast('Already recording');
   if(!navigator.mediaDevices||!navigator.mediaDevices.getDisplayMedia) return toast('📱 Screen recording is not supported on phone browsers. Use a laptop.');
-  let screen, mic=null;
-  try{ screen=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:15},audio:$('recSys').checked}); }catch(e){ return toast('Recording cancelled'); }
-  if($('recMic').checked){ try{ mic=await navigator.mediaDevices.getUserMedia({audio:true}); }catch(e){ toast('Microphone blocked — recording without it'); } }
-  const ctx=new AudioContext(), dest=ctx.createMediaStreamDestination(); let any=false;
-  [screen,mic].forEach(s=>{ if(s&&s.getAudioTracks().length){ ctx.createMediaStreamSource(new MediaStream(s.getAudioTracks())).connect(dest); any=true; } });
-  const out=new MediaStream([...screen.getVideoTracks(),...(any?dest.stream.getAudioTracks():[])]);
+  // 1) audio engine created + resumed right at the click (browsers keep it silent otherwise = "mic not working")
+  const AC=window.AudioContext||window.webkitAudioContext, ctx=new AC();
+  try{ await ctx.resume(); }catch(e){}
+  // 2) ask for the microphone FIRST
+  let mic=null;
+  if($('recMic').checked){
+    try{ mic=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}}); }
+    catch(e){ toast('🎙️ Microphone blocked: '+(e.name==='NotAllowedError'?'click the lock icon in the address bar and allow the microphone':e.message)); }
+  }
+  // 3) then the screen
+  let screen;
+  try{ screen=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:15},audio:$('recSys').checked}); }
+  catch(e){ if(mic) mic.getTracks().forEach(t=>t.stop()); ctx.close(); return toast('Recording cancelled'); }
+  const dest=ctx.createMediaStreamDestination(), parts=[];
+  if(screen.getAudioTracks().length){ ctx.createMediaStreamSource(new MediaStream(screen.getAudioTracks())).connect(dest); parts.push('device sound'); }
+  else if($('recSys').checked) toast('No device sound captured: tick "Also share tab/system audio" in the share window.');
+  if(mic&&mic.getAudioTracks().length){ const g=ctx.createGain(); g.gain.value=1.5; ctx.createMediaStreamSource(mic).connect(g); g.connect(dest); parts.push('microphone'); }
+  const out=new MediaStream([...screen.getVideoTracks(),...(parts.length?dest.stream.getAudioTracks():[])]);
   const mime=['video/webm;codecs=vp8,opus','video/webm'].find(m=>MediaRecorder.isTypeSupported(m));
-  const rec=new MediaRecorder(out,{mimeType:mime,videoBitsPerSecond:500000,audioBitsPerSecond:64000});
+  const rec=new MediaRecorder(out,{mimeType:mime,videoBitsPerSecond:500000,audioBitsPerSecond:96000});
   const chunks=[]; let size=0;
   rec.ondataavailable=e=>{ if(e.data.size){ chunks.push(e.data); size+=e.data.size; if(size>9.5e6){ toast('Size limit reached — saving'); recStop(); } } };
   rec.onstop=()=>recFinish(chunks);
   REC={rec,screen,mic,ctx,paused:false};
   screen.getVideoTracks()[0].onended=recStop;
-  rec.start(1000); socket.emit('rec_status',true); recInfo('🔴 Recording… others can see that you are recording');
+  rec.start(1000); socket.emit('rec_status',true);
+  recInfo('🔴 Recording ('+(parts.join(' + ')||'no audio')+') — others can see that you are recording');
 }
 function recPause(){ if(!REC) return; REC.paused?REC.rec.resume():REC.rec.pause(); REC.paused=!REC.paused; recInfo(REC.paused?'⏸ Paused':'🔴 Recording…'); }
 function recMic(){ const t=REC&&REC.mic&&REC.mic.getAudioTracks()[0]; if(!t) return toast('Microphone was not enabled for this recording'); t.enabled=!t.enabled; toast(t.enabled?'Mic on':'Mic off'); }
@@ -780,9 +828,9 @@ function recFinish(chunks){
 function openAdmin(){ openModal('adminModal'); socket.emit('admin_data'); }
 socket.on('admin_data',d=>{
   $('admUsers').innerHTML=d.users.map(u=>'<div class="user-card"><div>'+(u.online?'🟢 ':'⚪ ')+esc(u.name)+'<br><small style="color:#888">IP: '+esc(u.ips.join(', ')||'unknown')+' · strikes '+u.strikes+'</small></div><button class="btn sm" onclick="admBan(\''+enc(u.name)+'\')">🔨 Ban</button></div>').join('');
-  $('admBans').innerHTML=d.bans.map(b=>'<div class="user-card"><div>'+esc(b.name||'?')+' · '+esc(b.ip||'no ip')+'<br><small style="color:#888">'+esc(b.reason)+' · '+(b.until?'until '+new Date(b.until).toLocaleString():'permanent')+'</small></div><button class="btn sm green" onclick="admUnban(\''+b.id+'\')">Unban</button></div>').join('')||'<small style="color:#888">No active bans</small>';
+  $('admBans').innerHTML=d.bans.map(b=>'<div class="user-card"><div>'+esc(b.name||'?')+' · '+(((b.ips&&b.ips.length)||b.ip)?'name + device + IP':'name + device only')+'<br><small style="color:#888">'+esc(b.reason)+' · '+(b.until?'until '+new Date(b.until).toLocaleString():'permanent')+'</small></div><button class="btn sm green" onclick="admUnban(\''+b.id+'\')">Unban</button></div>').join('')||'<small style="color:#888">No active bans</small>';
 });
-function admBan(e){ socket.emit('admin_ban',{name:decodeURIComponent(e),minutes:$('admMins').value,reason:$('admReason').value.trim()||'No reason given'}); setTimeout(()=>socket.emit('admin_data'),400); }
+function admBan(e){ socket.emit('admin_ban',{name:decodeURIComponent(e),minutes:$('admMins').value,reason:$('admReason').value.trim()||'No reason given',ipToo:!!$('admIp').value}); setTimeout(()=>socket.emit('admin_data'),400); }
 function admUnban(id){ socket.emit('admin_unban',id); setTimeout(()=>socket.emit('admin_data'),400); }
 socket.on('banned',b=>{
   $('banReason').innerText='Reason: '+(b.reason||'No reason given');
@@ -992,7 +1040,7 @@ function gameTab(t){
   const web = t !== 'xo';
   $('webGameWrap').style.display = web ? 'block' : 'none';
   $('xoWrap').style.display = web ? 'none' : 'block';
-  if(web) loadGame(); else { stopGame(); showModeUI(); renderXO(); }
+  if(web) loadGame(); else { stopGame(); showModeUI(); fillOpp(); renderXO(); }
 }
 function nextSite(){ G.idx[G.tab] = (G.idx[G.tab] || 0) + 1; loadGame(); }
 function openGameTab(){ window.open(gameUrl(), '_blank'); }
@@ -1068,36 +1116,156 @@ socket.on('ttt_state',s=>{
 });
 socket.on('ttt_closed',d=>{ if(T.id===d.id){ T.id=null; T.board=Array(9).fill(''); T.res=null; T.over=false; toast('Your opponent left the game'); renderXO(); } });
 
+// ================= BROWSER =================
+// Google, Facebook, X, Instagram, Netflix... forbid being shown inside other apps (their rule, not a bug here).
+// YouTube links are converted to YouTube's official embedded player, so videos play inside the app.
+const ENGINES={
+  'Wikipedia (in app)':{u:'https://en.wikipedia.org/w/index.php?search='},
+  'DuckDuckGo (new tab)':{u:'https://duckduckgo.com/?q='},
+  'Google (new tab)':{u:'https://www.google.com/search?q='},
+  'YouTube search (new tab)':{u:'https://www.youtube.com/results?search_query='},
+  'Bing (new tab)':{u:'https://www.bing.com/search?q='}
+};
+const NOFRAME=/(^|\.)(google\.[a-z.]+|youtube\.com|facebook\.com|instagram\.com|x\.com|twitter\.com|linkedin\.com|netflix\.com|whatsapp\.com|bing\.com|duckduckgo\.com|brave\.com|reddit\.com|amazon\.[a-z.]+|github\.com|gmail\.com|outlook\.com|live\.com|paypal\.com|tiktok\.com|twitch\.tv|spotify\.com|discord\.com)$/i;
+const BR={tabs:[],cur:null,n:0,engine:localStorage.getItem('brEngine')};
+if(!ENGINES[BR.engine]) BR.engine='Wikipedia (in app)';
+$('brEngine').innerHTML=Object.keys(ENGINES).map(k=>'<option'+(k===BR.engine?' selected':'')+'>'+k+'</option>').join('');
+const brHist=()=>{ try{ return JSON.parse(localStorage.getItem('brHist')||'[]'); }catch(e){ return []; } };
+const curTab=()=>BR.tabs.find(t=>t.id===BR.cur);
+function ytEmbed(u){
+  try{
+    const x=new URL(u), h=x.hostname.replace(/^(www|m|music)\./,''); let id=null;
+    if(h==='youtu.be') id=x.pathname.slice(1).split('/')[0];
+    else if(h==='youtube.com'||h==='youtube-nocookie.com'){
+      if(x.pathname==='/watch') id=x.searchParams.get('v');
+      else{ const m=x.pathname.match(/^\/(shorts|embed|live)\/([\w-]{6,})/); if(m) id=m[2]; }
+      if(!id && x.searchParams.get('list') && (x.pathname==='/playlist'||x.pathname==='/watch')) return 'https://www.youtube-nocookie.com/embed/videoseries?list='+encodeURIComponent(x.searchParams.get('list'));
+    }
+    if(id && /^[\w-]{6,}$/.test(id)) return 'https://www.youtube-nocookie.com/embed/'+id+'?autoplay=1&rel=0';
+  }catch(e){}
+  return null;
+}
+function isExt(u){ try{ return !ytEmbed(u) && NOFRAME.test(new URL(u).hostname); }catch(e){ return false; } }
+function openBrowser(){ openModal('browserModal'); if(!BR.tabs.length) newTab(false); else brRender(); }
+function newTab(incog){ const t={id:++BR.n,incog:!!incog,url:'',stack:[],i:-1}; BR.tabs.push(t); BR.cur=t.id; brRender(); }
+function resolveUrl(q){
+  q=q.trim(); if(!q) return null;
+  if(/^https?:\/\//i.test(q)) return q;
+  if(!/\s/.test(q) && /\.[a-z]{2,}(\/|$|\?|#)/i.test(q)) return 'https://'+q;
+  return ENGINES[BR.engine].u+encodeURIComponent(q);
+}
+function brGo(q){
+  const t=curTab(), u=resolveUrl(q||''); if(!t||!u) return;
+  try{ new URL(u); }catch(e){ return toast('Invalid address'); }
+  t.stack=t.stack.slice(0,t.i+1); t.stack.push(u); t.i++; t.url=u;
+  if(!t.incog){ const h=brHist().filter(x=>x!==u); h.unshift(u); localStorage.setItem('brHist',JSON.stringify(h.slice(0,50))); }
+  if(isExt(u)) window.open(u,'_blank','noopener,noreferrer'); // these sites cannot be shown inside the app
+  brRender();
+}
+function brNav(d){ const t=curTab(), i=t.i+d; if(i<-1||i>=t.stack.length) return; t.i=i; t.url=i>=0?t.stack[i]:''; brRender(); }
+function brSwitch(id){ BR.cur=id; brRender(); }
+function brCloseTab(id){ BR.tabs=BR.tabs.filter(x=>x.id!==id); if(!BR.tabs.length) return newTab(false); if(BR.cur===id) BR.cur=BR.tabs[BR.tabs.length-1].id; brRender(); }
+function brExternal(){ const t=curTab(); if(t&&t.url) window.open(t.url,'_blank','noopener,noreferrer'); else toast('Open a page first'); }
+function brClose(){ BR.tabs=BR.tabs.filter(x=>!x.incog); BR.cur=BR.tabs.length?BR.tabs[0].id:null; }
+function brHome(t){
+  let h='<div style="padding:20px;text-align:center">'+(t.incog
+    ? '<h2>🕶 Incognito tab</h2><p style="color:#aaa;font-size:13px">No history is saved, sites get no referrer, and this tab is deleted when you close the Browser window. Your network and the sites you visit can still see you.</p>'
+    : '<h2>🌐 Browser</h2>');
+  h+='<div style="display:flex;gap:6px;max-width:520px;margin:12px auto"><input type="text" id="brYt" placeholder="▶ Paste a YouTube link to watch it here" style="flex:1" onkeydown="if(event.key===\'Enter\')brGo(this.value)"/><button class="btn" onclick="brGo($(\'brYt\').value)">Play</button></div>';
+  h+='<div>'+['https://en.wikipedia.org','https://www.openstreetmap.org','https://archive.org'].map(u=>'<button class="btn sm gray" onclick="brGo(\''+u+'\')">'+new URL(u).host+'</button> ').join('')+'</div>';
+  h+='<p style="color:#888;font-size:12px;max-width:520px;margin:14px auto">Google, YouTube pages, Facebook, X, Instagram, Netflix and similar sites forbid being shown inside other apps. Typing them opens a real browser tab instead. YouTube <b>video links</b> play right here.</p>';
+  if(!t.incog){
+    const hs=brHist();
+    h+='<h4>Recent</h4>'+(hs.map((u,i)=>'<div class="citem" onclick="brGo(brHist()['+i+'])">'+esc(u)+'</div>').join('')||'<small style="color:#888">No history yet</small>');
+    if(hs.length) h+='<br><button class="btn sm gray" onclick="localStorage.removeItem(\'brHist\');brRender()">Clear history</button>';
+  }
+  return h+'</div>';
+}
+function brRender(){
+  const t=curTab(); if(!t) return;
+  $('brTabs').innerHTML=BR.tabs.map(x=>{ let n='New tab'; try{ if(x.url) n=new URL(x.url).host; }catch(e){}
+    return '<button class="btn sm'+(x.id===BR.cur?'':' gray')+'" style="white-space:nowrap;'+(x.incog?'background:#5b2a86;':'')+'" onclick="brSwitch('+x.id+')">'+(x.incog?'🕶 ':'')+esc(n)+' <span onclick="event.stopPropagation();brCloseTab('+x.id+')">✕</span></button>'; }).join('')
+    +'<button class="btn sm green" onclick="newTab(false)" title="New tab">＋</button><button class="btn sm" style="background:#5b2a86" onclick="newTab(true)" title="New incognito tab">🕶＋</button>';
+  $('brUrl').value=t.url;
+  $('brBar').style.borderColor=t.incog?'#8e44ad':'var(--bd)';
+  const emb=t.url&&ytEmbed(t.url);
+  if(!t.url) $('brView').innerHTML=brHome(t);
+  else if(emb) $('brView').innerHTML='<iframe src="'+esc(emb)+'" referrerpolicy="no-referrer" '+(t.incog?'sandbox="allow-scripts allow-same-origin allow-popups allow-presentation" ':'')+'allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen style="width:100%;height:100%;min-height:300px;border:0;background:#000"></iframe>';
+  else if(isExt(t.url)) { let h=''; try{ h=new URL(t.url).host; }catch(e){} $('brView').innerHTML='<div style="padding:30px;text-align:center"><h3>🔗 '+esc(h)+'</h3><p style="color:#aaa">This site does not allow itself to be shown inside other apps, so it opened in a real browser tab.</p><button class="btn" onclick="brExternal()">Open again ↗</button><p style="color:#888;font-size:12px">Tip: paste a YouTube <b>video link</b> and it plays here.</p></div>'; }
+  else $('brView').innerHTML='<iframe src="'+esc(t.url)+'" referrerpolicy="no-referrer" '+(t.incog?'sandbox="allow-scripts allow-forms allow-popups" ':'')+'allow="fullscreen" style="width:100%;height:100%;min-height:300px;border:0;background:#fff"></iframe><small style="color:#888;padding:4px;display:block">Blank page? That site blocks embedding — press ↗.</small>';
+}
+
+// ================= PERFORMANCE: load photos/voice/files only when tapped, redraw less =================
+function loadMedia(id){ socket.emit('get_media',{id,chat:cur}); }
+socket.on('media_data',({id,image,audio})=>{
+  const m=[...globalMsgs,...Object.values(dms).flat()].find(x=>x.id===id);
+  if(m){ if(image) m.image=image; if(audio) m.audio=audio; renderChat(); }
+});
+socket.on('file_data',({id,url})=>{
+  const f=FILES[id]; if(!f) return; f.url=url; f.big=false;
+  const old=$('drive-file-'+id); if(old) old.remove(); renderCloudFile(f);
+});
+const _ru=renderUsers; let ruT;
+renderUsers=function(){ if($('usersModal').style.display!=='flex'){ $('reqBadge').innerText=requests.length?'('+requests.length+')':''; return; } clearTimeout(ruT); ruT=setTimeout(_ru,200); };
+const _rcp=renderCallPicker; renderCallPicker=function(){ if($('phoneApp').style.display==='flex') _rcp(); };
+const _fo=fillOpp; fillOpp=function(){ if($('gamesModal').style.display==='flex') _fo(); };
+
 // ================= SETTINGS: accent colors =================
 const THEMES={Red:['#e05656','#ff8a8a'],Blue:['#1a73e8','#8ab4f8'],Green:['#34a853','#81c995'],Purple:['#8e44ad','#c39bd3'],Orange:['#e67e22','#f5b041']};
 function applyTheme(n){ const t=THEMES[n]||THEMES.Red; document.documentElement.style.setProperty('--ac',t[0]); document.documentElement.style.setProperty('--hi',t[1]); localStorage.setItem('theme',n); }
 $('themeRow').innerHTML=Object.keys(THEMES).map(n=>'<button class="btn sm" style="background:'+THEMES[n][0]+'" onclick="applyTheme(\''+n+'\')">'+n+'</button>').join('');
 applyTheme(localStorage.getItem('theme')||'Red');
 
-// ================= PUSH NOTIFICATIONS =================
+// ================= NOTIFICATIONS =================
+let pushReady=false;
 function b64(s){ const p='='.repeat((4-s.length%4)%4), r=(s+p).replace(/-/g,'+').replace(/_/g,'/'); return Uint8Array.from(atob(r),c=>c.charCodeAt(0)); }
+function notifMsg(){
+  if(!window.Notification||!('serviceWorker' in navigator)) return '❌ This browser does not support notifications. Use Chrome / Edge / Firefox (iPhone: add the site to the Home Screen first).';
+  if(Notification.permission==='denied') return '🚫 Blocked. Click the lock icon next to the address → Notifications → Allow, then reload.';
+  if(Notification.permission!=='granted'||localStorage.getItem('push')==='0') return '🔕 Off for this device. Press "Turn on".';
+  return pushReady?'✅ On — works even when the app is closed.':'✅ On while the app is open in the background. (Closed-app alerts need the server VAPID keys.)';
+}
+function showNotifState(){ $('notifStatus').innerText=notifMsg(); }
 async function enablePush(ask){
-  if(!('serviceWorker' in navigator) || !('PushManager' in window) || !window.Notification) return ask && toast('Notifications are not supported here. Use Chrome/Edge/Firefox (iPhone: add to Home Screen first).');
+  if(!window.Notification||!('serviceWorker' in navigator)){ if(ask) toast(notifMsg()); return showNotifState(); }
+  if(Notification.permission==='default' && ask) await Notification.requestPermission();
+  if(Notification.permission!=='granted'){ if(ask) toast(notifMsg()); return showNotifState(); }
   try{
-    const k=(await (await fetch((SERVER_URL||'')+'/vapid')).json()).key;
-    if(!k) return ask && toast('Server notifications are not set up yet');
-    if(Notification.permission==='default' && ask) await Notification.requestPermission();
-    if(Notification.permission!=='granted') return ask && toast('Allow notifications in your browser settings');
-    const reg=await navigator.serviceWorker.register('/sw.js'); await navigator.serviceWorker.ready;
-    let sub=await reg.pushManager.getSubscription();
-    if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64(k)});
-    socket.emit('push_subscribe',sub.toJSON());
-    localStorage.setItem('push','1'); $('notifChk').checked=true;
+    await navigator.serviceWorker.register('/sw.js'); const reg=await navigator.serviceWorker.ready;
+    localStorage.setItem('push','1');
+    let k=''; try{ k=(await (await fetch((SERVER_URL||'')+'/vapid')).json()).key; }catch(e){}
+    if(k && 'PushManager' in window){
+      let sub=await reg.pushManager.getSubscription();
+      if(!sub){ try{ sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64(k)}); }catch(e){ toast('Push setup failed: '+e.message); } }
+      if(sub){ socket.emit('push_subscribe',sub.toJSON()); pushReady=true; }
+    }
     if(ask) toast('🔔 Notifications are on');
-  }catch(e){ if(ask) toast('Could not turn on notifications'); }
+  }catch(e){ if(ask) toast('Could not finish setup: '+e.message); }
+  showNotifState();
 }
 async function disablePush(){
   try{ const reg=await navigator.serviceWorker.getRegistration(); const s=reg&&await reg.pushManager.getSubscription(); if(s) await s.unsubscribe(); }catch(e){}
-  localStorage.setItem('push','0');
+  localStorage.setItem('push','0'); pushReady=false; showNotifState();
 }
-function setNotif(on){ on ? enablePush(true) : disablePush(); }
-$('notifChk').checked = !!window.Notification && Notification.permission==='granted' && localStorage.getItem('push')!=='0';
-socket.on('init',()=>{ if(window.Notification && Notification.permission==='granted' && localStorage.getItem('push')!=='0') enablePush(false); });
+async function localNotify(title,opts){
+  if(!window.Notification||Notification.permission!=='granted'||localStorage.getItem('push')==='0') return;
+  try{ const reg=await navigator.serviceWorker.getRegistration(); if(reg) reg.showNotification(title,opts); }catch(e){}
+}
+async function testPush(){
+  await enablePush(true);
+  localNotify('🔔 Test notification',{body:'Notifications work on this device!',tag:'test'});
+  socket.emit('push_test');
+}
+socket.on('push_info',i=>{
+  if(!i.vapid) toast('Server push keys (VAPID_*) are not set: alerts work only while the app is open in the background.');
+  else if(!i.subs) toast('This device is not subscribed yet. Press "Turn on".');
+  else toast('Push sent — it should arrive within seconds.');
+});
+// alerts while the app is in the background (no server keys needed)
+socket.on('receive_message',d=>{ if(document.hidden && d.user!==me && d.to) localNotify(d.user,{body:d.text||'📷 Photo / 🎙️ Voice note',tag:'msg-'+d.user,renotify:true,vibrate:[120],data:{type:'msg',from:d.user}}); });
+socket.on('call_invite',d=>{ if(document.hidden) localNotify('📞 '+d.from,{body:(d.video?'Video':'Voice')+' call — incoming',tag:'call-'+d.room,renotify:true,requireInteraction:true,vibrate:[400,200,400,200,400],data:{type:'call',room:d.room,from:d.from,video:d.video},actions:[{action:'answer',title:'✅ Pick up'},{action:'dismiss',title:'❌ Dismiss'}]}); });
+let pushDone=false;
+socket.on('init',()=>{ showNotifState(); if(!pushDone && window.Notification && Notification.permission==='granted' && localStorage.getItem('push')!=='0'){ pushDone=true; enablePush(false); } });
 
 function launchAnswer(m){
   if(call) return toast('You are already in a call');
