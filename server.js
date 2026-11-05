@@ -15,14 +15,14 @@ const io = new Server(server, { maxHttpBufferSize: 5e7, cors: { origin: '*' } })
 const DB_FILE = path.join(process.env.DATA_DIR || __dirname, 'db.json');
 let db = {
   totalVisits: 0, visitors: [], users: [], friends: {}, requests: {}, global: [], dms: {}, files: [],
-  profiles: {}, blocks: {}, accounts: {}, sessions: {}, push: {}, bans: [], strikes: {}, ips: {}
+  profiles: {}, blocks: {}, accounts: {}, sessions: {}, push: {}, bans: [], strikes: {}, ips: {}, cids: {}
 };
 let M = null;
 const logErr = e => console.error('Storage error:', e.message);
 const metaOf = () => ({
   totalVisits: db.totalVisits, visitors: db.visitors, users: db.users, friends: db.friends, requests: db.requests,
   profiles: db.profiles, blocks: db.blocks, accounts: db.accounts, sessions: db.sessions, push: db.push,
-  bans: db.bans, strikes: db.strikes, ips: db.ips
+  bans: db.bans, strikes: db.strikes, ips: db.ips, cids: db.cids
 });
 
 async function initStorage() {
@@ -121,14 +121,20 @@ const isAdmin = n => !!(n && getAcc(akey(n)) && getAcc(akey(n)).admin);
 
 // ---- bans & auto-moderation ----
 const ipOf = s => String(s.handshake.headers['x-forwarded-for'] || s.handshake.address || '').split(',')[0].trim();
-const banFor = (name, ip) => {
+// A ban matches the account name, the device id (browser), and - only if the admin chose it - an IP address.
+const banFor = (name, ip, cid) => {
   db.bans = db.bans.filter(b => !b.until || b.until > Date.now());
-  return db.bans.find(b => (ip && b.ip === ip) || (name && b.name && b.name.toLowerCase() === String(name).toLowerCase()));
+  return db.bans.find(b =>
+    (ip && ((b.ips || []).includes(ip) || b.ip === ip)) ||
+    (cid && (b.cids || []).includes(cid)) ||
+    (name && b.name && b.name.toLowerCase() === String(name).toLowerCase()));
 };
-function banUser(name, ip, minutes, reason, by) {
-  const b = { id: uid(), name, ip, reason, by, at: Date.now(), until: minutes ? Date.now() + minutes * 60000 : 0 };
+function banUser(name, ips, cids, minutes, reason, by) {
+  const b = { id: uid(), name, ips: ips || [], cids: cids || [], reason, by, at: Date.now(), until: minutes ? Date.now() + minutes * 60000 : 0 };
   db.bans.push(b); pMeta();
-  [...io.sockets.sockets.values()].filter(s => (ip && s.data.ip === ip) || (name && s.data.me === name)).forEach(s => {
+  [...io.sockets.sockets.values()].filter(s =>
+    (name && s.data.me === name) || b.ips.includes(s.data.ip) || (s.data.cid && b.cids.includes(s.data.cid))
+  ).forEach(s => {
     if (isAdmin(s.data.me)) return;
     s.emit('banned', b); s.disconnect(true);
   });
@@ -141,9 +147,9 @@ const norm = t => String(t || '').toLowerCase()
   .replace(/(.)\1+/g, '$1');
 const isAbusive = t => { const w = norm(t).split(/[^a-z]+/); return BAD_WORDS.some(b => w.includes(norm(b))); };
 const STRIKE_MIN = [5, 10, 30]; // 1st offence 5 min, 2nd 10 min, 3rd and later 30 min
-function autoBan(name, ip) {
+function autoBan(name, cid) { // bans ONLY the person who swore: their account + their own browser. Never an IP, never the other person.
   const n = db.strikes[name] = (db.strikes[name] || 0) + 1;
-  return banUser(name, ip, STRIKE_MIN[Math.min(n, 3) - 1], 'Auto-ban: abusive language (offence ' + n + ')', 'AutoMod');
+  return banUser(name, [], cid ? [cid] : [], STRIKE_MIN[Math.min(n, 3) - 1], 'Auto-ban: abusive language (offence ' + n + ')', 'AutoMod');
 }
 function seedAdmin() {
   const name = process.env.ADMIN_NAME || 'AllTimeLaugher', pw = process.env.ADMIN_PASS;
@@ -155,11 +161,16 @@ function seedAdmin() {
   pMeta(); console.log('Admin account ready: ' + name);
 }
 
-function stats() {
-  A().emit('stats', { online: Object.keys(online).length, totalVisits: db.totalVisits, uniqueVisitors: db.visitors.length });
-  A().emit('user_list', Object.keys(online));
-  A().emit('directory', directory());
-  A().emit('rec_list', [...recording]);
+let statT = null;
+function stats() { // throttled: many events in a row cause only one broadcast
+  if (statT) return;
+  statT = setTimeout(() => {
+    statT = null;
+    A().emit('stats', { online: Object.keys(online).length, totalVisits: db.totalVisits, uniqueVisitors: db.visitors.length });
+    A().emit('user_list', Object.keys(online));
+    A().emit('directory', directory());
+    A().emit('rec_list', [...recording]);
+  }, 700);
 }
 function social(name) { to(name, 'social', { friends: arr(db.friends, name), requests: arr(db.requests, name) }); }
 function dmsFor(name) {
@@ -171,6 +182,10 @@ function dmsFor(name) {
   return out;
 }
 const filesFor = n => db.files.filter(f => f.scope !== 'private' || f.uploader === n);
+// Performance: photos, voice notes and files are NOT sent in bulk. The app loads them when tapped.
+const slim = m => (m.image || m.audio) ? { ...m, image: m.image ? '1' : undefined, audio: m.audio ? '1' : undefined, media: true } : m;
+const slimF = f => ({ ...f, url: undefined, big: true });
+const lastN = (a, n) => a.slice(-n).map(slim);
 
 // ================= GROUP CALLS (mesh rooms, max 8 people) =================
 const rooms = {};
@@ -272,6 +287,8 @@ io.on('connection', (socket) => {
     if (!db.users.includes(me)) db.users.push(me);
     const l = arr(db.ips, me), ip = socket.data.ip;
     if (ip && !l.includes(ip)) db.ips[me] = l.concat([ip]).slice(-5);
+    socket.data.cid = clientId;
+    if (clientId) { const cl = arr(db.cids, me); if (!cl.includes(clientId)) db.cids[me] = cl.concat([clientId]).slice(-5); }
     const p = prof(me); p.lastSeen = Date.now();
     if (!counted) {
       counted = true; db.totalVisits++; p.visits++;
@@ -279,13 +296,13 @@ io.on('connection', (socket) => {
     }
     pMeta();
     if (!wasOnline) arr(db.friends, me).forEach(f => to(f, 'toast', '🟢 ' + me + ' is online'));
-    socket.emit('init', { global: db.global, dms: dmsFor(me), files: filesFor(me) });
+    socket.emit('init', { global: lastN(db.global, 50), dms: Object.fromEntries(Object.entries(dmsFor(me)).map(([k, v]) => [k, lastN(v, 50)])), files: filesFor(me).map(slimF) });
     social(me);
     socket.emit('blocks', arr(db.blocks, me));
     stats();
   }
   const ok = (name, token) => {
-    const b = banFor(name, socket.data.ip);
+    const b = banFor(name, socket.data.ip, clientId);
     if (b && !isAdmin(name)) return socket.emit('banned', b);
     socket.emit('auth_ok', { name, token, admin: isAdmin(name) });
     enter(name);
@@ -365,14 +382,15 @@ io.on('connection', (socket) => {
       bans: db.bans
     });
   });
-  socket.on('admin_ban', ({ name, minutes, reason } = {}) => {
+  socket.on('admin_ban', ({ name, minutes, reason, ipToo } = {}) => {
     if (!isAdmin(me)) return;
     const u = findUser(name);
     if (!u || isAdmin(u)) return socket.emit('toast', 'Cannot ban that user');
-    const ips = (db.ips[u] || []).filter(i => i !== socket.data.ip);
+    const ips = ipToo ? (db.ips[u] || []).filter(i => i !== socket.data.ip) : [];
+    const cids = (db.cids[u] || []).filter(c => c !== socket.data.cid);
     const why = String(reason || 'No reason given').slice(0, 200), mins = Math.max(0, +minutes || 0);
-    (ips.length ? ips : [null]).forEach(ip => banUser(u, ip, mins, why, me));
-    socket.emit('toast', '🔨 Banned ' + u);
+    banUser(u, ips, cids, mins, why, me);
+    socket.emit('toast', '🔨 Banned ' + u + (ips.length ? ' (+ IP)' : ' (account + device)'));
   });
   socket.on('admin_unban', (id) => { if (!isAdmin(me)) return; db.bans = db.bans.filter(b => b.id !== id); pMeta(); });
 
@@ -386,7 +404,7 @@ io.on('connection', (socket) => {
   // ---------- Messages ----------
   socket.on('send_message', (data) => {
     if (!me || !data) return;
-    if (data.text && !isAdmin(me) && isAbusive(data.text)) { autoBan(me, socket.data.ip); return; }
+    if (data.text && !isAdmin(me) && isAbusive(data.text)) { autoBan(me, clientId); return; }
     if ((data.image && data.image.length > MAX_BYTES) || (data.audio && data.audio.length > MAX_BYTES)) return socket.emit('toast', 'File too big (max 10 MB)');
     const m = { user: me, id: uid(), t: Date.now(), timestamp: data.timestamp || '', text: data.text ? String(data.text).slice(0, 2000) : undefined, image: data.image, audio: data.audio };
     if (data.to) {
@@ -404,7 +422,7 @@ io.on('connection', (socket) => {
       m.chat = 'global';
       db.global.push(m);
       if (db.global.length > 300) pMsgDel(db.global.shift().id);
-      A().emit('receive_message', m);
+      socket.to('authed').emit('receive_message', slim(m)); socket.emit('receive_message', m);
     }
     pMsg(m);
   });
@@ -491,14 +509,14 @@ io.on('connection', (socket) => {
       return socket.emit('toast', 'Personal drive is full (10 files). Delete some first.');
     const file = { id: uid(), t: Date.now(), name: String(f.name || 'file').slice(0, 100), type: String(f.type || 'application/octet-stream'), url: f.url, uploader: me, scope };
     db.files.push(file); pFile(file);
-    if (scope === 'shared') A().emit('new_cloud_file', file);
+    if (scope === 'shared') { socket.to('authed').emit('new_cloud_file', slimF(file)); socket.emit('new_cloud_file', file); }
     else { socket.emit('new_cloud_file', file); socket.emit('toast', '🔒 Saved to your personal drive'); }
   });
   socket.on('share_file', (id) => {
     const f = db.files.find(x => x.id === id && x.uploader === me && x.scope === 'private');
     if (!me || !f) return;
     const c = { ...f, id: uid(), t: Date.now(), scope: 'shared' };
-    db.files.push(c); pFile(c); A().emit('new_cloud_file', c);
+    db.files.push(c); pFile(c); socket.to('authed').emit('new_cloud_file', slimF(c)); socket.emit('new_cloud_file', slimF(c));
     socket.emit('toast', '🌍 Shared with everyone');
   });
   socket.on('delete_cloud_file', (id) => {
@@ -506,6 +524,24 @@ io.on('connection', (socket) => {
     if (!me || !f || f.uploader !== me) return;
     db.files = db.files.filter(x => x.id !== id); pFileDel(id);
     if (f.scope === 'private') socket.emit('cloud_file_deleted', id); else A().emit('cloud_file_deleted', id);
+  });
+
+  // ---------- Lazy media + notification test ----------
+  socket.on('get_media', ({ id, chat } = {}) => {
+    if (!me) return;
+    const list = chat === 'global' ? db.global : db.dms[key(me, String(chat))];
+    const m = list && list.find(x => x.id === id);
+    if (m) socket.emit('media_data', { id, image: m.image, audio: m.audio });
+  });
+  socket.on('get_file', (id) => {
+    const f = db.files.find(x => x.id === id && (x.scope !== 'private' || x.uploader === me));
+    if (me && f) socket.emit('file_data', { id, url: f.url });
+  });
+  socket.on('push_test', () => {
+    if (!me) return;
+    const subs = arr(db.push, me).length;
+    socket.emit('push_info', { vapid: pushOn, subs });
+    if (pushOn && subs) sendPush(me, { type: 'msg', from: 'Gemini OS', title: '🔔 Test notification', body: 'Notifications work on this device!' });
   });
 
   // ---------- Group calls ----------
