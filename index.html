@@ -376,6 +376,10 @@ h4{color:var(--hi);margin:14px 0 8px}
 <div id="recModal" class="modal">
   <div class="modal-header"><h3>🎬 Screen Recorder</h3><button class="close-btn" onclick="closeModal('recModal')">X</button></div>
   <div class="modal-body">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+      <button class="btn" id="rm-save" onclick="recModeSet('save')">💾 Personal (saved)</button>
+      <button class="btn gray" id="rm-live" onclick="recModeSet('live')">🔴 LIVE (friends watch, not saved)</button>
+    </div>
     <label><input type="checkbox" id="recSys" checked> 🔊 Device sound</label><br>
     <label><input type="checkbox" id="recMic" checked> 🎙️ Microphone</label><br><small style="color:#888">Device sound: in the browser's share window tick "Also share tab audio" / "Share system audio".</small>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin:12px 0">
@@ -383,10 +387,20 @@ h4{color:var(--hi);margin:14px 0 8px}
       <button class="btn gray" onclick="recPause()">⏯ Pause</button>
       <button class="btn gray" onclick="recMic()">🎙️ Mic on/off</button>
       <button class="btn gray" onclick="recScreen()">🖥️ Screen on/off</button>
-      <button class="btn" onclick="recStop()">⏹ Stop &amp; save</button>
+      <button class="btn" id="recStopBtn" onclick="recStop()">⏹ Stop &amp; save</button>
     </div>
     <div id="recInfo" style="color:#aaa;font-size:13px"></div><div id="recResult"></div>
-    <small style="color:#888">Saved to your personal drive (max ~10 MB, about 2 minutes, then it stops automatically). Others see a 🔴 REC badge next to your name. Phones cannot record the screen.</small>
+    <small style="color:#888"><b>Personal:</b> saved to your drive (max ~10 MB, about 2 minutes, then it stops). <b>LIVE:</b> nothing is saved and there is no time limit; up to 6 friends can watch from the Users list. Others always see a 🔴 badge next to your name while you record. Phones cannot record the screen.</small>
+  </div>
+</div>
+
+<!-- Live viewer -->
+<div id="liveModal" class="modal">
+  <div class="modal-header"><h3 id="liveTitle">🔴 Live</h3><button class="close-btn" onclick="closeModal('liveModal')">X</button></div>
+  <div class="modal-body" style="text-align:center">
+    <video id="liveVid" autoplay playsinline controls style="width:100%;max-height:75vh;background:#000;border-radius:12px"></video>
+    <div id="liveInfo" style="color:#aaa;font-size:13px;margin:8px"></div>
+    <button class="btn gray" onclick="closeModal('liveModal')">Stop watching</button>
   </div>
 </div>
 
@@ -507,6 +521,7 @@ function closeModal(id){
   if(id==='cameraApp' && camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
   if(id==='gamesModal') stopGame();
   if(id==='browserModal') brClose();
+  if(id==='liveModal') liveStopWatch();
 }
 function openModal(id){
   document.querySelectorAll('.modal').forEach(m=>{ if(m.id!==id && m.id!=='authModal' && m.style.display==='flex') closeModal(m.id); });
@@ -641,22 +656,27 @@ socket.on('directory',d=>{
   if(!profileLoaded && dirMap[me]){ profileLoaded=true; $('profEmoji').value=dirMap[me].emoji||'😀'; $('profStatus').value=dirMap[me].status||''; }
   renderUsers();
 });
-socket.on('rec_list',l=>{
-  recList=l; const o=l.filter(n=>n!==me), b=$('recBanner');
-  b.style.display=o.length?'block':'none';
-  b.innerText=o.length?'🔴 '+o.join(', ')+(o.length>1?' are':' is')+' recording their screen':'';
-  renderUsers();
-});
+let liveList=[];
+const recBadge=n=>liveList.includes(n)?' 🔴 LIVE':recList.includes(n)?' 🔴 REC':'';
+const watchBtn=n=>(liveList.includes(n)&&n!==me)?'<button class="btn sm" style="background:#c62828" onclick="liveWatch(\''+enc(n)+'\')">👁 Watch</button>':'';
+function updBanner(){
+  const b=$('recBanner'), o=recList.filter(n=>n!==me&&!liveList.includes(n)), lv=liveList.filter(n=>n!==me);
+  b.style.display=(o.length||lv.length)?'block':'none';
+  b.innerHTML=(lv.length?'🔴 LIVE now: '+lv.map(n=>'<a href="#" style="color:#fff;font-weight:bold" onclick="liveWatch(\''+enc(n)+'\');return false">'+esc(n)+' 👁</a>').join(', ')+'<br>':'')
+    +(o.length?'🔴 '+esc(o.join(', '))+(o.length>1?' are':' is')+' recording their screen':'');
+}
+socket.on('rec_list',l=>{ recList=l; updBanner(); renderUsers(); renderDirectory(); });
+socket.on('live_list',l=>{ liveList=l; updBanner(); renderUsers(); renderDirectory(); });
 socket.on('toast',toast);
 
 function addByName(){ const n=$('addFriendName').value.trim(); if(!n) return; socket.emit('friend_request',n); $('addFriendName').value=''; }
 function saveProfile(){ socket.emit('set_profile',{emoji:$('profEmoji').value,status:$('profStatus').value.trim()}); toast('Profile saved'); }
 function userRow(u,extra){
   const on=onlineUsers.includes(u), p=dirMap[u]||{};
-  return '<div class="user-card"><div><span>'+(on?'🟢':'⚪')+' '+esc(p.emoji||'👤')+' '+esc(u)+(recList.includes(u)?' 🔴 REC':'')+(u===me?' (You)':'')+'</span>'
+  return '<div class="user-card"><div><span>'+(on?'🟢':'⚪')+' '+esc(p.emoji||'👤')+' '+esc(u)+recBadge(u)+(u===me?' (You)':'')+'</span>'
     +(p.status?'<br><small style="color:#aaa">'+esc(p.status)+'</small>':'')
     +(!on?'<br><small style="color:#888">last seen '+timeAgo(p.lastSeen)+'</small>':'')
-    +'</div><div class="user-actions">'+extra+'</div></div>';
+    +'</div><div class="user-actions">'+extra+watchBtn(u)+'</div></div>';
 }
 function renderUsers(){
   $('reqBadge').innerText = requests.length ? '('+requests.length+')' : '';
@@ -670,9 +690,10 @@ function renderDirectory(){
   const list=directory.filter(u=>u.name!==me && u.name.toLowerCase().includes(q)).sort((a,b)=>(onlineUsers.includes(b.name)-onlineUsers.includes(a.name))||(b.lastSeen-a.lastSeen));
   $('allUsersList').innerHTML = list.map(u=>{
     const on=onlineUsers.includes(u.name), isF=friends.includes(u.name), bl=blocks.includes(u.name), n=enc(u.name);
-    return '<div class="user-card"><div><span>'+(on?'🟢':'⚪')+' '+esc(u.emoji||'👤')+' '+esc(u.name)+tag(u.role)+(recList.includes(u.name)?' 🔴 REC':'')+'</span>'
+    return '<div class="user-card"><div><span>'+(on?'🟢':'⚪')+' '+esc(u.emoji||'👤')+' '+esc(u.name)+tag(u.role)+recBadge(u.name)+'</span>'
       +(u.status?'<br><small style="color:#aaa">'+esc(u.status)+'</small>':'')
       +'<br><small style="color:#888">'+(on?'online now':'last seen '+timeAgo(u.lastSeen))+' · 👁 '+(u.visits||0)+' visits'+(u.wins?' · 🏆 '+u.wins+' wins':'')+'</small></div><div class="user-actions">'
+      +watchBtn(u.name)
       +(bl?'':'<button class="btn sm" onclick="act(\'chat\',\''+n+'\')">💬</button>')
       +(on&&!bl?'<button class="btn sm blue" onclick="act(\'call\',\''+n+'\')">📞</button>':'')
       +(!isF&&!bl?'<button class="btn sm green" onclick="act(\'add\',\''+n+'\')">➕</button>':'')
@@ -813,6 +834,10 @@ function toggleCameraRecording(){
 
 // ================= SCREEN RECORDER =================
 function recInfo(t){ $('recInfo').innerText=t; }
+let recMode='save';
+function recModeSet(m){ if(REC) return toast('Stop the current recording first'); recMode=m;
+  $('rm-save').className='btn'+(m==='save'?'':' gray'); $('rm-live').className='btn'+(m==='live'?'':' gray');
+  $('recStopBtn').innerHTML=m==='live'?'⏹ Stop live':'⏹ Stop &amp; save'; }
 async function recStart(){
   if(REC) return toast('Already recording');
   if(!navigator.mediaDevices||!navigator.mediaDevices.getDisplayMedia) return toast('📱 Screen recording is not supported on phone browsers. Use a laptop.');
@@ -834,6 +859,12 @@ async function recStart(){
   else if($('recSys').checked) toast('No device sound captured: tick "Also share tab/system audio" in the share window.');
   if(mic&&mic.getAudioTracks().length){ const g=ctx.createGain(); g.gain.value=1.5; ctx.createMediaStreamSource(mic).connect(g); g.connect(dest); parts.push('microphone'); }
   const out=new MediaStream([...screen.getVideoTracks(),...(parts.length?dest.stream.getAudioTracks():[])]);
+  if(recMode==='live'){ // LIVE: nothing is recorded or saved, no time limit
+    REC={live:true,out,screen,mic,ctx,paused:false}; LV.out=out;
+    screen.getVideoTracks()[0].onended=recStop;
+    socket.emit('rec_status',true); socket.emit('live_status',true);
+    recInfo('🔴 LIVE ('+(parts.join(' + ')||'no audio')+') — friends can watch from the Users list. Nothing is saved.'); return;
+  }
   const mime=['video/webm;codecs=vp8,opus','video/webm'].find(m=>MediaRecorder.isTypeSupported(m));
   const rec=new MediaRecorder(out,{mimeType:mime,videoBitsPerSecond:500000,audioBitsPerSecond:96000});
   const chunks=[]; let size=0;
@@ -844,11 +875,16 @@ async function recStart(){
   rec.start(1000); socket.emit('rec_status',true);
   recInfo('🔴 Recording ('+(parts.join(' + ')||'no audio')+') — others can see that you are recording');
 }
-function recPause(){ if(!REC) return; REC.paused?REC.rec.resume():REC.rec.pause(); REC.paused=!REC.paused; recInfo(REC.paused?'⏸ Paused':'🔴 Recording…'); }
+function recPause(){ if(!REC) return;
+  if(REC.live){ REC.paused=!REC.paused; REC.screen.getVideoTracks().forEach(t=>t.enabled=!REC.paused); return recInfo(REC.paused?'⏸ Live paused (viewers see a black screen)':'🔴 LIVE'); }
+  REC.paused?REC.rec.resume():REC.rec.pause(); REC.paused=!REC.paused; recInfo(REC.paused?'⏸ Paused':'🔴 Recording…'); }
 function recMic(){ const t=REC&&REC.mic&&REC.mic.getAudioTracks()[0]; if(!t) return toast('Microphone was not enabled for this recording'); t.enabled=!t.enabled; toast(t.enabled?'Mic on':'Mic off'); }
 function recScreen(){ const t=REC&&REC.screen.getVideoTracks()[0]; if(!t) return toast('Start recording first'); t.enabled=!t.enabled; toast(t.enabled?'Screen on':'Screen off (black)'); }
 function recStop(){
   if(!REC) return; const r=REC; REC=null;
+  if(r.live){ r.screen.getTracks().forEach(t=>t.stop()); if(r.mic) r.mic.getTracks().forEach(t=>t.stop()); r.ctx.close();
+    Object.keys(LV.peers).forEach(n=>{ try{LV.peers[n].close();}catch(e){} delete LV.peers[n]; });
+    socket.emit('live_status',false); socket.emit('rec_status',false); recInfo('⏹ Live ended. Nothing was saved.'); return; }
   if(r.rec.state!=='inactive') r.rec.stop();
   r.screen.getTracks().forEach(t=>t.stop()); if(r.mic) r.mic.getTracks().forEach(t=>t.stop()); r.ctx.close();
   socket.emit('rec_status',false); recInfo('Saving…');
@@ -859,6 +895,56 @@ function recFinish(chunks){
   if(blob.size>MAX_FILE) return recInfo('Too big for the drive. Download it with the button.');
   const rd=new FileReader(); rd.onload=e=>{ socket.emit('upload_cloud_file',{name,type:'video/webm',url:e.target.result}); recInfo('✅ Saved to My Drive'); }; rd.readAsDataURL(blob);
 }
+
+// ================= LIVE SCREEN (streamer + viewers, WebRTC, nothing saved) =================
+const LV={peers:{},out:null,view:null,watching:'',pend:[]};
+// streamer side: a friend wants to watch -> send them our stream
+socket.on('live_viewer',async({name})=>{
+  if(!REC||!REC.live) return;
+  if(LV.peers[name]) try{LV.peers[name].close();}catch(e){}
+  const pc=LV.peers[name]=new RTCPeerConnection(rtcConfig);
+  LV.out.getTracks().forEach(t=>pc.addTrack(t,LV.out));
+  pc.onicecandidate=e=>{ if(e.candidate) socket.emit('live_signal',{to:name,data:{candidate:e.candidate}}); };
+  pc.onconnectionstatechange=()=>{ if(['failed','closed','disconnected'].includes(pc.connectionState)&&LV.peers[name]===pc){ delete LV.peers[name]; liveCount(); } else liveCount(); };
+  try{ await pc.setLocalDescription(await pc.createOffer()); socket.emit('live_signal',{to:name,data:{description:pc.localDescription}}); }catch(e){}
+});
+socket.on('live_viewer_left',({name})=>{ if(LV.peers[name]){ try{LV.peers[name].close();}catch(e){} delete LV.peers[name]; liveCount(); } });
+function liveCount(){ if(REC&&REC.live){ const n=Object.values(LV.peers).filter(p=>p.connectionState==='connected').length; recInfo((REC.paused?'⏸ Live paused':'🔴 LIVE')+' — '+n+' watching. Nothing is saved.'); } }
+// viewer side
+function liveWatch(e){
+  const name=decodeURIComponent(e);
+  if(name===me) return;
+  liveStopWatch(); LV.watching=name; LV.pend=[];
+  $('liveTitle').innerText='🔴 '+name+' is live'; $('liveInfo').innerText='Connecting...'; $('liveVid').srcObject=null;
+  openModal('liveModal'); socket.emit('live_watch',{name});
+}
+function liveStopWatch(){
+  if(LV.view){ try{LV.view.close();}catch(e){} LV.view=null; }
+  if(LV.watching){ socket.emit('live_unwatch'); LV.watching=''; }
+  const v=$('liveVid'); if(v) v.srcObject=null;
+}
+socket.on('live_signal',async({from,data})=>{
+  try{
+    if(LV.watching===from){ // we are the viewer
+      if(data.description){
+        if(LV.view) try{LV.view.close();}catch(e){}
+        const pc=LV.view=new RTCPeerConnection(rtcConfig);
+        pc.ontrack=e=>{ const v=$('liveVid'); if(v.srcObject!==e.streams[0]) v.srcObject=e.streams[0]; v.play().catch(()=>{}); $('liveInfo').innerText='Watching live — not recorded or saved'; };
+        pc.onicecandidate=ev=>{ if(ev.candidate) socket.emit('live_signal',{to:from,data:{candidate:ev.candidate}}); };
+        pc.onconnectionstatechange=()=>{ if(pc.connectionState==='failed') $('liveInfo').innerText='Connection failed. Close and try again.'; };
+        await pc.setRemoteDescription(data.description);
+        for(const cd of LV.pend.splice(0)) await pc.addIceCandidate(cd).catch(()=>{});
+        await pc.setLocalDescription(await pc.createAnswer());
+        socket.emit('live_signal',{to:from,data:{description:pc.localDescription}});
+      } else if(data.candidate){ if(LV.view&&LV.view.remoteDescription) await LV.view.addIceCandidate(data.candidate).catch(()=>{}); else LV.pend.push(data.candidate); }
+    } else if(LV.peers[from]){ // we are the streamer
+      const pc=LV.peers[from];
+      if(data.description) await pc.setRemoteDescription(data.description);
+      else if(data.candidate) await pc.addIceCandidate(data.candidate).catch(()=>{});
+    }
+  }catch(e){}
+});
+socket.on('live_ended',({name})=>{ if(LV.watching===name){ LV.watching=''; if(LV.view){ try{LV.view.close();}catch(e){} LV.view=null; } $('liveInfo').innerText=name+' ended the live.'; toast(name+' ended the live'); } });
 
 // ================= ADMIN + BAN =================
 let AD={users:[],bans:[],words:[],owner:false}, myRole='';
