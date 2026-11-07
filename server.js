@@ -78,6 +78,11 @@ process.on('SIGTERM', async () => { clearTimeout(metaTimer); await flushMeta(); 
 // ================= HELPERS =================
 const online = {};
 const recording = new Set();
+const live = new Set(); // people streaming their screen LIVE (nothing is saved)
+const liveViews = {}; // streamer -> Set of viewers
+const MAX_VIEWERS = 6;
+function stopLive(name) { if (live.delete(name)) { (liveViews[name] || new Set()).forEach(v => to(v, 'live_ended', { name })); delete liveViews[name]; A().emit('live_list', [...live]); } }
+function stopWatching(v) { Object.keys(liveViews).forEach(st => { if (liveViews[st].delete(v)) to(st, 'live_viewer_left', { name: v }); }); }
 const MAX_BYTES = 14e6;
 const A = () => io.to('authed');
 const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
@@ -214,6 +219,7 @@ function stats() { // throttled: many events in a row cause only one broadcast
     A().emit('user_list', Object.keys(online));
     A().emit('directory', directory());
     A().emit('rec_list', [...recording]);
+    A().emit('live_list', [...live]);
   }, 700);
 }
 function social(name) { to(name, 'social', { friends: arr(db.friends, name), requests: arr(db.requests, name) }); }
@@ -390,7 +396,7 @@ io.on('connection', (socket) => {
   };
   const dropMe = () => {
     if (me && online[me] === socket.id) {
-      leaveAllRooms(me); tttLeaveAll(me); chessLeaveAll(me); recording.delete(me);
+      leaveAllRooms(me); tttLeaveAll(me); chessLeaveAll(me); recording.delete(me); stopLive(me); stopWatching(me);
       delete online[me]; prof(me).lastSeen = Date.now();
     }
   };
@@ -514,6 +520,28 @@ io.on('connection', (socket) => {
     if (!me) return;
     on ? recording.add(me) : recording.delete(me);
     A().emit('rec_list', [...recording]);
+  });
+
+  // ---------- LIVE screen sharing (WebRTC, never saved on the server) ----------
+  socket.on('live_status', (on) => {
+    if (!me) return;
+    if (on) { live.add(me); liveViews[me] = liveViews[me] || new Set(); A().emit('live_list', [...live]); }
+    else stopLive(me);
+  });
+  socket.on('live_watch', ({ name } = {}) => {
+    const st = findUser(name);
+    if (!me || !st || st === me || !live.has(st) || isBlocked(me, st)) return socket.emit('toast', 'That live stream is not available');
+    stopWatching(me);
+    if (liveViews[st].size >= MAX_VIEWERS) return socket.emit('toast', 'This live is full (' + MAX_VIEWERS + ' viewers)');
+    liveViews[st].add(me);
+    to(st, 'live_viewer', { name: me });
+  });
+  socket.on('live_unwatch', () => { if (me) stopWatching(me); });
+  socket.on('live_signal', ({ to: target, data } = {}) => {
+    const t = findUser(target);
+    if (!me || !t) return;
+    const ok = (live.has(me) && liveViews[me] && liveViews[me].has(t)) || (live.has(t) && liveViews[t] && liveViews[t].has(me));
+    if (ok) to(t, 'live_signal', { from: me, data });
   });
 
   // ---------- Messages ----------
