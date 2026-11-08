@@ -1,0 +1,201 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>HELLFRONT</title>
+<style>
+*{box-sizing:border-box;touch-action:none;-webkit-tap-highlight-color:transparent}
+body{margin:0;overflow:hidden;background:#000;font:14px monospace;color:#fff;-webkit-user-select:none;user-select:none}
+#c{position:fixed;inset:0;width:100%;height:100%;image-rendering:pixelated}
+#menu{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;z-index:9;background:radial-gradient(#6a1010,#140404)}
+h1{font-size:44px;margin:0;color:#e22;text-shadow:3px 3px #000;letter-spacing:3px}
+button,input{font:inherit;padding:10px 14px;border:3px solid #000;background:#7a2a1a;color:#fff;min-width:210px;text-shadow:1px 1px #000}
+input{-webkit-user-select:text;user-select:text;touch-action:auto;background:#444}
+button:active{background:#c33}
+.row{display:flex;gap:8px;align-items:center}.row input[type=color]{min-width:0;width:44px;height:38px;padding:0}
+#skin{background:#0005;border:3px solid #000;image-rendering:pixelated}
+#tc{display:none}
+#tc button{position:fixed;min-width:0;width:64px;height:64px;border-radius:50%;opacity:.7;z-index:5;font-size:22px;padding:0}
+#bF{right:24px;bottom:50px;width:84px;height:84px}#bW{right:24px;bottom:150px}#bR{right:24px;top:20px}
+</style></head><body>
+<canvas id="c"></canvas>
+<div id="menu">
+ <h1>HELLFRONT</h1>
+ <canvas id="skin" width="32" height="48" style="width:96px;height:144px"></canvas>
+ <input id="nm" maxlength="16" placeholder="Player name" value="Marine">
+ <div class="row">Armor <input type="color" id="c1" value="#e0b090" title="skin"><input type="color" id="c2" value="#3a6ad0" title="shirt"><input type="color" id="c3" value="#2a2a60" title="pants"><input type="color" id="c4" value="#3a2210" title="hair"></div>
+ <button id="sp">Singleplayer (vs demons)</button>
+ <input id="srv" placeholder="Server URL (blank = this site)">
+ <button id="mp">Multiplayer deathmatch + AI</button>
+ <small>WASD move · Mouse aim · Click fire · 1/2 weapon · Shift run · R record</small>
+</div>
+<div id="tc"><button id="bF">🔥</button><button id="bW">🔫</button><button id="bR" class="rec">⏺</button></div>
+<script src="doom-sim.js"></script>
+<script>
+const $=id=>document.getElementById(id);try{const q=new URLSearchParams(location.search).get('name');if(q)$('nm').value=q.slice(0,16)}catch(e){}
+const coarse=matchMedia('(pointer:coarse)').matches,cv=$('c'),ctx=cv.getContext('2d');
+let sim=new DoomSim(),st=sim,net=null,myId='me',playing=false,NAME='Marine',SK,wasDead=0,last=0,lcd=0,flash=0,hurtT=0,bob=0,zb=[],grad,feed=[],AC,acc=0;
+const L={x:2,y:2,a:0,w:0},K={},joy={x:0,y:0},acts={f:0},PL=.66,R=(x,c,a,b,w,h)=>{x.fillStyle=c;x.fillRect(a,b,w,h)};
+// ---------- procedural art ----------
+function mkTex(c1,c2,brick){const t=document.createElement('canvas');t.width=t.height=64;const x=t.getContext('2d');R(x,c1,0,0,64,64);x.fillStyle=c2;
+ if(brick){for(let r=0;r<8;r++){x.fillRect(0,r*8,64,1);for(let k=0;k<4;k++)x.fillRect((k*16+(r%2)*8)%64,r*8,1,8)}}
+ else{x.fillRect(0,0,64,3);x.fillRect(0,61,64,3);x.fillRect(30,0,4,64);R(x,'#8cf',8,20,14,6);R(x,'#8cf',42,34,14,6)}return t}
+const TX=[mkTex('#7a3b2a','#2a1410',1),mkTex('#4a5560','#20262c',0)];
+function mkSpr(f){const t=document.createElement('canvas');t.width=32;t.height=48;f(t.getContext('2d'));return t}
+const SPR={
+ imp:mkSpr(x=>{R(x,'#6b3a1e',8,16,16,20);R(x,'#6b3a1e',10,4,12,12);R(x,'#3a1e0e',8,2,3,6);R(x,'#3a1e0e',21,2,3,6);R(x,'#f33',12,8,3,3);R(x,'#f33',17,8,3,3);R(x,'#6b3a1e',3,16,5,16);R(x,'#6b3a1e',24,16,5,16);R(x,'#4a2810',10,36,5,12);R(x,'#4a2810',17,36,5,12)}),
+ demon:mkSpr(x=>{R(x,'#d46a7a',4,14,24,22);R(x,'#e08a98',8,4,16,12);R(x,'#fff',9,14,3,5);R(x,'#fff',20,14,3,5);R(x,'#ff0',11,8,3,3);R(x,'#ff0',18,8,3,3);R(x,'#b04a5a',6,36,7,12);R(x,'#b04a5a',19,36,7,12)})
+},pc={};
+function pSpr(s){const k=JSON.stringify(s);return pc[k]||(pc[k]=mkSpr(x=>{R(x,s.pants,9,34,6,14);R(x,s.pants,17,34,6,14);R(x,s.shirt,8,16,16,19);R(x,s.skin,3,16,5,16);R(x,s.skin,24,16,5,16);R(x,s.skin,10,4,12,12);R(x,s.hair,10,2,12,4);R(x,'#222',13,9,2,2);R(x,'#222',18,9,2,2)}))}
+function skinNow(){return{skin:$('c1').value,shirt:$('c2').value,pants:$('c3').value,hair:$('c4').value}}
+function drawSkin(){const x=$('skin').getContext('2d');x.clearRect(0,0,32,48);x.drawImage(pSpr(skinNow()),0,0)}
+[1,2,3,4].forEach(i=>$('c'+i).oninput=drawSkin);drawSkin();
+// ---------- audio ----------
+function snd(f,d,type){if(!AC)return;const o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime;o.type=type||'square';o.frequency.setValueAtTime(f,t);o.frequency.exponentialRampToValueAtTime(30,t+d);g.gain.setValueAtTime(.12,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(AC.destination);o.start();o.stop(t+d)}
+// ---------- recording ----------
+let rec,rch=[];
+function toggleRec(){
+ if(rec&&rec.state=='recording'){rec.stop();return}
+ const mt=['video/mp4','video/webm;codecs=vp9','video/webm'].find(t=>window.MediaRecorder&&MediaRecorder.isTypeSupported(t));
+ if(!mt||!cv.captureStream){alert("Recording isn't supported in this browser. Use your phone's screen recorder.");return}
+ rec=new MediaRecorder(cv.captureStream(30),{mimeType:mt,videoBitsPerSecond:4e6});
+ rec.ondataavailable=e=>e.data.size&&rch.push(e.data);
+ rec.onstop=()=>{const b=new Blob(rch,{type:mt.split(';')[0]}),a=document.createElement('a');rch=[];a.href=URL.createObjectURL(b);a.download='hellfront.'+(mt.includes('mp4')?'mp4':'webm');a.click();document.querySelectorAll('.rec').forEach(e=>e.textContent='⏺')};
+ rec.start(1000);document.querySelectorAll('.rec').forEach(e=>e.textContent='⏹');
+}
+// ---------- events / network ----------
+const nm=id=>(st.players[id]||{}).name||(String(id)[0]=='b'?'Demon':'?');
+function proc(ev){
+ for(const e of ev){
+  if(e.t=='h'&&e.id===myId){hurtT=.25;snd(90,.2,'sawtooth')}
+  else if(e.t=='k')feed.push({s:(e.by?nm(e.by):'Hell')+' ▸ '+nm(e.v),t:4});
+  else if(e.t=='f'&&e.id!==myId)snd(140,.1,'square');
+ }
+}
+function onSnap(d){
+ const P={};
+ for(const p of d.p){const o=st.players[p.id],own=p.id===myId;P[p.id]=o?Object.assign(o,p,own?{}:{x:o.x,y:o.y,tx:p.x,ty:p.y}):Object.assign(p,{tx:p.x,ty:p.y})}
+ st.players=P;
+ st.bots=d.b.map(b=>{const o=st.bots.find(q=>q.id===b.id);return o?Object.assign(o,b,{x:o.x,y:o.y,tx:b.x,ty:b.y}):Object.assign(b,{tx:b.x,ty:b.y})});
+ proc(d.e);
+}
+function connect(url){
+ const go=()=>{
+  net=io(url+'/doom');
+  net.on('connect',()=>net.emit('join',{name:NAME,skin:SK}));
+  net.on('init',d=>{myId=d.id;L.x=d.me.x;L.y=d.me.y;L.a=d.me.a});
+  net.on('s',onSnap);
+ };
+ if(typeof io!=='undefined')return go();
+ const s=document.createElement('script');s.src=url+'/socket.io/socket.io.js';s.onload=go;
+ s.onerror=()=>{alert('Cannot reach server – starting singleplayer');startSP()};document.head.appendChild(s);
+}
+// ---------- start ----------
+function size(){cv.height=200;cv.width=Math.max(200,Math.min(480,Math.round(200*innerWidth/innerHeight)));ctx.imageSmoothingEnabled=false;zb=new Array(cv.width);grad=ctx.createLinearGradient(0,0,0,200);[[0,'#120606'],[.5,'#4a2a2a'],[.5,'#1c1c1c'],[1,'#585858']].forEach(s=>grad.addColorStop(...s))}
+addEventListener('resize',()=>playing&&size());
+function begin(){
+ NAME=($('nm').value.trim()||'Marine').slice(0,16);SK=skinNow();
+ try{AC=new(window.AudioContext||window.webkitAudioContext)()}catch(e){}
+ $('menu').style.display='none';if(coarse)$('tc').style.display='block';
+ size();playing=true;last=performance.now();requestAnimationFrame(loop);
+}
+function startSP(){
+ if(net){net.disconnect();net=null}
+ sim=new DoomSim();sim.initBots();sim.addPlayer('me',NAME,SK);st=sim;myId='me';
+ const m=sim.players.me;L.x=m.x;L.y=m.y;L.a=m.a;
+ if(!playing)begin();
+}
+$('sp').onclick=()=>{begin();startSP()};
+$('mp').onclick=()=>{begin();st={players:{},bots:[]};myId=null;connect($('srv').value.trim().replace(/\/$/,''))};
+// ---------- input ----------
+addEventListener('keydown',e=>{if(!playing||e.target.tagName=='INPUT')return;K[e.code]=1;if(e.code=='Digit1')L.w=0;if(e.code=='Digit2')L.w=1;if(e.code=='KeyR')toggleRec()});
+addEventListener('keyup',e=>K[e.code]=0);
+addEventListener('mousemove',e=>{if(document.pointerLockElement)L.a+=e.movementX*.0025});
+addEventListener('mousedown',e=>{if(document.pointerLockElement&&e.button==0)acts.f=1});
+addEventListener('mouseup',()=>acts.f=0);
+addEventListener('contextmenu',e=>e.preventDefault());
+cv.onclick=()=>{if(playing&&!coarse&&!document.pointerLockElement)cv.requestPointerLock()};
+function bind(id,fn,up){const b=$(id);b.onpointerdown=e=>{e.preventDefault();fn()};if(up)b.onpointerup=b.onpointercancel=b.onpointerleave=up}
+bind('bF',()=>acts.f=1,()=>acts.f=0);bind('bW',()=>L.w^=1);bind('bR',toggleRec);
+let jt=null,jo,lt=null,lp;
+document.addEventListener('touchstart',e=>{if(!playing)return;for(const t of e.changedTouches){if(t.target.closest('button'))continue;if(t.clientX<innerWidth/2&&jt==null){jt=t.identifier;jo=[t.clientX,t.clientY]}else if(lt==null){lt=t.identifier;lp=t.clientX}}});
+document.addEventListener('touchmove',e=>{for(const t of e.changedTouches){if(t.identifier==jt){joy.x=Math.max(-1,Math.min(1,(t.clientX-jo[0])/50));joy.y=Math.max(-1,Math.min(1,(t.clientY-jo[1])/50))}if(t.identifier==lt){L.a+=(t.clientX-lp)*.007;lp=t.clientX}}});
+const tend=e=>{for(const t of e.changedTouches){if(t.identifier==jt){jt=null;joy.x=joy.y=0}if(t.identifier==lt)lt=null}};
+document.addEventListener('touchend',tend);document.addEventListener('touchcancel',tend);
+// ---------- loop ----------
+function loop(t){
+ requestAnimationFrame(loop);
+ const dt=Math.min(.05,(t-last)/1000);last=t;
+ if(!net){sim.tick(dt);proc(sim.ev);sim.ev=[]}
+ else{for(const e of Object.values(st.players).concat(st.bots))if(e.id!==myId&&e.tx!==undefined){e.x+=(e.tx-e.x)*.35;e.y+=(e.ty-e.y)*.35}}
+ const m=st.players[myId];
+ feed.forEach(f=>f.t-=dt);feed=feed.filter(f=>f.t>0);hurtT-=dt;flash-=dt;lcd-=dt;
+ if(m){
+  if(wasDead&&!m.dead){L.x=m.x;L.y=m.y;L.a=m.a}wasDead=m.dead;
+  if(!m.dead){
+   const fw=(K.KeyW?1:0)-(K.KeyS?1:0)-joy.y,sd=(K.KeyD?1:0)-(K.KeyA?1:0)+joy.x,l=Math.max(1,Math.hypot(fw,sd)),sp=(K.ShiftLeft?5:3.4)*dt/l,c=Math.cos(L.a),s=Math.sin(L.a);
+   const nx=L.x+(c*fw-s*sd)*sp,ny=L.y+(s*fw+c*sd)*sp;
+   if(sim.free(nx,L.y,.2))L.x=nx;if(sim.free(L.x,ny,.2))L.y=ny;
+   if(fw||sd)bob+=dt*9;
+   if(!net){m.x=L.x;m.y=L.y;m.a=L.a;m.wep=L.w}
+   else if((acc+=dt)>.05){acc=0;net.emit('p',{x:L.x,y:L.y,a:L.a,w:L.w})}
+   if(acts.f&&lcd<=0&&!(L.w&&m.sh<=0)){
+    lcd=L.w?.9:.35;flash=.1;snd(L.w?90:220,.15);
+    if(net){net.emit('p',{x:L.x,y:L.y,a:L.a,w:L.w});net.emit('fire')}else sim.fire(myId);
+   }
+  }
+ }
+ render(m);
+}
+// ---------- render ----------
+function render(m){
+ const W=cv.width,Hh=cv.height,dx=Math.cos(L.a),dy=Math.sin(L.a),px=-dy*PL,py=dx*PL;
+ ctx.fillStyle=grad;ctx.fillRect(0,0,W,Hh);
+ for(let col=0;col<W;col++){
+  const cx=2*col/W-1,rx=dx+px*cx,ry=dy+py*cx,ddx=Math.abs(1/rx),ddy=Math.abs(1/ry);
+  let mx=Math.floor(L.x),my=Math.floor(L.y),sx,sy,sdx,sdy,side=0,n=0;
+  if(rx<0){sx=-1;sdx=(L.x-mx)*ddx}else{sx=1;sdx=(mx+1-L.x)*ddx}
+  if(ry<0){sy=-1;sdy=(L.y-my)*ddy}else{sy=1;sdy=(my+1-L.y)*ddy}
+  while(n++<48){if(sdx<sdy){sdx+=ddx;mx+=sx;side=0}else{sdy+=ddy;my+=sy;side=1}if(sim.solid(mx+.5,my+.5))break}
+  const dist=Math.max(.05,side?sdy-ddy:sdx-ddx),lh=Math.min(Hh*5,Hh/dist|0),top=(Hh-lh)/2|0;
+  let wx=side?L.x+dist*rx:L.y+dist*ry;wx-=Math.floor(wx);
+  ctx.drawImage(TX[(mx+my)&1],(wx*64)|0,0,1,64,col,top,1,lh);
+  ctx.fillStyle='rgba(0,0,0,'+Math.min(.85,dist/15+(side?.2:0))+')';ctx.fillRect(col,top,1,lh);
+  zb[col]=dist;
+ }
+ const es=[];
+ for(const p of Object.values(st.players))if(p.id!==myId&&!p.dead)es.push({e:p,s:pSpr(p.skin||SK),n:p.name});
+ for(const b of st.bots)if(b.hp>0)es.push({e:b,s:SPR[b.type]});
+ const inv=1/(px*dy-dx*py);
+ for(const o of es){const sx=o.e.x-L.x,sy=o.e.y-L.y;o.tx=inv*(dy*sx-dx*sy);o.ty=inv*(-py*sx+px*sy)}
+ es.filter(o=>o.ty>.15).sort((a,b)=>b.ty-a.ty).forEach(o=>{
+  const sc=(W/2*(1+o.tx/o.ty))|0,sh=(Hh/o.ty*.9)|0,sw=(sh*.67)|0,x0=sc-(sw>>1),y0=((Hh-sh)/2+sh*.05)|0;
+  for(let s=Math.max(0,x0);s<Math.min(W,x0+sw);s++){
+   if(o.ty>=zb[s])continue;
+   ctx.drawImage(o.s,((s-x0)/sw*32)|0,0,1,48,s,y0,1,sh);
+   ctx.fillStyle='rgba(0,0,0,'+Math.min(.8,o.ty/15)+')';ctx.fillRect(s,y0,1,sh);
+  }
+  if(o.n&&sc>=0&&sc<W&&o.ty<zb[sc]){ctx.font='8px monospace';ctx.textAlign='center';ctx.fillStyle='#fff';ctx.fillText(o.n,sc,y0-2)}
+ });
+ // weapon
+ const bx=W/2+Math.sin(bob)*4,by=Math.abs(Math.cos(bob))*3+(flash>0?6:0);
+ if(m&&!m.dead){
+  if(L.w){R(ctx,'#333',bx-4,Hh-52+by,8,52);R(ctx,'#666',bx-2,Hh-52+by,4,40);R(ctx,'#7a4a1a',bx-12,Hh-22+by,24,22)}
+  else{R(ctx,'#555',bx-4,Hh-40+by,8,40);R(ctx,'#888',bx-2,Hh-40+by,4,30);R(ctx,'#c9a27a',bx-8,Hh-14+by,16,14)}
+  if(flash>0){ctx.fillStyle='#fd4';ctx.beginPath();ctx.arc(bx,Hh-(L.w?58:46)+by,9,0,7);ctx.fill()}
+ }
+ if(hurtT>0){ctx.fillStyle='rgba(255,0,0,'+hurtT*2+')';ctx.fillRect(0,0,W,Hh)}
+ // HUD
+ ctx.textAlign='left';ctx.font='bold 14px monospace';
+ ctx.fillStyle='#fff';ctx.fillRect(W/2-1,Hh/2-4,2,8);ctx.fillRect(W/2-4,Hh/2-1,8,2);
+ if(m){
+  ctx.fillStyle='#000a';ctx.fillRect(0,Hh-18,W,18);
+  ctx.fillStyle='#f55';ctx.fillText('HP '+Math.max(0,m.hp),6,Hh-5);
+  ctx.fillStyle='#fd4';ctx.fillText((L.w?'SHOTGUN '+m.sh:'PISTOL ∞'),70,Hh-5);
+  ctx.fillStyle='#fff';ctx.fillText('FRAGS '+m.frags+'  DEATHS '+m.deaths,W-150,Hh-5);
+  if(m.dead){ctx.fillStyle='#a00a';ctx.fillRect(0,0,W,Hh);ctx.fillStyle='#fff';ctx.textAlign='center';ctx.fillText('YOU DIED – respawning…',W/2,Hh/2)}
+ }else{ctx.fillStyle='#fff';ctx.textAlign='center';ctx.fillText('Connecting…',W/2,Hh/2)}
+ ctx.font='9px monospace';ctx.textAlign='right';
+ Object.values(st.players).sort((a,b)=>b.frags-a.frags).slice(0,5).forEach((p,i)=>{ctx.fillStyle=p.id===myId?'#fd4':'#fff';ctx.fillText(p.name+' '+p.frags,W-4,10+i*10)});
+ ctx.textAlign='left';feed.slice(-4).forEach((f,i)=>{ctx.fillStyle='#fff';ctx.fillText(f.s,4,10+i*10)});
+ if(!coarse&&!document.pointerLockElement){ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='12px monospace';ctx.fillText('CLICK TO CAPTURE MOUSE',W/2,Hh/2+30)}
+}
+</script></body></html>
