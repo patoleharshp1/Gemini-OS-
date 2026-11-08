@@ -10,6 +10,10 @@ let webpush = null; try { webpush = require('web-push'); } catch (e) {}
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { maxHttpBufferSize: 5e7, cors: { origin: '*' } });
+// ---- Doom (multiplayer + AI) and Geometry Dash pages ----
+require('./doom-server')(io);
+['doom', 'gd'].forEach(n => app.get('/' + n, (req, res) => res.sendFile(path.join(__dirname, n + '.html'))));
+app.get('/doom-sim.js', (req, res) => { res.set('Content-Type', 'application/javascript'); res.sendFile(path.join(__dirname, 'doom-sim.js')); });
 
 // ================= STORAGE (MongoDB Atlas, falls back to db.json) =================
 const DB_FILE = path.join(process.env.DATA_DIR || __dirname, 'db.json');
