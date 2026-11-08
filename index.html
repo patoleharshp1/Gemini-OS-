@@ -351,6 +351,8 @@ h4{color:var(--hi);margin:14px 0 8px}
       <button class="btn gray" id="gt-chess" onclick="gameTab('chess')">♟ Chess</button>
       <button class="btn gray" id="gt-arena" onclick="gameTab('arena')">🎯 Arena</button>
       <button class="btn gray" id="gt-bc" onclick="gameTab('bc')">⛏ BlockCraft</button>
+      <button class="btn gray" id="gt-doom" onclick="gameTab('doom')">👹 Doom</button>
+      <button class="btn gray" id="gt-gd" onclick="gameTab('gd')">🔷 Geometry Dash</button>
     </div>
     <div id="webGameWrap">
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
@@ -411,6 +413,8 @@ h4{color:var(--hi);margin:14px 0 8px}
         </div>
       </div>
     </div>
+    <div id="doomWrap" style="display:none"><div style="display:flex;gap:6px;margin-bottom:8px"><button class="btn sm gray" onclick="fullFrame('doomFrame')">⛶ Fullscreen</button></div><iframe id="doomFrame" allow="fullscreen; autoplay; gamepad; pointer-lock" style="width:100%;height:calc(100vh - 230px);min-height:360px;border:1px solid var(--bd);border-radius:12px;background:#000"></iframe></div>
+    <div id="gdWrap" style="display:none"><div style="display:flex;gap:6px;margin-bottom:8px"><button class="btn sm gray" onclick="fullFrame('gdFrame')">⛶ Fullscreen</button></div><iframe id="gdFrame" allow="fullscreen; autoplay; gamepad; pointer-lock" style="width:100%;height:calc(100vh - 230px);min-height:360px;border:1px solid var(--bd);border-radius:12px;background:#000"></iframe></div>
     <div id="bcWrap" style="display:none">
       <div class="gbar">
         <button class="btn green" onclick="bcStart()">▶ Play / Resume</button>
@@ -1264,20 +1268,23 @@ const WEB_GAMES = {
 };
 const G = { tab: 'dino', idx: {} };
 function openGames(){ openModal('gamesModal'); gameTab(G.tab); }
-function stopGame(){ $('gameFrame').src = 'about:blank'; arStop(); bcStop(); }
+function stopGame(){ $('gameFrame').src = 'about:blank'; $('doomFrame').src = 'about:blank'; $('gdFrame').src = 'about:blank'; arStop(); bcStop(); }
+function fullFrame(id){ const f = $(id); (f.requestFullscreen || f.webkitRequestFullscreen || function(){ toast('Fullscreen not supported'); }).call(f); }
 function gameUrl(){ const g = WEB_GAMES[G.tab]; return g.urls[(G.idx[G.tab] || 0) % g.urls.length]; }
 function loadGame(){ $('gameFrame').src = gameUrl(); $('gameSite').innerText = new URL(gameUrl()).host; }
 function gameTab(t){
   G.tab = t;
   arStop(); bcStop();
-  ['dino','flappy','xo','chess','arena','bc'].forEach(k => $('gt-'+k).className = 'btn' + (k === t ? '' : ' gray'));
+  ['dino','flappy','xo','chess','arena','bc','doom','gd'].forEach(k => $('gt-'+k).className = 'btn' + (k === t ? '' : ' gray'));
   const web = t === 'dino' || t === 'flappy';
   $('webGameWrap').style.display = web ? 'block' : 'none';
   $('xoWrap').style.display = t === 'xo' ? 'block' : 'none';
   $('chessWrap').style.display = t === 'chess' ? 'block' : 'none';
   $('arenaWrap').style.display = t === 'arena' ? 'block' : 'none';
   $('bcWrap').style.display = t === 'bc' ? 'block' : 'none';
-  if(web) loadGame(); else { stopGame(); if(t === 'xo'){ fillOpp(); showModeUI(); renderXO(); } else if(t === 'chess'){ fillOpp(); chShowMode(); chRender(); } else if(t === 'arena') arMode(AR.mode); }
+  $('doomWrap').style.display = t === 'doom' ? 'block' : 'none';
+  $('gdWrap').style.display = t === 'gd' ? 'block' : 'none';
+  if(web) loadGame(); else { stopGame(); if(t === 'xo'){ fillOpp(); showModeUI(); renderXO(); } else if(t === 'chess'){ fillOpp(); chShowMode(); chRender(); } else if(t === 'arena') arMode(AR.mode); else if(t === 'doom') $('doomFrame').src = '/doom?name=' + encodeURIComponent(me || 'Marine'); else if(t === 'gd') $('gdFrame').src = '/gd'; }
 }
 function nextSite(){ G.idx[G.tab] = (G.idx[G.tab] || 0) + 1; loadGame(); }
 function openGameTab(){ window.open(gameUrl(), '_blank'); }
