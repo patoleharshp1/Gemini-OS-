@@ -78,6 +78,9 @@ process.on('SIGTERM', async () => { clearTimeout(metaTimer); await flushMeta(); 
 // ================= HELPERS =================
 const online = {};
 const recording = new Set();
+// ---- Arena multiplayer rooms (relay only; clients simulate) ----
+const arenaRooms = {}, arenaOf = {};
+function arenaLeave(name) { const c = arenaOf[name]; if (!c) return; delete arenaOf[name]; const set = arenaRooms[c]; if (!set) return; set.delete(name); if (!set.size) delete arenaRooms[c]; else set.forEach(n => to(n, 'arena_players', [...set])); }
 const live = new Set(); // people streaming their screen LIVE (nothing is saved)
 const liveViews = {}; // streamer -> Set of viewers
 const MAX_VIEWERS = 6;
@@ -418,7 +421,7 @@ io.on('connection', (socket) => {
   };
   const dropMe = () => {
     if (me && online[me] === socket.id) {
-      leaveAllRooms(me); tttLeaveAll(me); chessLeaveAll(me); recording.delete(me); stopLive(me); stopWatching(me);
+      leaveAllRooms(me); tttLeaveAll(me); chessLeaveAll(me); recording.delete(me); stopLive(me); stopWatching(me); arenaLeave(me);
       delete online[me]; prof(me).lastSeen = Date.now();
     }
   };
@@ -542,6 +545,31 @@ io.on('connection', (socket) => {
     if (!me) return;
     on ? recording.add(me) : recording.delete(me);
     A().emit('rec_list', [...recording]);
+  });
+
+  // ---------- Arena (2D shooter) ----------
+  const num = v => (Number.isFinite(+v) ? +v : 0);
+  socket.on('arena_join', ({ code } = {}) => {
+    if (!me) return;
+    code = String(code || 'main').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 16) || 'main';
+    arenaLeave(me);
+    const set = arenaRooms[code] = arenaRooms[code] || new Set();
+    if (set.size >= 8) return socket.emit('toast', 'That room is full (8 players)');
+    set.add(me); arenaOf[me] = code;
+    set.forEach(n => to(n, 'arena_players', [...set]));
+  });
+  socket.on('arena_leave', () => { if (me) arenaLeave(me); });
+  socket.on('a_state', (d = {}) => {
+    const c = arenaOf[me]; if (!me || !c || !arenaRooms[c]) return;
+    const o = { from: me, x: num(d.x), y: num(d.y), a: num(d.a), hp: Math.max(0, Math.min(200, num(d.hp))), d: d.d ? 1 : 0 };
+    arenaRooms[c].forEach(n => { if (n !== me) to(n, 'a_state', o); });
+  });
+  socket.on('a_event', (d = {}) => {
+    const c = arenaOf[me]; if (!me || !c || !arenaRooms[c]) return;
+    if (!['shot', 'hit', 'kill'].includes(d.t)) return;
+    const o = { t: d.t, from: me, x: num(d.x), y: num(d.y), a: num(d.a), to: String(d.to || '').slice(0, 32), dmg: Math.max(0, Math.min(40, num(d.dmg))), victim: String(d.victim || '').slice(0, 32), by: String(d.by || '').slice(0, 32) };
+    if (d.t === 'kill') o.by = o.by === me ? me : o.by; // victim reports who fragged them
+    arenaRooms[c].forEach(n => { if (n !== me) to(n, 'a_event', o); });
   });
 
   // ---------- LIVE screen sharing (WebRTC, never saved on the server) ----------
