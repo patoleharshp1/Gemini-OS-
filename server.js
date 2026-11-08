@@ -10,10 +10,6 @@ let webpush = null; try { webpush = require('web-push'); } catch (e) {}
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { maxHttpBufferSize: 5e7, cors: { origin: '*' } });
-// ---- Doom (multiplayer + AI) and Geometry Dash pages ----
-require('./doom-server')(io);
-['doom', 'gd'].forEach(n => app.get('/' + n, (req, res) => res.sendFile(path.join(__dirname, n + '.html'))));
-app.get('/doom-sim.js', (req, res) => { res.set('Content-Type', 'application/javascript'); res.sendFile(path.join(__dirname, 'doom-sim.js')); });
 
 // ================= STORAGE (MongoDB Atlas, falls back to db.json) =================
 const DB_FILE = path.join(process.env.DATA_DIR || __dirname, 'db.json');
@@ -82,6 +78,12 @@ process.on('SIGTERM', async () => { clearTimeout(metaTimer); await flushMeta(); 
 // ================= HELPERS =================
 const online = {};
 const recording = new Set();
+// ---- BlockCraft rooms (shared world: relay + edit memory while someone is inside) ----
+const bcRooms = {}, bcOf = {};
+function bcLeave(name) { const c = bcOf[name]; if (!c) return; delete bcOf[name]; const r = bcRooms[c]; if (!r) return; r.players.delete(name); if (!r.players.size) delete bcRooms[c]; else r.players.forEach(n => to(n, 'bc_players', [...r.players])); }
+// ---- Doom rooms ----
+const doomRooms = {}, doomOf = {};
+function doomLeave(name) { const c = doomOf[name]; if (!c) return; delete doomOf[name]; const s = doomRooms[c]; if (!s) return; s.delete(name); if (!s.size) delete doomRooms[c]; else s.forEach(n => to(n, 'doom_players', [...s])); }
 // ---- Arena multiplayer rooms (relay only; clients simulate) ----
 const arenaRooms = {}, arenaOf = {};
 function arenaLeave(name) { const c = arenaOf[name]; if (!c) return; delete arenaOf[name]; const set = arenaRooms[c]; if (!set) return; set.delete(name); if (!set.size) delete arenaRooms[c]; else set.forEach(n => to(n, 'arena_players', [...set])); }
@@ -425,7 +427,7 @@ io.on('connection', (socket) => {
   };
   const dropMe = () => {
     if (me && online[me] === socket.id) {
-      leaveAllRooms(me); tttLeaveAll(me); chessLeaveAll(me); recording.delete(me); stopLive(me); stopWatching(me); arenaLeave(me);
+      leaveAllRooms(me); tttLeaveAll(me); chessLeaveAll(me); recording.delete(me); stopLive(me); stopWatching(me); arenaLeave(me); bcLeave(me); doomLeave(me);
       delete online[me]; prof(me).lastSeen = Date.now();
     }
   };
@@ -551,6 +553,55 @@ io.on('connection', (socket) => {
     A().emit('rec_list', [...recording]);
   });
 
+  // ---------- BlockCraft multiplayer ----------
+  const cleanCode = c => String(c || 'main').toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 16) || 'main';
+  const isCol = v => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
+  socket.on('bc_join', ({ code, mode } = {}) => {
+    if (!me) return; code = cleanCode(code); bcLeave(me);
+    let r = bcRooms[code];
+    if (!r) r = bcRooms[code] = { seed: 1 + Math.floor(Math.random() * 999999), mode: mode === 'creative' ? 'creative' : 'survival', edits: new Map(), players: new Set() };
+    if (r.players.size >= 8) return socket.emit('toast', 'That room is full (8 players)');
+    r.players.add(me); bcOf[me] = code;
+    const edits = []; r.edits.forEach((id, k) => { const p = k.split(':').map(Number); edits.push([p[0], p[1], p[2], p[3], id]); });
+    socket.emit('bc_world', { seed: r.seed, mode: r.mode, room: code, edits });
+    r.players.forEach(n => to(n, 'bc_players', [...r.players]));
+  });
+  socket.on('bc_leave', () => { if (me) bcLeave(me); });
+  socket.on('bc_p', (d = {}) => {
+    const c = bcOf[me], r = c && bcRooms[c]; if (!r) return;
+    const sk = d.skin && typeof d.skin === 'object' ? d.skin : {};
+    const o = { from: me, x: num(d.x), y: num(d.y), z: num(d.z), yaw: num(d.yaw), pitch: num(d.pitch), dim: Math.max(0, Math.min(2, num(d.dim) | 0)), hp: num(d.hp),
+      skin: { hair: isCol(sk.hair) ? sk.hair : '#3b2a1a', skin: isCol(sk.skin) ? sk.skin : '#e0ac82', shirt: isCol(sk.shirt) ? sk.shirt : '#00a8a8', pants: isCol(sk.pants) ? sk.pants : '#3a3aa8' } };
+    r.players.forEach(n => { if (n !== me) to(n, 'bc_p', o); });
+  });
+  socket.on('bc_edit', (d = {}) => {
+    const c = bcOf[me], r = c && bcRooms[c]; if (!r) return;
+    const e = { d: Math.max(0, Math.min(2, num(d.d) | 0)), x: num(d.x) | 0, y: Math.max(0, Math.min(63, num(d.y) | 0)), z: num(d.z) | 0, id: Math.max(0, Math.min(21, num(d.id) | 0)) };
+    if (r.edits.size < 80000) r.edits.set(e.d + ':' + e.x + ':' + e.y + ':' + e.z, e.id);
+    r.players.forEach(n => { if (n !== me) to(n, 'bc_edit', e); });
+  });
+  socket.on('bc_hit', (d = {}) => {
+    const c = bcOf[me], r = c && bcRooms[c]; if (!r || !r.players.has(String(d.to))) return;
+    to(String(d.to), 'bc_hit', { from: me, dmg: Math.max(0, Math.min(8, num(d.dmg))) });
+  });
+  // ---------- Doom multiplayer ----------
+  socket.on('doom_join', ({ code } = {}) => {
+    if (!me) return; code = cleanCode(code); doomLeave(me);
+    const s = doomRooms[code] = doomRooms[code] || new Set();
+    if (s.size >= 8) return socket.emit('toast', 'That room is full (8 players)');
+    s.add(me); doomOf[me] = code; s.forEach(n => to(n, 'doom_players', [...s]));
+  });
+  socket.on('doom_leave', () => { if (me) doomLeave(me); });
+  socket.on('d_state', (d = {}) => {
+    const c = doomOf[me], s = c && doomRooms[c]; if (!s) return;
+    const o = { from: me, x: num(d.x), y: num(d.y), a: num(d.a), hp: Math.max(0, Math.min(200, num(d.hp))), d: d.d ? 1 : 0, w: d.w ? 1 : 0 };
+    s.forEach(n => { if (n !== me) to(n, 'd_state', o); });
+  });
+  socket.on('d_event', (d = {}) => {
+    const c = doomOf[me], s = c && doomRooms[c]; if (!s || !['shot', 'hit', 'kill'].includes(d.t)) return;
+    const o = { t: d.t, from: me, x: num(d.x), y: num(d.y), a: num(d.a), to: String(d.to || '').slice(0, 32), dmg: Math.max(0, Math.min(60, num(d.dmg))), victim: String(d.victim || '').slice(0, 32), by: String(d.by || '').slice(0, 32), w: d.w ? 1 : 0 };
+    s.forEach(n => { if (n !== me) to(n, 'd_event', o); });
+  });
   // ---------- Arena (2D shooter) ----------
   const num = v => (Number.isFinite(+v) ? +v : 0);
   socket.on('arena_join', ({ code } = {}) => {
