@@ -149,6 +149,10 @@ h4{color:var(--hi);margin:14px 0 8px}
 .sq.tgt::after{content:'';width:28%;height:28%;border-radius:50%;background:rgba(0,0,0,.3);position:absolute}.sq.tgt.cap::after{width:86%;height:86%;background:transparent;border:4px solid rgba(0,0,0,.35)}
 .pw{color:#fff;text-shadow:0 0 2px #000,0 0 2px #000,0 0 3px #000}.pb{color:#161616;text-shadow:0 0 1px rgba(255,255,255,.4)}
 .rtag{font-size:10px;font-weight:bold;padding:1px 6px;border-radius:8px;margin-left:4px;vertical-align:middle}.rtag.owner{background:#ffb300;color:#000}.rtag.admin{background:#1a73e8;color:#fff}
+/* NEW: shop ranks, rainbow name, shop cards */
+.rtag.rank_vip{background:#2a2200;color:#ffd54f;border:1px solid #ffd54f}.rtag.rank_pro{background:#00263a;color:#4fc3f7;border:1px solid #4fc3f7}.rtag.rank_elite{background:#3a1200;color:#ff8a50;border:1px solid #ff8a50}.rtag.rank_legend{background:linear-gradient(90deg,#7b1fa2,#c2185b);color:#fff;border:1px solid #f48fb1}
+.rainbow{background:linear-gradient(90deg,#ff5252,#ffa726,#ffee58,#66bb6a,#42a5f5,#ab47bc);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;font-weight:bold}
+.shopitem{display:flex;justify-content:space-between;align-items:center;gap:8px;background:#1a0808;border:1px solid var(--bd);padding:10px;border-radius:10px;margin-bottom:6px}
 #inviteBar{display:none;position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:950;background:#1b3d22;border:1px solid #4caf50;padding:10px 14px;border-radius:12px;gap:10px;align-items:center;font-size:13px;box-shadow:0 8px 30px #000}
 #toast{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:#5c1818;border:1px solid var(--hi);padding:10px 16px;border-radius:10px;z-index:3000;display:none;font-size:13px;max-width:90%;text-align:center}
 .avs{width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle}
@@ -263,6 +267,7 @@ h4{color:var(--hi);margin:14px 0 8px}
       <div class="tile-app" onclick="openModal('phoneApp')"><i>📞</i>Calls</div>
       <div class="tile-app" onclick="openModal('usersModal')"><i>👥</i>Friends</div>
       <div class="tile-app" onclick="openGames()"><i>🎮</i>Games</div>
+      <div class="tile-app" onclick="openShop()"><i>🛒</i>Shop</div>
       <div class="tile-app" onclick="openModal('storageApp')"><i>☁️</i>Drive</div>
       <div class="tile-app" onclick="openModal('recModal')"><i>🎬</i>Recorder</div>
       <div class="tile-app" onclick="openBrowser()"><i>🌐</i>Browser</div>
@@ -368,6 +373,7 @@ h4{color:var(--hi);margin:14px 0 8px}
       <button class="btn gray" id="gt-doom" onclick="gameTab('doom')">👹 Doom</button>
       <button class="btn gray" id="gt-gd" onclick="gameTab('gd')">🔷 Dash</button>
       <button class="btn" style="background:#b8860b" onclick="openBoard()">🏆 Leaderboard</button>
+      <button class="btn" style="background:#2e7d32" onclick="openShop()">🛒 Shop</button>
     </div>
     <div id="webGameWrap">
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
@@ -623,6 +629,21 @@ h4{color:var(--hi);margin:14px 0 8px}
   </div>
 </div>
 
+<!-- NEW: Shop -->
+<div id="shopModal" class="modal">
+  <div class="modal-header"><h3>🛒 Shop <span id="shopCoins" style="font-size:12px;color:#ffd54f;margin-left:8px"></span></h3><button class="close-btn" onclick="closeModal('shopModal')">X</button></div>
+  <div class="modal-body">
+    <div class="gtabs">
+      <button class="btn sm" id="sh-rank" onclick="shopTab('rank')">🏅 Ranks</button>
+      <button class="btn sm gray" id="sh-color" onclick="shopTab('color')">🎨 Name colours</button>
+      <button class="btn sm gray" id="sh-badge" onclick="shopTab('badge')">🎖 Badges</button>
+    </div>
+    <small style="color:#888;display:block;margin:6px 0 10px">Earn 🪙 coins by winning games. 👑 Owner and 🛡 Admin tags cannot be bought.</small>
+    <div id="shopList"></div>
+    <div style="text-align:center;margin-top:10px"><button class="btn gray" onclick="openGames()">🎮 Back to games</button></div>
+  </div>
+</div>
+
 <script src="/socket.io/socket.io.js"></script>
 <script>
 // Leave '' when served by Render. (Bundled APK/ZIP apps cannot use push notifications.)
@@ -738,7 +759,7 @@ async function logout(){
   if(CH.mode==='online' && CH.id) socket.emit('chess_leave',CH.id);
   socket.emit('logout',{token:localStorage.getItem('token'),endpoint:ep});
   ['token','saved_name','chat_cache','outbox'].forEach(k=>localStorage.removeItem(k));
-  outbox=[]; me=''; globalMsgs=[]; dms={}; friends=[]; requests=[]; blocks=[]; directory=[]; dirMap={}; unread={}; cur='global'; profileLoaded=false;
+  outbox=[]; me=''; globalMsgs=[]; dms={}; friends=[]; requests=[]; blocks=[]; directory=[]; dirMap={}; unread={}; cur='global'; profileLoaded=false; SHOP.fx=0;
   $('adminBtn').style.display='none';
   goHome(); showName(); refreshLists(); renderChat(); setAuthMode('signup'); showAuth();
 }
@@ -775,7 +796,7 @@ socket.on('blocks',b=>{ blocks=b; renderDirectory(); });
 socket.on('directory',d=>{
   directory=d; dirMap={}; d.forEach(u=>dirMap[u.name]=u);
   if(!profileLoaded && dirMap[me]){ profileLoaded=true; $('profEmoji').value=dirMap[me].emoji||'😀'; $('profStatus').value=dirMap[me].status||''; }
-  renderUsers();
+  renderUsers(); fxRefresh();
 });
 let liveList=[];
 const recBadge=n=>liveList.includes(n)?' 🔴 LIVE':recList.includes(n)?' 🔴 REC':'';
@@ -798,7 +819,7 @@ function saveProfile(){
 }
 function userRow(u,extra){
   const on=onlineUsers.includes(u), p=dirMap[u]||{};
-  return '<div class="user-card"><div><span>'+(on?'🟢':'⚪')+' '+avatar(p)+' '+esc(u)+recBadge(u)+(u===me?' (You)':'')+'</span>'
+  return '<div class="user-card"><div><span>'+(on?'🟢':'⚪')+' '+avatar(p)+' '+fxName(u)+tag(p.role||p.rank)+recBadge(u)+(u===me?' (You)':'')+'</span>'
     +(p.status?'<br><small style="color:#aaa">'+esc(p.status)+'</small>':'')
     +(!on?'<br><small style="color:#888">last seen '+timeAgo(p.lastSeen)+'</small>':'')
     +'</div><div class="user-actions">'+extra+watchBtn(u)+'</div></div>';
@@ -815,7 +836,7 @@ function renderDirectory(){
   const list=directory.filter(u=>u.name!==me && u.name.toLowerCase().includes(q)).sort((a,b)=>(onlineUsers.includes(b.name)-onlineUsers.includes(a.name))||(b.lastSeen-a.lastSeen));
   $('allUsersList').innerHTML = list.map(u=>{
     const on=onlineUsers.includes(u.name), isF=friends.includes(u.name), bl=blocks.includes(u.name), n=enc(u.name);
-    return '<div class="user-card"><div><span>'+(on?'🟢':'⚪')+' '+avatar(u)+' '+esc(u.name)+tag(u.role)+recBadge(u.name)+'</span>'
+    return '<div class="user-card"><div><span>'+(on?'🟢':'⚪')+' '+avatar(u)+' '+fxName(u.name)+tag(u.role||u.rank)+recBadge(u.name)+'</span>'
       +(u.status?'<br><small style="color:#aaa">'+esc(u.status)+'</small>':'')
       +'<br><small style="color:#888">'+(on?'online now':'last seen '+timeAgo(u.lastSeen))+' · 👁 '+(u.visits||0)+' visits'+(u.wins?' · 🏆 '+u.wins+' wins':'')+'</small></div><div class="user-actions">'
       +watchBtn(u.name)
@@ -860,7 +881,7 @@ function renderChat(){ chatBox.innerHTML=''; curList().forEach(renderMsg); }
 function renderMsg(d){
   const mine=d.user===me, w=document.createElement('div');
   w.id='msg-'+d.id; w.className='msg-wrapper '+(mine?'my-msg':'other-msg');
-  let h='<div class="msg-author" style="cursor:pointer" onclick="openProfile(\''+enc(d.user)+'\')">'+avatar(dirMap[d.user]||{})+' '+esc(d.user)+'</div><div class="bubble">';
+  let h='<div class="msg-author" style="cursor:pointer" onclick="openProfile(\''+enc(d.user)+'\')">'+avatar(dirMap[d.user]||{})+' '+fxName(d.user)+tag((dirMap[d.user]||{}).role||(dirMap[d.user]||{}).rank)+'</div><div class="bubble">';
   if(d.text) h+=esc(d.text);
   if(d.image) h+= d.image==='1' ? '<br><button class="btn sm gray" onclick="loadMedia(\''+d.id+'\')">📷 Tap to load</button>' : '<br><img class="msg-img" src="'+d.image+'"/>';
   if(d.audio) h+= d.audio==='1' ? '<br><button class="btn sm gray" onclick="loadMedia(\''+d.id+'\')">🎙️ Tap to load</button>' : '<br><audio controls src="'+d.audio+'" style="width:200px;height:35px"></audio>';
@@ -1116,7 +1137,11 @@ setInterval(async()=>{
 
 // ================= ADMIN + BAN =================
 let AD={users:[],bans:[],words:[],owner:false}, myRole='';
-const tag=r=>r==='owner'?'<span class="rtag owner">👑 OWNER</span>':r==='admin'?'<span class="rtag admin">🛡 ADMIN</span>':'';
+let SHOP={items:{},own:[],rank:'',color:'',badge:'',coins:0,fx:0}; // NEW: filled by the server ('shop_state')
+const tag=r=>r==='owner'?'<span class="rtag owner">👑 OWNER</span>':r==='admin'?'<span class="rtag admin">🛡 ADMIN</span>':(SHOP.items[r]&&SHOP.items[r].cat==='rank'?'<span class="rtag '+r+'">'+SHOP.items[r].icon+' '+SHOP.items[r].name+'</span>':'');
+// NEW: a person's name with their bought colour and badge
+function fxName(n){ const p=dirMap[n]||{}, col=SHOP.items[p.color], b=SHOP.items[p.badge]; const rb=col&&col.css==='rainbow'; return (b&&b.cat==='badge'?b.icon+' ':'')+'<span'+(rb?' class="rainbow"':'')+(col&&col.cat==='color'&&!rb?' style="color:'+col.css+'"':'')+'>'+esc(n)+'</span>'; }
+function fxRefresh(){ if(SHOP.fx||!Object.keys(SHOP.items).length||!directory.length) return; SHOP.fx=1; try{ renderChat(); }catch(e){} } // redraw chat once so old messages get colours
 function openAdmin(){ openModal('adminModal'); socket.emit('admin_data'); }
 function renderAdmin(){
   const q=($('admSearch').value||'').trim().toLowerCase();
@@ -1689,7 +1714,7 @@ function aMove(e,dx,dy,sp,dt){ const m=e.dash>0?3.2:1; e.x+=dx*sp*m*dt; e.y+=dy*
 function aLOS(x1,y1,x2,y2){ const d=Math.hypot(x2-x1,y2-y1), n=Math.ceil(d/16); for(let i=1;i<n;i++){ const x=x1+(x2-x1)*i/n,y=y1+(y2-y1)*i/n; for(const r of AWALLS) if(x>r[0]&&x<r[0]+r[2]&&y>r[1]&&y<r[1]+r[3]) return false; } return true; }
 function aSpawn(skip){ let best=ASPAWN[0],bd=-1; const all=AR.ents.concat(Object.values(AR.others)); for(const s of ASPAWN){ let md=1e9; for(const o of all){ if(o===skip||!aAlive(o)) continue; md=Math.min(md,Math.hypot(o.x-s[0],o.y-s[1])); } md+=Math.random()*250; if(md>bd){bd=md;best=s;} } return best; }
 function aParts(x,y,col,n){ for(let i=0;i<n;i++){ const a=Math.random()*6.28,s=60+Math.random()*180; AR.parts.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,l:.35+Math.random()*.3,col}); } }
-function arMode(m){ AR.mode=m; $('am-solo').className='btn'+(m==='solo'?'':' gray'); $('am-online').className='btn'+(m==='online'?'':' gray'); $('arLvl').style.display=m==='solo'?'inline-block':'none'; $('arRoomBox').style.display=m==='online'?'inline':'none'; }
+function arMode(m){ const run=AR.on&&AR.mode!==m; if(run) arStop(); AR.mode=m; $('am-solo').className='btn'+(m==='solo'?'':' gray'); $('am-online').className='btn'+(m==='online'?'':' gray'); $('arLvl').style.display=m==='solo'?'inline-block':'none'; $('arRoomBox').style.display=m==='online'?'inline':'none'; if(run) arStart(); }
 function arStart(){
   if(document.activeElement&&document.activeElement.blur) document.activeElement.blur(); gcInit(); arStop(true); 
   AR.on=true; GK.on='ar'; const cont=$('arCont'); cont.classList.toggle('touch',IS_TOUCH||!!cont._ft);
@@ -1711,7 +1736,7 @@ function aShoot(e,ang,rate){
   AR.bullets.push({x,y,vx:Math.cos(ang)*780,vy:Math.sin(ang)*780,own:e.name,life:1.1,dmg:20,vis:false,col:e.col}); aParts(x,y,'#ffeb3b',2);
   if(e===AR.me&&AR.mode==='online') socket.emit('a_event',{t:'shot',x:Math.round(x),y:Math.round(y),a:+ang.toFixed(3)});
 }
-function aScore(by){ AR.scores[by]=(AR.scores[by]||0)+1; if(AR.scores[by]>=10&&!AR.over){ AR.over=6; AR.msg=by===AR.me.name?'🏆 YOU WIN!':'🏆 '+by+' wins!'; AR.msgT=6; socket.emit('game_reward',{game:'arena',win:by===AR.me.name,score:AR.scores[AR.me.name]||0}); } }
+function aScore(by){ AR.scores[by]=(AR.scores[by]||0)+1; if(AR.scores[by]>=10&&AR.over<=0){ AR.over=6; AR.msg=by===AR.me.name?'🏆 YOU WIN!':'🏆 '+by+' wins!'; AR.msgT=6; socket.emit('game_reward',{game:'arena',win:by===AR.me.name,score:AR.scores[AR.me.name]||0}); } }
 function aHurt(e,dmg,by){
   if(!aAlive(e)) return; e.hp-=dmg; e.lastHit=AR.t; aParts(e.x,e.y,e.col,6);
   if(e.hp<=0){ e.hp=0; e.dead=2.2; aParts(e.x,e.y,e.col,22); aScore(by);
@@ -1754,7 +1779,7 @@ function arUpdate(dt){
   // --- bots
   if(AR.mode==='solo'){ const L=ALVL[AR.lvl]; for(const e of AR.ents) if(e.bot&&aAlive(e)) aBot(e,dt,L); }
   // --- respawn
-  for(const e of AR.ents) if(e.dead>0){ e.dead-=dt; if(e.dead<=0&&!AR.over){ const s=aSpawn(e); e.x=s[0]; e.y=s[1]; e.hp=e.max; e.lastHit=AR.t; } }
+  for(const e of AR.ents) if(e.dead>0){ e.dead-=dt; if(e.dead<=0&&AR.over<=0){ const s=aSpawn(e); e.x=s[0]; e.y=s[1]; e.hp=e.max; e.lastHit=AR.t; } }
   // --- remote players: smooth
   for(const o of Object.values(AR.others)){ o.x+=(o.tx-o.x)*Math.min(1,dt*14); o.y+=(o.ty-o.y)*Math.min(1,dt*14); }
   // --- bullets
@@ -1770,7 +1795,7 @@ function arUpdate(dt){
   }
   for(let i=AR.parts.length-1;i>=0;i--){ const p=AR.parts[i]; p.x+=p.vx*dt; p.y+=p.vy*dt; p.l-=dt; if(p.l<=0) AR.parts.splice(i,1); }
   if(AR.msgT>0) AR.msgT-=dt;
-  if(AR.over>0){ AR.over-=dt; if(AR.over<=0){ AR.scores={}; AR.msg='New round!'; AR.msgT=2; for(const e of AR.ents){ const s=aSpawn(e); e.x=s[0]; e.y=s[1]; e.hp=e.max; e.dead=0; } } }
+  if(AR.over>0){ AR.over-=dt; if(AR.over<=0){ AR.over=0; AR.scores={}; AR.msg='New round!'; AR.msgT=2; for(const e of AR.ents){ const s=aSpawn(e); e.x=s[0]; e.y=s[1]; e.hp=e.max; e.dead=0; } } }
   // --- network
   if(AR.mode==='online'){ AR.netT-=dt; if(AR.netT<=0){ AR.netT=.066; socket.emit('a_state',{x:Math.round(me_.x),y:Math.round(me_.y),a:+me_.a.toFixed(2),hp:Math.round(me_.hp),d:me_.dead>0?1:0}); } }
 }
@@ -1850,7 +1875,7 @@ function doomInitCtl(){
   addEventListener('mousemove',e=>{ if(document.pointerLockElement===cv) DM.a+=e.movementX*0.0025; });
   cv.addEventListener('contextmenu',e=>e.preventDefault());
 }
-function dmMode(m){ DM.mode=m; $('dm-solo').className='btn'+(m==='solo'?'':' gray'); $('dm-online').className='btn'+(m==='online'?'':' gray'); $('dmLvl').style.display=m==='solo'?'inline-block':'none'; $('dmRoomBox').style.display=m==='online'?'inline':'none'; }
+function dmMode(m){ const run=DM.on&&DM.mode!==m; if(run) dmStop(); DM.mode=m; $('dm-solo').className='btn'+(m==='solo'?'':' gray'); $('dm-online').className='btn'+(m==='online'?'':' gray'); $('dmLvl').style.display=m==='solo'?'inline-block':'none'; $('dmRoomBox').style.display=m==='online'?'inline':'none'; if(run) dmStart(); }
 function dmSfx(k){ try{ const A=DM.ac||(DM.ac=new (window.AudioContext||window.webkitAudioContext)()); const o=A.createOscillator(),g=A.createGain(),t=A.currentTime; o.connect(g); g.connect(A.destination);
   if(k==='pistol'){ o.type='square'; o.frequency.setValueAtTime(520,t); o.frequency.exponentialRampToValueAtTime(90,t+.12); g.gain.setValueAtTime(.12,t); g.gain.exponentialRampToValueAtTime(.001,t+.14); o.start(t); o.stop(t+.15); }
   else if(k==='shotgun'){ o.type='sawtooth'; o.frequency.setValueAtTime(180,t); o.frequency.exponentialRampToValueAtTime(40,t+.25); g.gain.setValueAtTime(.2,t); g.gain.exponentialRampToValueAtTime(.001,t+.28); o.start(t); o.stop(t+.3); }
@@ -1858,7 +1883,10 @@ function dmSfx(k){ try{ const A=DM.ac||(DM.ac=new (window.AudioContext||window.w
   else if(k==='pick'){ o.type='sine'; o.frequency.setValueAtTime(600,t); o.frequency.setValueAtTime(900,t+.07); g.gain.setValueAtTime(.12,t); g.gain.exponentialRampToValueAtTime(.001,t+.18); o.start(t); o.stop(t+.2); }
   else { o.type='square'; o.frequency.setValueAtTime(140,t); g.gain.setValueAtTime(.1,t); g.gain.exponentialRampToValueAtTime(.001,t+.2); o.start(t); o.stop(t+.22); } }catch(e){} }
 function dSpawnPt(skip){ let best=DSPAWN[0],bd=-1; for(const s of DSPAWN){ let md=1e9; for(const o of Object.values(DM.others).concat(DM.ents)){ if(o===skip) continue; md=Math.min(md,Math.hypot(o.x-s[0],o.y-s[1])); } md+=Math.random()*6; if(md>bd){bd=md;best=s;} } return best; }
-function dFreeCell(){ for(let t=0;t<60;t++){ const x=1+Math.random()*30,y=1+Math.random()*30; if(!dBlocked(x,y)&&!dBlocked(x+.4,y)&&!dBlocked(x-.4,y)&&!dBlocked(x,y+.4)&&!dBlocked(x,y-.4)) return [x,y]; } return [3.5,3.5]; }
+// NEW: every open cell that can be reached from the start (flood fill). Villains and pickups only use these cells,
+// so none can spawn inside a closed pocket or on top of the player.
+function dReach(){ if(DM.reach) return DM.reach; const seen=new Uint8Array(DN*DN),q=[[3,3]],out=[]; seen[3*DN+3]=1; while(q.length){ const [x,y]=q.pop(); out.push([x+.5,y+.5]); for(const [ax,ay] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx=x+ax,ny=y+ay; if(nx<0||ny<0||nx>=DN||ny>=DN||seen[ny*DN+nx]||DMAP[ny][nx]) continue; seen[ny*DN+nx]=1; q.push([nx,ny]); } } return DM.reach=out; }
+function dFreeCell(minD,fx,fy,maxD){ const R=dReach(); let best=null,bd=-1; for(let t=0;t<150;t++){ const c=R[Math.floor(Math.random()*R.length)],d=minD?Math.hypot(c[0]-fx,c[1]-fy):99; if(d>=(minD||0)&&d<=(maxD||999)) return [c[0]+(Math.random()-.5)*.2,c[1]+(Math.random()-.5)*.2]; if(d>bd){ bd=d; best=c; } } return best?[best[0],best[1]]:[3.5,3.5]; }
 function dmStart(){
   try{ if(document.activeElement&&document.activeElement.blur) document.activeElement.blur(); gcInit(); arStop();  dmReset(); DM.on=true; GK.on='dm'; const cont=$('dmCont'); cont.classList.toggle('touch',IS_TOUCH||!!cont._ft);
   DM.cv=$('dmCv'); DM.cx=DM.cv.getContext('2d'); if(!DM.lo){ DM.lo=document.createElement('canvas'); DM.lo.width=320; DM.lo.height=200; DM.lx=DM.lo.getContext('2d'); DM.tex=[null,dMkTex(1),dMkTex(2),dMkTex(3)]; DM.spr={}; for(const k of ['imp','demon','marine','fire','med','ammo']) DM.spr[k]=dMkSpr(k); }
@@ -1866,10 +1894,10 @@ function dmStart(){
   DM.last=performance.now(); cancelAnimationFrame(DM.raf); DM.raf=requestAnimationFrame(dmLoop); }catch(e){ console.error(e); toast('Doom error: '+e.message); } }
 function dmReset(){ const s=DSPAWN[0]; Object.assign(DM,{x:s[0],y:s[1],a:.8,hp:100,ammo:60,shells:12,w:0,wcd:0,kick:0,flash:0,hurt:0,ents:[],proj:[],picks:[],others:{},parts:[],wave:0,kills:0,scores:{},dead:0,over:0,msg:'',msgT:0,spawnT:4,nextWave:0}); if(DM.mode==='online'){ const p=dSpawnPt(); DM.x=p[0]; DM.y=p[1]; } }
 function dmStop(){ cancelAnimationFrame(DM.raf); if(DM.on&&DM.mode==='online') socket.emit('doom_leave'); DM.on=false; DM.fire=false; DM.mv.x=DM.mv.y=0; if(GK.on==='dm') GK.on=null; if(document.pointerLockElement&&document.exitPointerLock) document.exitPointerLock(); }
-function dNextWave(){ DM.wave++; const L=DLVL[DM.lvl],n=L.n+(DM.wave-1)*2; for(let i=0;i<n;i++){ let p; for(let t=0;t<30;t++){ p=dFreeCell(); if(Math.hypot(p[0]-DM.x,p[1]-DM.y)>9) break; } const demon=Math.random()<.3+DM.wave*.04; DM.ents.push({kind:demon?'demon':'imp',x:p[0],y:p[1],hp:(demon?70:40)*L.hp,max:(demon?70:40)*L.hp,cd:1+Math.random()*2,hurt:0,dead:0,a:0}); }
-  DM.hp=Math.min(100,DM.hp+25); DM.ammo+=15; DM.shells+=3; DM.msg='WAVE '+DM.wave; DM.msgT=2.5; dmSfx('pick'); }
+function dNextWave(){ DM.wave++; const L=DLVL[DM.lvl],n=L.n+(DM.wave-1)*2; for(let i=0;i<n;i++){ const p=dFreeCell(9,DM.x,DM.y); const demon=Math.random()<.3+DM.wave*.04; DM.ents.push({kind:demon?'demon':'imp',x:p[0],y:p[1],hp:(demon?70:40)*L.hp,max:(demon?70:40)*L.hp,cd:1+Math.random()*2,hurt:0,dead:0,a:0,sx:p[0],sy:p[1],st:0}); }
+  DM.hp=Math.min(100,DM.hp+25); DM.ammo+=15; DM.shells+=3; DM.msg='WAVE '+DM.wave; DM.msgT=2.5; DM.waveT=0; dmSfx('pick'); }
 function dHurt(n,by){ if(DM.dead>0||DM.over>0) return; DM.hp-=n; DM.hurt=.35; dmSfx('hurt'); if(DM.hp<=0){ DM.hp=0; DM.dead=3; if(DM.mode==='online'){ dScore(by); socket.emit('d_event',{t:'kill',victim:me,by}); DM.msg='💀 Fragged by '+by; } else { socket.emit('game_reward',{game:'doom',win:false,score:DM.kills}); DM.msg='💀 YOU DIED — wave '+DM.wave+', '+DM.kills+' kills'; } DM.msgT=3; } }
-function dScore(by){ DM.scores[by]=(DM.scores[by]||0)+1; if(DM.scores[by]>=10&&!DM.over){ DM.over=6; DM.msg=by===me?'🏆 YOU WIN!':'🏆 '+by+' wins!'; DM.msgT=6; socket.emit('game_reward',{game:'doom',win:by===me,score:DM.scores[me]||0}); } }
+function dScore(by){ DM.scores[by]=(DM.scores[by]||0)+1; if(DM.scores[by]>=10&&DM.over<=0){ DM.over=6; DM.msg=by===me?'🏆 YOU WIN!':'🏆 '+by+' wins!'; DM.msgT=6; socket.emit('game_reward',{game:'doom',win:by===me,score:DM.scores[me]||0}); } }
 function dShoot(){
   const W=DM.w; if(DM.wcd>0||DM.dead>0||DM.over>0) return; if(W===0){ if(DM.ammo<=0){ dmSfx('dry'); DM.wcd=.3; return; } DM.ammo--; DM.wcd=.3; } else { if(DM.shells<=0){ dmSfx('dry'); DM.wcd=.4; return; } DM.shells--; DM.wcd=.85; }
   DM.kick=1; DM.flash=.08; dmSfx(W===0?'pistol':'shotgun'); const pellets=W===0?1:7,dmg=W===0?18:9,spread=W===0?.008:.11;
@@ -1883,7 +1911,7 @@ function dmLoop(t){ if(!DM.on) return; const dt=Math.min(.05,(t-DM.last)/1000||0
 function dmUpdate(dt){
   const k=GK.k; DM.wcd-=dt; if(DM.fireT>0) DM.fireT-=dt; DM.kick=Math.max(0,DM.kick-dt*5); DM.flash-=dt; DM.hurt-=dt; if(DM.msgT>0) DM.msgT-=dt;
   if(k.ArrowLeft) DM.a-=2.2*dt; if(k.ArrowRight) DM.a+=2.2*dt; if(k.Digit1) DM.w=0; if(k.Digit2) DM.w=1;
-  if(DM.dead>0){ DM.dead-=dt; if(DM.dead<=0&&!DM.over){ if(DM.mode==='online'){ const p=dSpawnPt(); DM.x=p[0]; DM.y=p[1]; DM.hp=100; DM.ammo=Math.max(DM.ammo,40); } else { DM.ents=[]; DM.proj=[]; DM.wave=0; DM.kills=0; DM.hp=100; DM.ammo=60; DM.shells=12; DM.x=DSPAWN[0][0]; DM.y=DSPAWN[0][1]; dNextWave(); } } }
+  if(DM.dead>0){ DM.dead-=dt; if(DM.dead<=0&&DM.over<=0){ if(DM.mode==='online'){ const p=dSpawnPt(); DM.x=p[0]; DM.y=p[1]; DM.hp=100; DM.ammo=Math.max(DM.ammo,40); } else { DM.ents=[]; DM.proj=[]; DM.wave=0; DM.kills=0; DM.hp=100; DM.ammo=60; DM.shells=12; DM.x=DSPAWN[0][0]; DM.y=DSPAWN[0][1]; dNextWave(); } } }
   else {
     let mx=(k.KeyD?1:0)-(k.KeyA?1:0)+DM.mv.x,my=(k.KeyW||k.ArrowUp?1:0)-(k.KeyS||k.ArrowDown?1:0)+DM.mv.y; const l=Math.hypot(mx,my); if(l>1){mx/=l;my/=l;}
     const sp=(k.ShiftLeft||k.ShiftRight?4.6:3.1)*dt,ca=Math.cos(DM.a),sa=Math.sin(DM.a); dMove(DM,(ca*my-sa*mx)*sp,(sa*my+ca*mx)*sp,.25);
@@ -1892,20 +1920,22 @@ function dmUpdate(dt){
   }
   if(DM.mode==='solo'){
     const L=DLVL[DM.lvl];
+    DM.waveT=(DM.waveT||0)+dt; if(DM.waveT>15) for(const e of DM.ents) e.alert=true; // NEW: after 15 s every villain hunts you
     for(const e of DM.ents){ e.cd-=dt; e.hurt-=dt; if(e.dead>0){ e.dead-=dt; continue; } if(DM.dead>0) continue;
       const dx=DM.x-e.x,dy=DM.y-e.y,d=Math.hypot(dx,dy)||1,los=dCast(e.x,e.y,Math.atan2(dy,dx))>=d-.2; e.a=Math.atan2(dy,dx);
+      e.st=(e.st||0)+dt; if(e.st>3){ if(e.alert&&!los&&e.sd!==undefined&&d>e.sd-1){ const q=dFreeCell(7,DM.x,DM.y,13); e.x=q[0]; e.y=q[1]; } e.sd=Math.hypot(DM.x-e.x,DM.y-e.y); e.st=0; } // NEW: stuck behind a wall -> put it back near you
       if(los||e.alert){ e.alert=true; const demon=e.kind==='demon',sp=(demon?2.4:1.3)*L.spd*dt; let m=1; if(!demon&&d<4.5) m=-.6; if(d>(demon?.8:3.5)||m<0) dMove(e,dx/d*sp*m,dy/d*sp*m,.3);
         if(demon&&d<1.1&&e.cd<=0){ dHurt(12*L.dmg,'a demon'); e.cd=.8; }
         else if(!demon&&los&&d>1.2&&e.cd<=0){ DM.proj.push({x:e.x,y:e.y,vx:dx/d*5.2,vy:dy/d*5.2,dmg:9*L.dmg,life:5}); e.cd=1.8+Math.random(); } else if(!demon&&d<1.1&&e.cd<=0){ dHurt(5*L.dmg,'an imp'); e.cd=.9; } } }
     DM.ents=DM.ents.filter(e=>e.hp>0||e.dead>0);
     for(let i=DM.proj.length-1;i>=0;i--){ const p=DM.proj[i]; p.x+=p.vx*dt; p.y+=p.vy*dt; p.life-=dt; if(dBlocked(p.x,p.y)||p.life<=0){ DM.proj.splice(i,1); continue; } if(DM.dead<=0&&Math.hypot(p.x-DM.x,p.y-DM.y)<.4){ dHurt(p.dmg,'an imp'); DM.proj.splice(i,1); } }
-    if(DM.dead<=0&&!DM.ents.some(e=>e.hp>0)){ DM.nextWave-=dt; if(DM.nextWave<=0){ DM.nextWave=3.5; if(DM.wave>0&&DM.ents.length===0){ dNextWave(); } } } else DM.nextWave=2.5;
+    if(DM.dead<=0&&!DM.ents.some(e=>e.hp>0)){ DM.nextWave-=dt; if(DM.nextWave<=0){ DM.nextWave=3.5; dNextWave(); /* NEW: also starts wave 1 when Doom was opened in Online mode and then switched to Solo */ } } else DM.nextWave=2.5;
     DM.spawnT-=dt; if(DM.spawnT<=0){ DM.spawnT=10; if(DM.picks.length<5){ const p=dFreeCell(); DM.picks.push({kind:Math.random()<.5?'med':'ammo',x:p[0],y:p[1]}); } }
   } else {
     DM.spawnT-=dt; if(DM.spawnT<=0){ DM.spawnT=9; if(DM.picks.length<5){ const p=dFreeCell(); DM.picks.push({kind:Math.random()<.5?'med':'ammo',x:p[0],y:p[1]}); } }
     for(const o of Object.values(DM.others)){ const f=Math.min(1,dt*12); o.x+=(o.tx-o.x)*f; o.y+=(o.ty-o.y)*f; }
     DM.netT-=dt; if(DM.netT<=0){ DM.netT=.066; socket.emit('d_state',{x:+DM.x.toFixed(2),y:+DM.y.toFixed(2),a:+DM.a.toFixed(2),hp:Math.round(DM.hp),d:DM.dead>0?1:0,w:DM.w}); }
-    if(DM.over>0){ DM.over-=dt; if(DM.over<=0){ DM.scores={}; DM.hp=100; DM.msg='New round!'; DM.msgT=2; const p=dSpawnPt(); DM.x=p[0]; DM.y=p[1]; } }
+    if(DM.over>0){ DM.over-=dt; if(DM.over<=0){ DM.over=0; DM.dead=0; DM.ammo=Math.max(DM.ammo,40); DM.scores={}; DM.hp=100; DM.msg='New round!'; DM.msgT=2; const p=dSpawnPt(); DM.x=p[0]; DM.y=p[1]; } }
   }
   for(let i=DM.parts.length-1;i>=0;i--){ DM.parts[i].l-=dt; if(DM.parts[i].l<=0) DM.parts.splice(i,1); }
 }
@@ -2259,7 +2289,7 @@ function openProfile(e){
   const big=p.av?'<img class="avbig" src="/avatar/'+enc(n)+'?v='+p.av+'" alt="">':'<div class="avbig">'+esc(p.emoji||'👤')+'</div>';
   const ach=(p.ach||[]).filter(id=>ACH_INFO[id]).map(id=>'<span class="achchip">'+ACH_INFO[id][0]+' '+esc(ACH_INFO[id][1])+'</span>').join('')||'<small style="color:#888">No achievements yet</small>';
   $('profileBody').innerHTML='<div style="text-align:center">'+big
-    +'<h3 style="margin:4px 0">'+esc(n)+tag(p.role)+'</h3>'
+    +'<h3 style="margin:4px 0">'+fxName(n)+tag(p.role||p.rank)+'</h3>'
     +'<div>'+(on?'🟢 online':'⚪ last seen '+timeAgo(p.lastSeen))+'</div>'
     +(p.status?'<div style="color:#aaa;margin-top:4px">'+esc(p.status)+'</div>':'')
     +(p.bio?'<p style="margin:10px 0">'+esc(p.bio)+'</p>':'')+'</div>'
@@ -2282,11 +2312,36 @@ socket.on('leaderboard',({by,rows,mine})=>{
   if(by!==lbBy||$('boardModal').style.display!=='flex') return;
   $('lbMine').innerText=mine.rank?'Your rank: #'+mine.rank+' · '+lbVal(by,mine.v):'You are not on this board yet. Play to get on it!';
   $('lbList').innerHTML=rows.length?rows.map((r,i)=>'<div class="user-card" style="cursor:pointer" onclick="openProfile(\''+enc(r.name)+'\')"><span>'
-    +(['🥇','🥈','🥉'][i]||'#'+(i+1))+' '+avatar(r)+' '+esc(r.name)+(r.name===me?' (You)':'')+'</span><b>'+lbVal(by,r.v)+'</b></div>').join('')
+    +(['🥇','🥈','🥉'][i]||'#'+(i+1))+' '+avatar(r)+' '+fxName(r.name)+tag((dirMap[r.name]||{}).role||(dirMap[r.name]||{}).rank)+(r.name===me?' (You)':'')+'</span><b>'+lbVal(by,r.v)+'</b></div>').join('')
     :'<small style="color:#888">Nobody yet. Be the first!</small>';
 });
-function showCoins(c){ ['coinBadge','coinBadge2'].forEach(id=>{ const e=$(id); if(e) e.innerText='🪙 '+c; }); }
+function showCoins(c){ ['coinBadge','coinBadge2','shopCoins'].forEach(id=>{ const e=$(id); if(e) e.innerText='🪙 '+c; }); }
 socket.on('coins',({coins,gained})=>{ showCoins(coins); if(gained>0) toast('🪙 +'+gained+' coins'); });
+
+// ================= SHOP (ranks, name colours, badges) =================
+let shopCat='rank';
+function openShop(){ openModal('shopModal'); socket.emit('shop_get'); renderShop(); }
+function shopTab(k){ shopCat=k; renderShop(); }
+function shopBuy(id){ socket.emit('shop_buy',id); }
+function shopEquip(cat,id){ socket.emit('shop_equip',{cat,id}); }
+function shopPreview(id,it){
+  if(it.cat==='rank') return '<span class="rtag '+id+'" style="font-size:13px">'+it.icon+' '+esc(it.name)+'</span>';
+  if(it.cat==='color') return it.css==='rainbow'?'<b class="rainbow">'+esc(me||'Your name')+'</b>':'<b style="color:'+it.css+'">'+esc(me||'Your name')+'</b>';
+  return '<span style="font-size:22px">'+it.icon+'</span> <b>'+esc(it.name)+'</b>';
+}
+function renderShop(){
+  ['rank','color','badge'].forEach(k=>{ const b=$('sh-'+k); if(b) b.className='btn sm'+(k===shopCat?'':' gray'); });
+  showCoins(SHOP.coins||0);
+  const rows=Object.entries(SHOP.items).filter(([id,it])=>it.cat===shopCat);
+  $('shopList').innerHTML=rows.length?rows.map(([id,it])=>{
+    const own=SHOP.own.includes(id), on=SHOP[shopCat]===id;
+    const btn=own?(on?'<button class="btn sm gray" onclick="shopEquip(\''+shopCat+'\',\'\')">Take off</button>'
+                    :'<button class="btn sm blue" onclick="shopEquip(\''+shopCat+'\',\''+id+'\')">Equip</button>')
+                 :'<button class="btn sm green" style="'+((SHOP.coins||0)<it.price?'opacity:.55':'')+'" onclick="shopBuy(\''+id+'\')">Buy 🪙 '+it.price+'</button>';
+    return '<div class="shopitem"><div>'+shopPreview(id,it)+(on?' <small style="color:#4caf50">✔ equipped</small>':own?' <small style="color:#888">owned</small>':'')+'</div><div>'+btn+'</div></div>';
+  }).join(''):'<small style="color:#888">Loading...</small>';
+}
+socket.on('shop_state',s=>{ Object.assign(SHOP,s); showCoins(SHOP.coins||0); if($('shopModal').style.display==='flex') renderShop(); fxRefresh(); });
 socket.on('directory',()=>{
   const p=dirMap[me]; if(!p) return;
   showCoins(p.coins||0);
