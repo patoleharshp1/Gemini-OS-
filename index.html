@@ -151,6 +151,10 @@ h4{color:var(--hi);margin:14px 0 8px}
 .rtag{font-size:10px;font-weight:bold;padding:1px 6px;border-radius:8px;margin-left:4px;vertical-align:middle}.rtag.owner{background:#ffb300;color:#000}.rtag.admin{background:#1a73e8;color:#fff}
 #inviteBar{display:none;position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:950;background:#1b3d22;border:1px solid #4caf50;padding:10px 14px;border-radius:12px;gap:10px;align-items:center;font-size:13px;box-shadow:0 8px 30px #000}
 #toast{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:#5c1818;border:1px solid var(--hi);padding:10px 16px;border-radius:10px;z-index:3000;display:none;font-size:13px;max-width:90%;text-align:center}
+.avs{width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle}
+.avbig{width:96px;height:96px;border-radius:50%;object-fit:cover;border:3px solid var(--ac);background:#1a0808;display:flex;align-items:center;justify-content:center;font-size:48px;margin:0 auto 8px}
+.achchip{display:inline-block;background:#1f0808;border:1px solid var(--bd);border-radius:14px;padding:3px 9px;font-size:12px;margin:3px}
+.pstats{display:flex;gap:8px;margin:12px 0}.pstats .stat{flex:1}.pstats b{display:block;font-size:18px;color:var(--hi)}
 </style>
 </head>
 <body>
@@ -286,7 +290,15 @@ h4{color:var(--hi);margin:14px 0 8px}
         <div style="display:flex;gap:6px">
           <select id="profEmoji"><option>😀</option><option>😎</option><option>🤖</option><option>🦊</option><option>🐱</option><option>🔥</option><option>🌙</option><option>🎧</option><option>👑</option><option>🚀</option></select>
           <input type="text" id="profStatus" placeholder="Your status..." maxlength="60" style="flex:1"/>
+        </div>
+        <input type="text" id="profBio" placeholder="Short bio (max 160)..." maxlength="160" style="width:100%;margin-top:6px"/>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap">
+          <input type="file" id="avInput" accept="image/*" style="display:none" onchange="pickAvatar(this)"/>
+          <img id="profAvPrev" class="avs" style="display:none;width:40px;height:40px" alt=""/>
+          <button class="btn sm gray" onclick="$('avInput').click()">🖼 Choose avatar</button>
+          <button class="btn sm gray" onclick="clearAvatar()">Remove avatar</button>
           <button class="btn" onclick="saveProfile()">Save</button>
+          <button class="btn sm blue" onclick="openProfile(enc(me))">👁 View my profile</button>
         </div>
         <h4>Friend requests</h4><div id="requestList"></div>
         <h4>My friends</h4><div id="friendList"></div>
@@ -320,6 +332,7 @@ h4{color:var(--hi);margin:14px 0 8px}
         <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="sendImage(this)"/>
         <button class="btn btn-icon" onclick="$('imageInput').click()">📷</button>
         <button class="btn btn-icon" id="recordBtn" onclick="toggleRecord()">🎙️</button>
+        <button class="btn btn-icon" id="recCancel" style="display:none" onclick="cancelRecord()">✖</button>
         <button class="btn btn-icon" onclick="toggleEmoji()">😊</button>
         <input type="text" id="messageInput" placeholder="Type a message..." oninput="emitTyping()" onkeydown="if(event.key==='Enter')sendMessage()"/>
         <button class="btn" onclick="sendMessage()">Send</button>
@@ -344,7 +357,7 @@ h4{color:var(--hi);margin:14px 0 8px}
 
 <!-- Games -->
 <div id="gamesModal" class="modal">
-  <div class="modal-header"><h3>Games</h3><button class="close-btn" onclick="closeModal('gamesModal')">X</button></div>
+  <div class="modal-header"><h3>Games <span id="coinBadge" style="font-size:12px;color:#ffd54f;margin-left:8px"></span></h3><button class="close-btn" onclick="closeModal('gamesModal')">X</button></div>
   <div class="modal-body">
     <div class="gtabs">
       <button class="btn" id="gt-dino" onclick="gameTab('dino')">🦖 Dino</button>
@@ -354,6 +367,7 @@ h4{color:var(--hi);margin:14px 0 8px}
       <button class="btn gray" id="gt-arena" onclick="gameTab('arena')">🎯 Arena</button>
       <button class="btn gray" id="gt-doom" onclick="gameTab('doom')">👹 Doom</button>
       <button class="btn gray" id="gt-gd" onclick="gameTab('gd')">🔷 Dash</button>
+      <button class="btn" style="background:#b8860b" onclick="openBoard()">🏆 Leaderboard</button>
     </div>
     <div id="webGameWrap">
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
@@ -586,6 +600,29 @@ h4{color:var(--hi);margin:14px 0 8px}
   </div>
 </div>
 
+<!-- Profile page -->
+<div id="profileModal" class="modal" style="z-index:150">
+  <div class="modal-header"><h3>Profile</h3><button class="close-btn" onclick="closeModal('profileModal')">X</button></div>
+  <div class="modal-body" id="profileBody"></div>
+</div>
+
+<!-- Leaderboard -->
+<div id="boardModal" class="modal">
+  <div class="modal-header"><h3>🏆 Leaderboard <span id="coinBadge2" style="font-size:12px;color:#ffd54f;margin-left:8px"></span></h3><button class="close-btn" onclick="closeModal('boardModal')">X</button></div>
+  <div class="modal-body">
+    <div class="gtabs">
+      <button class="btn sm" id="lb-coins" onclick="openBoard('coins')">🪙 Coins</button>
+      <button class="btn sm gray" id="lb-wins" onclick="openBoard('wins')">🏆 Wins</button>
+      <button class="btn sm gray" id="lb-gd" onclick="openBoard('gd')">🔷 Dash %</button>
+      <button class="btn sm gray" id="lb-doom" onclick="openBoard('doom')">👹 Doom</button>
+      <button class="btn sm gray" id="lb-arena" onclick="openBoard('arena')">🎯 Arena</button>
+    </div>
+    <div id="lbMine" style="text-align:center;color:#aaa;margin-bottom:10px"></div>
+    <div id="lbList"></div>
+    <div style="text-align:center;margin-top:10px"><button class="btn gray" onclick="openGames()">🎮 Back to games</button></div>
+  </div>
+</div>
+
 <script src="/socket.io/socket.io.js"></script>
 <script>
 // Leave '' when served by Render. (Bundled APK/ZIP apps cannot use push notifications.)
@@ -595,7 +632,7 @@ const socket = io(SERVER_URL || undefined, { reconnection: true, reconnectionDel
 // ================= helpers =================
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const enc = s => encodeURIComponent(s);
+const enc = s => encodeURIComponent(s).replace(/[!'()*]/g, c => '%' + c.charCodeAt(0).toString(16));
 const nowTime = () => new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
 const MAX_FILE = 10 * 1024 * 1024;
 function toast(t){ const e=$('toast'); e.innerText=t; e.style.display='block'; clearTimeout(e._t); e._t=setTimeout(()=>e.style.display='none',3500); }
@@ -754,10 +791,14 @@ socket.on('live_list',l=>{ liveList=l; updBanner(); renderUsers(); renderDirecto
 socket.on('toast',toast);
 
 function addByName(){ const n=$('addFriendName').value.trim(); if(!n) return; socket.emit('friend_request',n); $('addFriendName').value=''; }
-function saveProfile(){ socket.emit('set_profile',{emoji:$('profEmoji').value,status:$('profStatus').value.trim()}); toast('Profile saved'); }
+function saveProfile(){
+  const d={emoji:$('profEmoji').value,status:$('profStatus').value.trim(),bio:$('profBio').value.trim()};
+  if(newAvatar!==undefined) d.avatar=newAvatar;
+  socket.emit('set_profile',d); newAvatar=undefined; toast('Profile saved');
+}
 function userRow(u,extra){
   const on=onlineUsers.includes(u), p=dirMap[u]||{};
-  return '<div class="user-card"><div><span>'+(on?'🟢':'⚪')+' '+esc(p.emoji||'👤')+' '+esc(u)+recBadge(u)+(u===me?' (You)':'')+'</span>'
+  return '<div class="user-card"><div><span>'+(on?'🟢':'⚪')+' '+avatar(p)+' '+esc(u)+recBadge(u)+(u===me?' (You)':'')+'</span>'
     +(p.status?'<br><small style="color:#aaa">'+esc(p.status)+'</small>':'')
     +(!on?'<br><small style="color:#888">last seen '+timeAgo(p.lastSeen)+'</small>':'')
     +'</div><div class="user-actions">'+extra+watchBtn(u)+'</div></div>';
@@ -774,7 +815,7 @@ function renderDirectory(){
   const list=directory.filter(u=>u.name!==me && u.name.toLowerCase().includes(q)).sort((a,b)=>(onlineUsers.includes(b.name)-onlineUsers.includes(a.name))||(b.lastSeen-a.lastSeen));
   $('allUsersList').innerHTML = list.map(u=>{
     const on=onlineUsers.includes(u.name), isF=friends.includes(u.name), bl=blocks.includes(u.name), n=enc(u.name);
-    return '<div class="user-card"><div><span>'+(on?'🟢':'⚪')+' '+esc(u.emoji||'👤')+' '+esc(u.name)+tag(u.role)+recBadge(u.name)+'</span>'
+    return '<div class="user-card"><div><span>'+(on?'🟢':'⚪')+' '+avatar(u)+' '+esc(u.name)+tag(u.role)+recBadge(u.name)+'</span>'
       +(u.status?'<br><small style="color:#aaa">'+esc(u.status)+'</small>':'')
       +'<br><small style="color:#888">'+(on?'online now':'last seen '+timeAgo(u.lastSeen))+' · 👁 '+(u.visits||0)+' visits'+(u.wins?' · 🏆 '+u.wins+' wins':'')+'</small></div><div class="user-actions">'
       +watchBtn(u.name)
@@ -819,7 +860,7 @@ function renderChat(){ chatBox.innerHTML=''; curList().forEach(renderMsg); }
 function renderMsg(d){
   const mine=d.user===me, w=document.createElement('div');
   w.id='msg-'+d.id; w.className='msg-wrapper '+(mine?'my-msg':'other-msg');
-  let h='<div class="msg-author">'+esc(d.user)+'</div><div class="bubble">';
+  let h='<div class="msg-author" style="cursor:pointer" onclick="openProfile(\''+enc(d.user)+'\')">'+avatar(dirMap[d.user]||{})+' '+esc(d.user)+'</div><div class="bubble">';
   if(d.text) h+=esc(d.text);
   if(d.image) h+= d.image==='1' ? '<br><button class="btn sm gray" onclick="loadMedia(\''+d.id+'\')">📷 Tap to load</button>' : '<br><img class="msg-img" src="'+d.image+'"/>';
   if(d.audio) h+= d.audio==='1' ? '<br><button class="btn sm gray" onclick="loadMedia(\''+d.id+'\')">🎙️ Tap to load</button>' : '<br><audio controls src="'+d.audio+'" style="width:200px;height:35px"></audio>';
@@ -847,22 +888,45 @@ function emit(data){
   outbox.push(data); saveOutbox(); toast('📴 Saved — will send when you are online');
 }
 function sendMessage(){ const i=$('messageInput'); if(!i.value.trim()) return; emit({text:i.value.trim()}); i.value=''; socket.emit('typing_status',{to:cur==='global'?null:cur,isTyping:false}); }
-function sendImage(inp){ const f=inp.files[0]; inp.value=''; if(!f||tooBig(f)) return; const r=new FileReader(); r.onload=e=>emit({image:e.target.result}); r.readAsDataURL(f); }
+function sendImage(inp){
+  const f=inp.files[0]; inp.value=''; if(!f) return;
+  if(!f.type.startsWith('image/')) return toast('Pick a picture file');
+  if(f.type==='image/gif'){ if(f.size>2e6) return toast('GIF too big (max 2 MB)'); const r=new FileReader(); r.onload=e=>emit({image:e.target.result}); r.readAsDataURL(f); return; }
+  const u=URL.createObjectURL(f), img=new Image();
+  img.onload=()=>{
+    const k=Math.min(1,1280/Math.max(img.width,img.height)), c=document.createElement('canvas');
+    c.width=Math.round(img.width*k); c.height=Math.round(img.height*k);
+    const x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height); x.drawImage(img,0,0,c.width,c.height);
+    URL.revokeObjectURL(u); emit({image:c.toDataURL('image/jpeg',0.82)});
+  };
+  img.onerror=()=>{ URL.revokeObjectURL(u); toast('Could not read that picture'); };
+  img.src=u;
+}
 let typingTimeout;
 function emitTyping(){ const to=cur==='global'?null:cur; socket.emit('typing_status',{to,isTyping:true}); clearTimeout(typingTimeout); typingTimeout=setTimeout(()=>socket.emit('typing_status',{to,isTyping:false}),1500); }
 socket.on('user_typing',d=>{ const rel=d.to?d.user===cur:cur==='global'; $('typingNotice').innerText=(rel&&d.isTyping)?d.user+' is typing...':''; });
 function callCurrent(video){ if(cur==='global') return toast('Pick a person to call'); quickCall(cur,video); }
-let audioRecorder, chatChunks=[], recording=false;
+let audioRecorder, chatChunks=[], recording=false, recTick=null, recT0=0, recDrop=false;
+function endRecUI(){ clearInterval(recTick); recording=false; $('recordBtn').innerText='🎙️'; $('recordBtn').style.background='#2b0b0b'; $('recCancel').style.display='none'; }
+function recLabel(){ const s=Math.floor((Date.now()-recT0)/1000); $('recordBtn').innerText='⏹ '+Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); if(s>=120) toggleRecord(); }
+function cancelRecord(){ if(!recording) return; recDrop=true; audioRecorder.stop(); endRecUI(); toast('Voice note cancelled'); }
 async function toggleRecord(){
-  const btn=$('recordBtn');
-  if(!recording){
-    try{
-      const s=await navigator.mediaDevices.getUserMedia({audio:true}); audioRecorder=new MediaRecorder(s); chatChunks=[];
-      audioRecorder.ondataavailable=e=>chatChunks.push(e.data);
-      audioRecorder.onstop=()=>{ s.getTracks().forEach(t=>t.stop()); const b=new Blob(chatChunks,{type:'audio/webm'}); if(b.size>MAX_FILE) return toast('Voice note too big'); const r=new FileReader(); r.onload=e=>emit({audio:e.target.result}); r.readAsDataURL(b); };
-      audioRecorder.start(); recording=true; btn.style.background='#f00';
-    }catch(e){ alert('Microphone permission required'); }
-  } else { audioRecorder.stop(); recording=false; btn.style.background='#2b0b0b'; }
+  if(recording){ audioRecorder.stop(); endRecUI(); return; }
+  if(!window.MediaRecorder||!navigator.mediaDevices) return toast('Voice notes are not supported in this browser');
+  try{
+    const s=await navigator.mediaDevices.getUserMedia({audio:true}); audioRecorder=new MediaRecorder(s); chatChunks=[]; recDrop=false;
+    audioRecorder.ondataavailable=e=>{ if(e.data.size) chatChunks.push(e.data); };
+    audioRecorder.onstop=()=>{
+      s.getTracks().forEach(t=>t.stop());
+      if(recDrop||!chatChunks.length) return;
+      if(Date.now()-recT0<800) return toast('Too short: hold on a little longer');
+      const b=new Blob(chatChunks,{type:(audioRecorder.mimeType||'audio/webm').split(';')[0]});
+      if(b.size>MAX_FILE) return toast('Voice note too big');
+      const r=new FileReader(); r.onload=e=>emit({audio:e.target.result}); r.readAsDataURL(b);
+    };
+    audioRecorder.start(); recording=true; recT0=Date.now(); recLabel(); recTick=setInterval(recLabel,500);
+    $('recordBtn').style.background='#f00'; $('recCancel').style.display='';
+  }catch(e){ toast('Microphone permission required'); }
 }
 const EMOJIS=['😀','😂','😍','😎','🥳','😭','😡','👍','👎','🙏','🔥','❤️','🎉','🤔','😴','🤝'];
 $('emojiRow').innerHTML=EMOJIS.map(e=>'<button class="btn sm btn-icon" onclick="addEmoji(\''+e+'\')">'+e+'</button>').join('');
@@ -1305,7 +1369,7 @@ const WL=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
 const winnerOf=b=>{ for(const l of WL) if(b[l[0]]&&b[l[0]]===b[l[1]]&&b[l[0]]===b[l[2]]) return {w:b[l[0]],line:l}; return b.every(Boolean)?{w:'draw',line:[]}:null; };
 const nameOf=s=>s==='X'?T.x:T.o;
 let XS=JSON.parse(localStorage.getItem('xoScore')||'{"w":0,"l":0,"d":0}');
-function scoreXO(r){ if(T.mode!=='ai') return; if(r.w==='draw') XS.d++; else if(r.w==='X') XS.w++; else XS.l++; localStorage.setItem('xoScore',JSON.stringify(XS)); }
+function scoreXO(r){ if(T.mode!=='ai') return; if(r.w==='draw') XS.d++; else if(r.w==='X') XS.w++; else XS.l++; localStorage.setItem('xoScore',JSON.stringify(XS)); socket.emit('game_reward',{game:'xo',win:r.w==='X',score:0}); }
 function showModeUI(){
   ['ai','local','online'].forEach(m=>$('m-'+m).className='btn'+(T.mode===m?'':' gray'));
   $('onlinePick').style.display=T.mode==='online'?'block':'none'; $('aiLevel').style.display=T.mode==='ai'?'inline-block':'none';
@@ -1647,7 +1711,7 @@ function aShoot(e,ang,rate){
   AR.bullets.push({x,y,vx:Math.cos(ang)*780,vy:Math.sin(ang)*780,own:e.name,life:1.1,dmg:20,vis:false,col:e.col}); aParts(x,y,'#ffeb3b',2);
   if(e===AR.me&&AR.mode==='online') socket.emit('a_event',{t:'shot',x:Math.round(x),y:Math.round(y),a:+ang.toFixed(3)});
 }
-function aScore(by){ AR.scores[by]=(AR.scores[by]||0)+1; if(AR.scores[by]>=10&&!AR.over){ AR.over=6; AR.msg=by===AR.me.name?'🏆 YOU WIN!':'🏆 '+by+' wins!'; AR.msgT=6; } }
+function aScore(by){ AR.scores[by]=(AR.scores[by]||0)+1; if(AR.scores[by]>=10&&!AR.over){ AR.over=6; AR.msg=by===AR.me.name?'🏆 YOU WIN!':'🏆 '+by+' wins!'; AR.msgT=6; socket.emit('game_reward',{game:'arena',win:by===AR.me.name,score:AR.scores[AR.me.name]||0}); } }
 function aHurt(e,dmg,by){
   if(!aAlive(e)) return; e.hp-=dmg; e.lastHit=AR.t; aParts(e.x,e.y,e.col,6);
   if(e.hp<=0){ e.hp=0; e.dead=2.2; aParts(e.x,e.y,e.col,22); aScore(by);
@@ -1804,8 +1868,8 @@ function dmReset(){ const s=DSPAWN[0]; Object.assign(DM,{x:s[0],y:s[1],a:.8,hp:1
 function dmStop(){ cancelAnimationFrame(DM.raf); if(DM.on&&DM.mode==='online') socket.emit('doom_leave'); DM.on=false; DM.fire=false; DM.mv.x=DM.mv.y=0; if(GK.on==='dm') GK.on=null; if(document.pointerLockElement&&document.exitPointerLock) document.exitPointerLock(); }
 function dNextWave(){ DM.wave++; const L=DLVL[DM.lvl],n=L.n+(DM.wave-1)*2; for(let i=0;i<n;i++){ let p; for(let t=0;t<30;t++){ p=dFreeCell(); if(Math.hypot(p[0]-DM.x,p[1]-DM.y)>9) break; } const demon=Math.random()<.3+DM.wave*.04; DM.ents.push({kind:demon?'demon':'imp',x:p[0],y:p[1],hp:(demon?70:40)*L.hp,max:(demon?70:40)*L.hp,cd:1+Math.random()*2,hurt:0,dead:0,a:0}); }
   DM.hp=Math.min(100,DM.hp+25); DM.ammo+=15; DM.shells+=3; DM.msg='WAVE '+DM.wave; DM.msgT=2.5; dmSfx('pick'); }
-function dHurt(n,by){ if(DM.dead>0||DM.over>0) return; DM.hp-=n; DM.hurt=.35; dmSfx('hurt'); if(DM.hp<=0){ DM.hp=0; DM.dead=3; if(DM.mode==='online'){ dScore(by); socket.emit('d_event',{t:'kill',victim:me,by}); DM.msg='💀 Fragged by '+by; } else DM.msg='💀 YOU DIED — wave '+DM.wave+', '+DM.kills+' kills'; DM.msgT=3; } }
-function dScore(by){ DM.scores[by]=(DM.scores[by]||0)+1; if(DM.scores[by]>=10&&!DM.over){ DM.over=6; DM.msg=by===me?'🏆 YOU WIN!':'🏆 '+by+' wins!'; DM.msgT=6; } }
+function dHurt(n,by){ if(DM.dead>0||DM.over>0) return; DM.hp-=n; DM.hurt=.35; dmSfx('hurt'); if(DM.hp<=0){ DM.hp=0; DM.dead=3; if(DM.mode==='online'){ dScore(by); socket.emit('d_event',{t:'kill',victim:me,by}); DM.msg='💀 Fragged by '+by; } else { socket.emit('game_reward',{game:'doom',win:false,score:DM.kills}); DM.msg='💀 YOU DIED — wave '+DM.wave+', '+DM.kills+' kills'; } DM.msgT=3; } }
+function dScore(by){ DM.scores[by]=(DM.scores[by]||0)+1; if(DM.scores[by]>=10&&!DM.over){ DM.over=6; DM.msg=by===me?'🏆 YOU WIN!':'🏆 '+by+' wins!'; DM.msgT=6; socket.emit('game_reward',{game:'doom',win:by===me,score:DM.scores[me]||0}); } }
 function dShoot(){
   const W=DM.w; if(DM.wcd>0||DM.dead>0||DM.over>0) return; if(W===0){ if(DM.ammo<=0){ dmSfx('dry'); DM.wcd=.3; return; } DM.ammo--; DM.wcd=.3; } else { if(DM.shells<=0){ dmSfx('dry'); DM.wcd=.4; return; } DM.shells--; DM.wcd=.85; }
   DM.kick=1; DM.flash=.08; dmSfx(W===0?'pistol':'shotgun'); const pellets=W===0?1:7,dmg=W===0?18:9,spread=W===0?.008:.11;
@@ -1969,8 +2033,8 @@ function gdUpdate(dt){
   if(GD.state==='play'){ GD.acc+=dt; const H=1/60; let n=0;
     while(GD.acc>=H&&n++<6){ GD.acc-=H; GD.prev={x:GD.S.x,y:GD.S.y}; gdStep(GD.S,GD.L,GD.held,H);
       if(GD.practice&&!GD.S.dead&&!GD.S.won){ GD.cpT+=H; if(GD.cpT>2.5&&GD.S.ground){ GD.cp=JSON.parse(JSON.stringify(GD.S)); GD.cpT=0; } }
-      if(GD.S.dead){ GD.state='over'; GD.deadT=0; gdMusicStop(); gdBoom(); const pc=Math.floor(Math.min(99,GD.S.x/GD.L.end*100)); if(pc>(GD.best[GD.li]||0)&&!GD.practice){ GD.best[GD.li]=pc; try{ localStorage.setItem('gd_best',JSON.stringify(GD.best)); }catch(e){} } for(let i=0;i<26;i++){ const a=Math.random()*6.28,s=3+Math.random()*7; GD.parts.push({x:GD.S.x+.5,y:GD.S.y+.5,vx:Math.cos(a)*s,vy:Math.sin(a)*s,l:.7+Math.random()*.4,c:i%2?'#fff':'#5ff'}); } break; }
-      if(GD.S.won){ GD.state='won'; GD.wonT=0; gdMusicStop(); if(!GD.practice){ GD.best[GD.li]=100; try{ localStorage.setItem('gd_best',JSON.stringify(GD.best)); }catch(e){} } break; } }
+      if(GD.S.dead){ GD.state='over'; GD.deadT=0; gdMusicStop(); gdBoom(); const pc=Math.floor(Math.min(99,GD.S.x/GD.L.end*100)); if(!GD.practice) socket.emit('game_reward',{game:'gd',win:false,score:pc}); if(pc>(GD.best[GD.li]||0)&&!GD.practice){ GD.best[GD.li]=pc; try{ localStorage.setItem('gd_best',JSON.stringify(GD.best)); }catch(e){} } for(let i=0;i<26;i++){ const a=Math.random()*6.28,s=3+Math.random()*7; GD.parts.push({x:GD.S.x+.5,y:GD.S.y+.5,vx:Math.cos(a)*s,vy:Math.sin(a)*s,l:.7+Math.random()*.4,c:i%2?'#fff':'#5ff'}); } break; }
+      if(GD.S.won){ GD.state='won'; GD.wonT=0; gdMusicStop(); if(!GD.practice){ socket.emit('game_reward',{game:'gd',win:true,score:100}); GD.best[GD.li]=100; try{ localStorage.setItem('gd_best',JSON.stringify(GD.best)); }catch(e){} } break; } }
     if(GD.S.mode==='cube'){ if(GD.S.ground) GD.rot=Math.round(GD.rot/(Math.PI/2))*(Math.PI/2); else GD.rot+=dt*6.4*GD.S.grav*-1; } else GD.rot=-GD.S.vy*.05*GD.S.grav;
     if(!GD.S.dead&&GD.held&&GD.S.mode==='ship') GD.parts.push({x:GD.S.x,y:GD.S.y+.2,vx:-3,vy:-GD.S.vy*.3,l:.35,c:'#fa0'}); else if(GD.S.ground&&GD.S.mode==='cube'&&Math.random()<.4) GD.parts.push({x:GD.S.x,y:GD.S.grav===1?GD.S.y:GD.S.y+1,vx:-2-Math.random()*2,vy:(Math.random())*2*GD.S.grav,l:.3,c:'#8ff'});
   } else if(GD.state==='over'){ GD.deadT+=dt; if(GD.deadT>.9){ GD.att++; gdRestart(false); } }
@@ -2168,6 +2232,74 @@ socket.on('init',()=>{ if(launchDone) return; launchDone=true; setTimeout(()=>{
   if(L_ANS) launchAnswer({room:L_ANS,video:L_VID,from:L_FROM||'Caller'});
   else if(L_CHAT){ openModal('chatApp'); switchChat(L_CHAT); }
 },400); });
+
+// ================= PROFILES + COINS + LEADERBOARD =================
+const ACH_INFO={first_win:['🥇','First win'],wins_10:['🏆','10 wins'],coins_100:['🪙','100 coins'],coins_1000:['💰','1000 coins'],dash_done:['🔷','Finished a Dash level'],all_games:['🎮','Played all 5 games']};
+const avatar=p=>p.av?'<img class="avs" src="/avatar/'+enc(p.name)+'?v='+p.av+'" alt="">':esc(p.emoji||'👤');
+let newAvatar, bioFor='', lbBy='coins';
+
+function pickAvatar(inp){
+  const f=inp.files[0]; inp.value=''; if(!f) return;
+  if(!f.type.startsWith('image/')) return toast('Pick a picture file');
+  const u=URL.createObjectURL(f), img=new Image();
+  img.onload=()=>{
+    const s=Math.min(img.width,img.height), c=document.createElement('canvas'); c.width=c.height=128;
+    c.getContext('2d').drawImage(img,(img.width-s)/2,(img.height-s)/2,s,s,0,0,128,128);
+    newAvatar=c.toDataURL('image/jpeg',0.8); URL.revokeObjectURL(u);
+    $('profAvPrev').src=newAvatar; $('profAvPrev').style.display='inline-block'; toast('Now press Save');
+  };
+  img.onerror=()=>{ URL.revokeObjectURL(u); toast('Could not read that picture'); };
+  img.src=u;
+}
+function clearAvatar(){ newAvatar=''; $('profAvPrev').style.display='none'; toast('Avatar will be removed when you press Save'); }
+
+function openProfile(e){
+  const n=decodeURIComponent(e), p=dirMap[n]; if(!p) return toast('Profile not found');
+  const on=onlineUsers.includes(n), rank=directory.filter(u=>(u.coins||0)>(p.coins||0)).length+1;
+  const big=p.av?'<img class="avbig" src="/avatar/'+enc(n)+'?v='+p.av+'" alt="">':'<div class="avbig">'+esc(p.emoji||'👤')+'</div>';
+  const ach=(p.ach||[]).filter(id=>ACH_INFO[id]).map(id=>'<span class="achchip">'+ACH_INFO[id][0]+' '+esc(ACH_INFO[id][1])+'</span>').join('')||'<small style="color:#888">No achievements yet</small>';
+  $('profileBody').innerHTML='<div style="text-align:center">'+big
+    +'<h3 style="margin:4px 0">'+esc(n)+tag(p.role)+'</h3>'
+    +'<div>'+(on?'🟢 online':'⚪ last seen '+timeAgo(p.lastSeen))+'</div>'
+    +(p.status?'<div style="color:#aaa;margin-top:4px">'+esc(p.status)+'</div>':'')
+    +(p.bio?'<p style="margin:10px 0">'+esc(p.bio)+'</p>':'')+'</div>'
+    +'<div class="pstats"><div class="stat"><b>🪙 '+(p.coins||0)+'</b><small>Coins</small></div><div class="stat"><b>🏆 '+(p.wins||0)+'</b><small>Wins</small></div><div class="stat"><b>#'+rank+'</b><small>Rank</small></div></div>'
+    +'<h4>Achievements</h4><div>'+ach+'</div>'
+    +'<p style="color:#888;font-size:12px">👁 '+(p.visits||0)+' visits</p>'
+    +(n===me?'<button class="btn" onclick="closeModal(\'profileModal\');openModal(\'usersModal\')">✏️ Edit profile</button>'
+      :'<div class="user-actions"><button class="btn" onclick="closeModal(\'profileModal\');act(\'chat\',\''+enc(n)+'\')">💬 Chat</button>'
+       +(on?'<button class="btn blue" onclick="closeModal(\'profileModal\');act(\'call\',\''+enc(n)+'\')">📞 Call</button>':'')+'</div>');
+  $('profileModal').style.display='flex';
+}
+
+function openBoard(by){
+  lbBy=by||lbBy; openModal('boardModal');
+  ['coins','wins','gd','doom','arena'].forEach(k=>$('lb-'+k).className='btn sm'+(k===lbBy?'':' gray'));
+  $('lbList').innerHTML='<small style="color:#888">Loading...</small>'; socket.emit('get_leaderboard',lbBy);
+}
+const lbVal=(by,v)=>by==='coins'?'🪙 '+v:by==='wins'?'🏆 '+v:by==='gd'?v+'%':v+(by==='doom'?' kills':' kills');
+socket.on('leaderboard',({by,rows,mine})=>{
+  if(by!==lbBy||$('boardModal').style.display!=='flex') return;
+  $('lbMine').innerText=mine.rank?'Your rank: #'+mine.rank+' · '+lbVal(by,mine.v):'You are not on this board yet. Play to get on it!';
+  $('lbList').innerHTML=rows.length?rows.map((r,i)=>'<div class="user-card" style="cursor:pointer" onclick="openProfile(\''+enc(r.name)+'\')"><span>'
+    +(['🥇','🥈','🥉'][i]||'#'+(i+1))+' '+avatar(r)+' '+esc(r.name)+(r.name===me?' (You)':'')+'</span><b>'+lbVal(by,r.v)+'</b></div>').join('')
+    :'<small style="color:#888">Nobody yet. Be the first!</small>';
+});
+function showCoins(c){ ['coinBadge','coinBadge2'].forEach(id=>{ const e=$(id); if(e) e.innerText='🪙 '+c; }); }
+socket.on('coins',({coins,gained})=>{ showCoins(coins); if(gained>0) toast('🪙 +'+gained+' coins'); });
+socket.on('directory',()=>{
+  const p=dirMap[me]; if(!p) return;
+  showCoins(p.coins||0);
+  if(bioFor!==me){ bioFor=me; $('profBio').value=p.bio||''; }
+});
+
+// picture viewer: tap a photo in chat to see it big
+chatBox.addEventListener('click',e=>{
+  if(!e.target.classList.contains('msg-img')) return;
+  const o=document.createElement('div');
+  o.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:300;display:flex;align-items:center;justify-content:center;cursor:zoom-out';
+  o.innerHTML='<img src="'+e.target.src+'" style="max-width:96%;max-height:96%;border-radius:8px">'; o.onclick=()=>o.remove(); document.body.appendChild(o);
+});
 
 // ================= boot =================
 showName();
