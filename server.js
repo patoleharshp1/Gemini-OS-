@@ -93,13 +93,38 @@ const MAX_BYTES = 14e6;
 const A = () => io.to('authed');
 const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 const arr = (o, k) => (hasOwn(o, k) ? o[k] : (o[k] = []));
-const prof = n => (hasOwn(db.profiles, n) ? db.profiles[n] : (db.profiles[n] = { lastSeen: 0, visits: 0, status: '', emoji: '😀', wins: 0 }));
-const directory = () => db.users.map(n => ({ name: n, ...prof(n), role: roleOf(n) }));
+const prof = n => {
+  const p = hasOwn(db.profiles, n) ? db.profiles[n] : (db.profiles[n] = { lastSeen: 0, visits: 0, status: '', emoji: '😀', wins: 0 });
+  if (p.coins === undefined) Object.assign(p, { coins: 0, bio: '', avatar: '', ach: [], best: {}, played: {} }); // fills old profiles too
+  return p;
+};
+const directory = () => db.users.map(n => { const { avatar, ...p } = prof(n); return { name: n, ...p, av: avatar ? (p.avV || 1) : 0, role: roleOf(n) }; });
 const key = (a, b) => [a, b].sort().join('|');
 const uid = () => Date.now().toString() + Math.random().toString(36).slice(2, 6);
 const to = (name, ev, data) => { if (online[name]) io.to(online[name]).emit(ev, data); };
 const findUser = n => db.users.find(u => u.toLowerCase() === String(n || '').trim().toLowerCase());
 const isBlocked = (a, b) => arr(db.blocks, a).includes(b) || arr(db.blocks, b).includes(a);
+
+// ---- coins, achievements, leaderboard ----
+const ACH = { // id: [icon, title, test]
+  first_win: ['🥇', 'First win', p => p.wins >= 1],
+  wins_10: ['🏆', '10 wins', p => p.wins >= 10],
+  coins_100: ['🪙', '100 coins', p => p.coins >= 100],
+  coins_1000: ['💰', '1000 coins', p => p.coins >= 1000],
+  dash_done: ['🔷', 'Finished a Dash level', p => (p.best.gd || 0) >= 100],
+  all_games: ['🎮', 'Played all 5 games', p => Object.keys(p.played).length >= 5]
+};
+function reward(name, game, coins, win, score) {
+  const p = prof(name);
+  p.coins += coins; if (win) p.wins = (p.wins || 0) + 1;
+  p.played[game] = (p.played[game] || 0) + 1;
+  if (score > (p.best[game] || 0)) p.best[game] = score;
+  to(name, 'coins', { coins: p.coins, gained: coins });
+  Object.keys(ACH).forEach(id => {
+    if (!p.ach.includes(id) && ACH[id][2](p)) { p.ach.push(id); to(name, 'toast', ACH[id][0] + ' Achievement: ' + ACH[id][1]); }
+  });
+  pMeta(); stats();
+}
 
 // ---- push notifications ----
 const pushOn = !!(webpush && process.env.VAPID_PUBLIC && process.env.VAPID_PRIVATE);
@@ -371,6 +396,13 @@ app.get('/api/search', async (req, res) => {
   } catch (e) { res.json({ error: 'Search failed. Try again.' }); }
 });
 
+app.get('/avatar/:name', (req, res) => {
+  const n = findUser(req.params.name), a = n && hasOwn(db.profiles, n) && db.profiles[n].avatar;
+  const m = a && /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(a);
+  if (!m) return res.status(404).end();
+  res.set({ 'Content-Type': m[1], 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'public, max-age=31536000, immutable' }); // the URL has ?v=version
+  res.send(Buffer.from(m[2], 'base64'));
+});
 app.get('/backup', (req, res) => {
   if (!process.env.ADMIN_KEY || req.query.key !== process.env.ADMIN_KEY) return res.status(403).send('forbidden');
   res.setHeader('Content-Disposition', 'attachment; filename="db-backup.json"');
@@ -621,6 +653,8 @@ io.on('connection', (socket) => {
     if (!me || !data) return;
     if (data.text && !isAdmin(me) && isAbusive(data.text)) { autoBan(me, clientId); return; }
     if ((data.image && data.image.length > MAX_BYTES) || (data.audio && data.audio.length > MAX_BYTES)) return socket.emit('toast', 'File too big (max 10 MB)');
+    if (data.image && !/^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(data.image)) return socket.emit('toast', 'Only PNG, JPG, WebP or GIF pictures are allowed');
+    if (data.audio && !/^data:audio\/(webm|ogg|mp4|mpeg|wav|aac|x-m4a)(;codecs=[\w.,-]+)?;base64,[A-Za-z0-9+/=]+$/.test(data.audio)) return socket.emit('toast', 'Unsupported voice note format');
     const m = { user: me, id: uid(), t: Date.now(), timestamp: data.timestamp || '', text: data.text ? String(data.text).slice(0, 2000) : undefined, image: data.image, audio: data.audio };
     if (data.to) {
       const target = findUser(data.to);
@@ -660,9 +694,13 @@ io.on('connection', (socket) => {
   // ---------- Profile & blocking ----------
   socket.on('set_profile', (d = {}) => {
     if (!me) return;
+    if (!isAdmin(me) && isAbusive(String(d.status || '') + ' ' + String(d.bio || ''))) return socket.emit('toast', 'That text is not allowed');
     const p = prof(me);
     p.status = String(d.status || '').replace(/[<>]/g, '').slice(0, 60);
     p.emoji = Array.from(String(d.emoji || '😀')).slice(0, 2).join('');
+    if (typeof d.bio === 'string') p.bio = d.bio.replace(/[<>]/g, '').slice(0, 160);
+    if (d.avatar === '') p.avatar = '';
+    else if (typeof d.avatar === 'string' && d.avatar.length <= 40000 && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(d.avatar)) { p.avatar = d.avatar; p.avV = Date.now(); }
     pMeta(); stats();
   });
   socket.on('block_user', (u) => {
@@ -816,7 +854,7 @@ io.on('connection', (socket) => {
     const r = tttResult(g.board);
     if (r) {
       g.over = true; g.result = r;
-      if (r.w !== 'draw') { const p = prof(r.w === 'X' ? g.x : g.o); p.wins = (p.wins || 0) + 1; pMeta(); stats(); }
+      if (r.w !== 'draw') reward(r.w === 'X' ? g.x : g.o, 'xo', 20, true, 0);
     } else g.turn = sym === 'X' ? 'O' : 'X';
     emitG(g);
   });
@@ -863,17 +901,44 @@ io.on('connection', (socket) => {
   socket.on('chess_over', ({ id, win } = {}) => { // sent only by the winner (checkmate)
     const g = chess[id]; if (!g || g.over || (g.w !== me && g.b !== me)) return;
     g.over = true;
-    if (win) { const p = prof(me); p.wins = (p.wins || 0) + 1; pMeta(); stats(); }
+    if (win) reward(me, 'chess', 30, true, 0);
   });
   socket.on('chess_resign', (id) => {
     const g = chess[id]; if (!g || g.over || (g.w !== me && g.b !== me)) return;
     g.over = true; const o = g.w === me ? g.b : g.w;
     to(o, 'chess_end', { id, reason: me + ' resigned' });
-    const p = prof(o); p.wins = (p.wins || 0) + 1; pMeta(); stats();
+    reward(o, 'chess', 30, true, 0);
   });
   socket.on('chess_leave', (id) => {
     const g = chess[id]; if (!g || (g.w !== me && g.b !== me)) return;
     to(g.w === me ? g.b : g.w, 'chess_closed', { id }); delete chess[id];
+  });
+
+  // ---------- Coins & leaderboard ----------
+  const GAME_COINS = { xo: 8, arena: 25, doom: 25, gd: 40 }; // coins for a win in the games that run on the player's device
+  const lastGR = {};
+  socket.on('game_reward', ({ game, win, score } = {}) => {
+    if (!me || !hasOwn(GAME_COINS, game)) return;
+    score = Math.max(0, Math.min(Math.floor(+score) || 0, 1e6));
+    const p = prof(me), k = me + '|' + game, now = Date.now(), day = new Date().toISOString().slice(0, 10);
+    let c = 0;
+    if (now - (lastGR[k] || 0) >= 15000) { // at most one reward per game every 15 seconds
+      lastGR[k] = now;
+      if (p.day !== day) { p.day = day; p.dayCoins = 0; }
+      c = win ? GAME_COINS[game] : Math.min(10, 2 + Math.floor(score / 10));
+      c = Math.max(0, Math.min(c, 400 - (p.dayCoins || 0))); // daily limit: 400 coins from these games
+      p.dayCoins = (p.dayCoins || 0) + c;
+    }
+    reward(me, game, c, !!win && c > 0, score);
+  });
+  socket.on('get_leaderboard', (by) => {
+    if (!me) return;
+    by = ['coins', 'wins', 'gd', 'doom', 'arena'].includes(by) ? by : 'coins';
+    const val = p => (by === 'coins' ? p.coins : by === 'wins' ? p.wins : p.best[by]) || 0;
+    const all = db.users.map(n => { const p = prof(n); return { name: n, emoji: p.emoji, av: p.avatar ? (p.avV || 1) : 0, v: val(p) }; })
+      .filter(r => r.v > 0).sort((a, b) => b.v - a.v);
+    const i = all.findIndex(r => r.name === me);
+    socket.emit('leaderboard', { by, rows: all.slice(0, 20), mine: { v: val(prof(me)), rank: i < 0 ? 0 : i + 1 } });
   });
 
   socket.on('disconnect', () => {
