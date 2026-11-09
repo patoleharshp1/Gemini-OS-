@@ -96,9 +96,10 @@ const arr = (o, k) => (hasOwn(o, k) ? o[k] : (o[k] = []));
 const prof = n => {
   const p = hasOwn(db.profiles, n) ? db.profiles[n] : (db.profiles[n] = { lastSeen: 0, visits: 0, status: '', emoji: '😀', wins: 0 });
   if (p.coins === undefined) Object.assign(p, { coins: 0, bio: '', avatar: '', ach: [], best: {}, played: {} }); // fills old profiles too
+  if (!Array.isArray(p.own)) Object.assign(p, { own: [], rank: '', color: '', badge: '' }); // NEW: shop items (owned list + what is equipped)
   return p;
 };
-const directory = () => db.users.map(n => { const { avatar, ...p } = prof(n); return { name: n, ...p, av: avatar ? (p.avV || 1) : 0, role: roleOf(n) }; });
+const directory = () => db.users.map(n => { const { avatar, own, ...p } = prof(n); return { name: n, ...p, av: avatar ? (p.avV || 1) : 0, role: roleOf(n) }; });
 const key = (a, b) => [a, b].sort().join('|');
 const uid = () => Date.now().toString() + Math.random().toString(36).slice(2, 6);
 const to = (name, ev, data) => { if (online[name]) io.to(online[name]).emit(ev, data); };
@@ -125,6 +126,27 @@ function reward(name, game, coins, win, score) {
   });
   pMeta(); stats();
 }
+
+// ---- NEW: shop (spend coins). Owner and Admin can NOT be bought: they only come from the account. ----
+const SHOP = {
+  rank_vip:    { cat: 'rank',  name: 'VIP',    icon: '⭐', price: 300 },
+  rank_pro:    { cat: 'rank',  name: 'PRO',    icon: '💎', price: 800 },
+  rank_elite:  { cat: 'rank',  name: 'ELITE',  icon: '🔥', price: 2000 },
+  rank_legend: { cat: 'rank',  name: 'LEGEND', icon: '🐉', price: 5000 },
+  col_red:     { cat: 'color', name: 'Red',     icon: '🎨', css: '#ff5252', price: 150 },
+  col_green:   { cat: 'color', name: 'Green',   icon: '🎨', css: '#66bb6a', price: 150 },
+  col_cyan:    { cat: 'color', name: 'Cyan',    icon: '🎨', css: '#26c6da', price: 150 },
+  col_pink:    { cat: 'color', name: 'Pink',    icon: '🎨', css: '#f48fb1', price: 150 },
+  col_gold:    { cat: 'color', name: 'Gold',    icon: '🎨', css: '#ffd54f', price: 300 },
+  col_rainbow: { cat: 'color', name: 'Rainbow', icon: '🌈', css: 'rainbow', price: 700 },
+  bdg_ghost:   { cat: 'badge', name: 'Ghost',  icon: '👻', price: 100 },
+  bdg_rocket:  { cat: 'badge', name: 'Rocket', icon: '🚀', price: 200 },
+  bdg_alien:   { cat: 'badge', name: 'Alien',  icon: '👽', price: 200 },
+  bdg_skull:   { cat: 'badge', name: 'Skull',  icon: '💀', price: 300 },
+  bdg_diamond: { cat: 'badge', name: 'Diamond', icon: '💠', price: 500 },
+  bdg_dragon:  { cat: 'badge', name: 'Dragon', icon: '🐲', price: 1000 }
+};
+const SHOP_SLOTS = ['rank', 'color', 'badge'];
 
 // ---- push notifications ----
 const pushOn = !!(webpush && process.env.VAPID_PUBLIC && process.env.VAPID_PRIVATE);
@@ -446,6 +468,7 @@ io.on('connection', (socket) => {
     socket.emit('init', { global: lastN(db.global, 50), dms: Object.fromEntries(Object.entries(dmsFor(me)).map(([k, v]) => [k, lastN(v, 50)])), files: filesFor(me).map(slimF) });
     social(me);
     socket.emit('blocks', arr(db.blocks, me));
+    socket.emit('shop_state', shopState()); // NEW
     stats();
   }
   const ok = (name, token) => {
@@ -939,6 +962,30 @@ io.on('connection', (socket) => {
       .filter(r => r.v > 0).sort((a, b) => b.v - a.v);
     const i = all.findIndex(r => r.name === me);
     socket.emit('leaderboard', { by, rows: all.slice(0, 20), mine: { v: val(prof(me)), rank: i < 0 ? 0 : i + 1 } });
+  });
+
+  // ---------- NEW: Shop (ranks, name colours, badges - paid with coins) ----------
+  const shopState = () => { const p = prof(me); return { coins: p.coins, own: p.own, rank: p.rank, color: p.color, badge: p.badge, items: SHOP }; };
+  socket.on('shop_get', () => { if (me) socket.emit('shop_state', shopState()); });
+  socket.on('shop_buy', (id) => {
+    if (!me) return;
+    id = String(id || '');
+    if (!hasOwn(SHOP, id)) return socket.emit('toast', 'That item does not exist');
+    const it = SHOP[id], p = prof(me);
+    if (p.own.includes(id)) return socket.emit('toast', 'You already own that');
+    if (p.coins < it.price) return socket.emit('toast', '🪙 You need ' + (it.price - p.coins) + ' more coins');
+    p.coins -= it.price; p.own.push(id); p[it.cat] = id; // a new purchase is equipped right away
+    pMeta(); stats();
+    socket.emit('coins', { coins: p.coins, gained: 0 });
+    socket.emit('shop_state', shopState());
+    socket.emit('toast', '🛒 Bought ' + it.icon + ' ' + it.name);
+  });
+  socket.on('shop_equip', ({ cat, id } = {}) => { // id '' = take it off
+    if (!me || !SHOP_SLOTS.includes(cat)) return;
+    const p = prof(me); id = String(id || '');
+    if (id && !(hasOwn(SHOP, id) && SHOP[id].cat === cat && p.own.includes(id))) return;
+    p[cat] = id; pMeta(); stats();
+    socket.emit('shop_state', shopState());
   });
 
   socket.on('disconnect', () => {
