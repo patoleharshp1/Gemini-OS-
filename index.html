@@ -2374,21 +2374,13 @@ if(!navigator.onLine) setOnlineUI(false);
 const el=(t,a,...k)=>{ const e=document.createElement(t); for(const x in (a||{})){ if(x==='style') Object.assign(e.style,a[x]); else if(x.startsWith('on')) e[x]=a[x]; else e.setAttribute(x,a[x]); } k.forEach(c=>e.append(c)); return e; };
 const lsGet=(k,d)=>{ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } };
 const lsSet=(k,v)=>{ try{ localStorage.setItem(k,JSON.stringify(v)); return true; }catch(e){ return false; } };
-const DESK=()=>innerWidth>=900;
 
 const st=el('style'); st.textContent=`
 :root{--gf-glow:10px}
-.gfw{position:fixed!important;inset:auto!important;border:1px solid var(--ac);border-radius:10px;box-shadow:0 0 var(--gf-glow) var(--ac),0 10px 40px #000a;overflow:hidden;min-width:300px;min-height:200px}
-.gfw .modal-header{cursor:move;user-select:none;touch-action:none}
-.gfw .modal-header .gfb{display:flex;gap:6px}
-.gf-grip{position:absolute;right:0;bottom:0;width:18px;height:18px;cursor:nwse-resize;touch-action:none;background:linear-gradient(135deg,transparent 50%,var(--ac) 50%);z-index:5}
-#gfTask{display:none;position:fixed;bottom:0;left:230px;right:0;height:38px;background:#1a0505;border-top:1px solid var(--bd);z-index:9000;align-items:center;gap:6px;padding:0 8px;overflow-x:auto}
-#gfTask button{background:#2b0b0b;border:1px solid var(--bd);color:var(--tx);border-radius:6px;padding:5px 10px;cursor:pointer;white-space:nowrap;font-size:12px}
-#gfTask button.on{border-color:var(--ac);color:#fff}
 #gfCrt{display:none;position:fixed;inset:0;pointer-events:none;z-index:99999;background:repeating-linear-gradient(0deg,rgba(0,0,0,.28) 0,rgba(0,0,0,.28) 1px,transparent 1px,transparent 3px);box-shadow:inset 0 0 120px rgba(0,0,0,.6)}
 body.gf-pixel{font-family:"Courier New",monospace}
 body.gf-pixel *{image-rendering:pixelated}
-body.gf-pixel .btn,body.gf-pixel .tile-app,body.gf-pixel .topbar,body.gf-pixel .gfw,body.gf-pixel .close-btn{border-radius:0!important}
+body.gf-pixel .btn,body.gf-pixel .tile-app,body.gf-pixel .topbar,body.gf-pixel .close-btn{border-radius:0!important}
 .gf-p{display:flex;flex-direction:column;gap:10px}
 .gf-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .gf-sw{width:26px;height:26px;border-radius:50%;border:2px solid #222;cursor:pointer;display:inline-block}
@@ -2396,7 +2388,7 @@ body.gf-pixel .btn,body.gf-pixel .tile-app,body.gf-pixel .topbar,body.gf-pixel .
 .gf-log{font-size:12px;max-height:70px;overflow:auto;background:#0b0b14;padding:5px;border-radius:6px}
 `;
 document.head.append(st);
-document.body.append(el('div',{id:'gfCrt'}),el('div',{id:'gfTask'}));
+document.body.append(el('div',{id:'gfCrt'}));
 
 function mkApp(id,title,icon,label,body){
   const m=el('div',{id,class:'modal'});
@@ -2406,60 +2398,11 @@ function mkApp(id,title,icon,label,body){
   const tiles=document.querySelector('.tiles'); tiles.insertBefore(el('div',{class:'tile-app',onclick:()=>openModal(id)},el('i',{},icon),label),tiles.lastElementChild);
 }
 
-/* ---------- 1) WINDOW MANAGER (laptop screens only; phones keep the full-screen style) ---------- */
-let zTop=1000, nWin=0;
-const WM_SKIP=['authModal','profileModal'];
-function wmFocus(m){ m.style.zIndex=++zTop; }
-function wmSetup(m){
-  if(m.dataset.wm) return; m.dataset.wm='1'; m.classList.add('gfw');
-  const big=['gamesModal','browserModal','liveModal'].includes(m.id);
-  const w=big?innerWidth-260:Math.min(760,innerWidth-300), h=big?innerHeight-60:Math.min(560,innerHeight-120);
-  const off=(nWin++%8)*26;
-  Object.assign(m.style,{left:(big?240:250+off)+'px',top:(big?10:30+off)+'px',width:w+'px',height:h+'px'});
-  const hd=m.querySelector('.modal-header'), close=hd.querySelector('.close-btn');
-  const bMin=el('button',{class:'close-btn',style:{background:'#444'},title:'Minimize'},'–');
-  const bMax=el('button',{class:'close-btn',style:{background:'#444'},title:'Maximize'},'□');
-  const grp=el('span',{class:'gfb'}); close.replaceWith(grp); grp.append(bMin,bMax,close);
-  const grip=el('div',{class:'gf-grip'}); m.append(grip);
-  let saved=null;
-  const toggleMax=()=>{ if(saved){ Object.assign(m.style,saved); saved=null; return; } saved={left:m.style.left,top:m.style.top,width:m.style.width,height:m.style.height}; Object.assign(m.style,{left:'230px',top:'0px',width:(innerWidth-230)+'px',height:(innerHeight-38)+'px'}); };
-  bMax.onclick=toggleMax; hd.ondblclick=e=>{ if(e.target.tagName!=='BUTTON') toggleMax(); };
-  bMin.onclick=()=>{ m.dataset.min='1'; m.style.display='none'; };
-  m.addEventListener('pointerdown',()=>wmFocus(m));
-  hd.addEventListener('pointerdown',e=>{
-    if(e.target.tagName==='BUTTON'||saved) return;
-    const dx=e.clientX-m.offsetLeft, dy=e.clientY-m.offsetTop; hd.setPointerCapture(e.pointerId);
-    const mv=ev=>{ m.style.left=Math.max(0,Math.min(innerWidth-80,ev.clientX-dx))+'px'; m.style.top=Math.max(0,Math.min(innerHeight-90,ev.clientY-dy))+'px'; };
-    const up=()=>{ hd.removeEventListener('pointermove',mv); hd.removeEventListener('pointerup',up); };
-    hd.addEventListener('pointermove',mv); hd.addEventListener('pointerup',up);
-  });
-  grip.addEventListener('pointerdown',e=>{
-    if(saved) return; e.stopPropagation();
-    const sx=e.clientX, sy=e.clientY, sw=m.offsetWidth, sh=m.offsetHeight; grip.setPointerCapture(e.pointerId);
-    const mv=ev=>{ m.style.width=Math.max(300,sw+ev.clientX-sx)+'px'; m.style.height=Math.max(200,sh+ev.clientY-sy)+'px'; window.dispatchEvent(new Event('resize')); };
-    const up=()=>{ grip.removeEventListener('pointermove',mv); grip.removeEventListener('pointerup',up); };
-    grip.addEventListener('pointermove',mv); grip.addEventListener('pointerup',up);
-  });
-}
+/* ---------- 1) (multitasking removed) apps open one at a time, full screen, like the original ---------- */
 const _openModal=openModal;
-openModal=function(id){
-  if(!DESK()||WM_SKIP.includes(id)) _openModal(id);
-  else { const m=$(id); if(!m) return; wmSetup(m); delete m.dataset.min; m.style.display='flex'; wmFocus(m);
-    if(id==='phoneApp') renderCallPicker(); if(id==='usersModal') renderUsers(); }
-  if(id==='wbApp') wbJoin();
-};
+openModal=function(id){ _openModal(id); if(id==='wbApp') wbJoin(); };
 const _closeModal=closeModal;
-closeModal=function(id){ const m=$(id); if(m) delete m.dataset.min; _closeModal(id); if(id==='wbApp') socket.emit('wb_leave'); };
-function taskRefresh(){
-  const bar=$('gfTask'); if(!DESK()){ bar.style.display='none'; return; }
-  const open=[...document.querySelectorAll('.modal.gfw')].filter(m=>m.style.display==='flex'||m.dataset.min);
-  bar.style.display=open.length?'flex':'none';
-  const sig=open.map(m=>m.id+(m.dataset.min?'m':'o')).join(',');
-  if(bar.dataset.sig===sig) return; bar.dataset.sig=sig; bar.innerHTML='';
-  open.forEach(m=>{ const t=(m.querySelector('h3')||{}).textContent||m.id;
-    bar.append(el('button',{class:m.dataset.min?'':'on',onclick:()=>{ if(m.dataset.min){ delete m.dataset.min; m.style.display='flex'; wmFocus(m); } else if(m.style.zIndex==zTop){ m.dataset.min='1'; m.style.display='none'; } else wmFocus(m); }},t.trim().slice(0,22))); });
-}
-setInterval(taskRefresh,500);
+closeModal=function(id){ _closeModal(id); if(id==='wbApp') socket.emit('wb_leave'); };
 
 /* ---------- 2) SHARED WHITEBOARD + PICTIONARY ---------- */
 const NEON=['#00f0ff','#ff2bd6','#39ff14','#fff200','#ff6a00','#ffffff','#9d4dff','#ff3131'], BG='#0b0b14';
@@ -2558,7 +2501,7 @@ socket.on('prefs',p=>{ if(!p) { tApply(); return; } T=Object.assign({},T0,p,{cus
 tApply();
 /* ---------- 5) DRAW BATTLE: friends draw the same thing, the AI rates both out of 100, you win that many coins ---------- */
 const BW=480,BH=320,BCOL=['#000000','#e53935','#1e88e5','#43a047','#fb8c00','#8e24aa','#6d4c41'];
-let dbId=null, dbSent=false, dbTimer=0, dbDraw=false, dbLast=null, dbStrokes=0, dbCol=BCOL[0], dbSz=4, dbEr=false, dbActive=false;
+let dbId=null, dbSent=false, dbTimer=0, dbDraw=false, dbLast=null, dbStrokes=0, dbCol=BCOL[0], dbSz=4, dbEr=false, dbActive=false, dbSolo=false;
 const bc=el('canvas',{width:BW,height:BH,style:{width:'100%',maxWidth:'560px',background:'#fff',borderRadius:'8px',touchAction:'none',cursor:'crosshair',alignSelf:'center'}});
 const bx=bc.getContext('2d'); bx.lineCap='round'; bx.lineJoin='round';
 const bClear=()=>{ bx.fillStyle='#fff'; bx.fillRect(0,0,BW,BH); }; bClear();
@@ -2566,7 +2509,7 @@ const bPos=e=>{ const r=bc.getBoundingClientRect(); return {x:(e.clientX-r.left)
 bc.addEventListener('pointerdown',e=>{ if(!dbActive||dbSent) return; bc.setPointerCapture(e.pointerId); dbDraw=true; dbLast=bPos(e); dbStrokes++; });
 bc.addEventListener('pointermove',e=>{ if(!dbDraw) return; const p=bPos(e); bx.strokeStyle=dbEr?'#fff':dbCol; bx.lineWidth=dbSz*(dbEr?3:1); bx.beginPath(); bx.moveTo(dbLast.x,dbLast.y); bx.lineTo(p.x,p.y); bx.stroke(); dbLast=p; });
 ['pointerup','pointercancel'].forEach(ev=>bc.addEventListener(ev,()=>{ dbDraw=false; }));
-const dbStatus=el('div',{style:{fontSize:'14px',color:'#ffb300'}},'Pick an online friend and challenge them!');
+const dbStatus=el('div',{style:{fontSize:'14px',color:'#ffb300'}},'Play solo (the AI gives you something to draw) or challenge an online friend!');
 const dbSel=el('select',{style:{minWidth:'150px'}});
 function dbFill(){ const on=new Set((onlineUsers||[]).map(x=>typeof x==='string'?x:x.name)); const list=(friends||[]).filter(f=>on.has(f)); dbSel.innerHTML=''; list.forEach(f=>dbSel.append(el('option',{value:f},f))); if(!list.length) dbSel.append(el('option',{value:''},'(no friends online)')); }
 const dbInv=el('div',{class:'gf-row',style:{display:'none',background:'#2b0b0b',padding:'8px',borderRadius:'8px'}});
@@ -2577,30 +2520,30 @@ BCOL.forEach((c,i)=>dbTools.append(el('span',{class:'gf-sw'+(i?'':' sel'),style:
 dbTools.append(el('input',{type:'range',min:1,max:20,value:4,oninput:e=>{ dbSz=+e.target.value; }}),el('button',{class:'btn sm gray',onclick:()=>{ dbEr=!dbEr; }},'Eraser'),el('button',{class:'btn sm gray',onclick:()=>{ if(!dbSent) bClear(); }},'Clear'),el('button',{class:'btn sm green',onclick:()=>dbSubmit()},'✔ Done'));
 const dbRes=el('div',{class:'gf-p'});
 const dbRoot=el('div',{class:'gf-p'},
-  el('div',{class:'gf-row'},dbSel,el('button',{class:'btn sm green',onclick:()=>{ if(dbSel.value) socket.emit('db_invite',dbSel.value); else toast('No friend is online'); }},'⚔️ Challenge'),el('button',{class:'btn sm gray',onclick:dbFill},'↻ Refresh')),
+  el('div',{class:'gf-row'},el('button',{class:'btn sm green',onclick:()=>{ if(dbId) return toast('Finish this round first'); dbRes.innerHTML=''; socket.emit('db_solo'); }},'🎯 Play Solo'),dbSel,el('button',{class:'btn sm green',onclick:()=>{ if(dbSel.value) socket.emit('db_invite',dbSel.value); else toast('No friend is online'); }},'⚔️ Challenge'),el('button',{class:'btn sm gray',onclick:dbFill},'↻ Refresh')),
   dbStatus,dbInv,dbPrompt,dbClock,bc,dbTools,dbRes,
-  el('small',{style:{color:'#888'}},'Both players draw the same thing for 60 seconds. An AI looks at both drawings and rates each from 0 to 100. Your score is the number of coins you win (daily limit 500).'));
+  el('small',{style:{color:'#888'}},'You get a random thing to draw (one of 100) and 60 seconds. The AI rates your drawing from 0 to 100. Solo: you win half your score in coins (60+ counts as a win). Versus a friend: you win your full score in coins. Daily limit 500.'));
 mkApp('dbApp','⚔️ Draw Battle','⚔️','Draw Battle',dbRoot);
 const _om2=openModal; openModal=function(id){ _om2(id); if(id==='dbApp') dbFill(); };
 const _cm2=closeModal; closeModal=function(id){ _cm2(id); if(id==='dbApp'&&dbId&&!dbSent){ socket.emit('db_leave'); dbReset(); } };
-function dbReset(){ clearInterval(dbTimer); dbId=null; dbSent=false; dbActive=false; dbPrompt.style.display=dbClock.style.display=dbTools.style.display='none'; bc.style.display='none'; }
+function dbReset(){ clearInterval(dbTimer); dbSolo=false; dbId=null; dbSent=false; dbActive=false; dbPrompt.style.display=dbClock.style.display=dbTools.style.display='none'; bc.style.display='none'; }
 bc.style.display='none';
 function dbSubmit(){
   if(!dbId||dbSent) return; dbSent=true; clearInterval(dbTimer);
   const o=document.createElement('canvas'); o.width=BW; o.height=BH; const c=o.getContext('2d'); c.fillStyle='#fff'; c.fillRect(0,0,BW,BH); c.drawImage(bc,0,0);
   const s=document.createElement('canvas'); s.width=96; s.height=64; const sc=s.getContext('2d'); sc.drawImage(o,0,0,96,64); const d=sc.getImageData(0,0,96,64).data; let ink=0; for(let i=0;i<d.length;i+=4) if(d[i]<235||d[i+1]<235||d[i+2]<235) ink++;
   socket.emit('db_submit',{id:dbId,img:o.toDataURL('image/jpeg',.7),cov:ink/(96*64),strokes:dbStrokes});
-  dbStatus.textContent='✅ Submitted! Waiting for the other player…'; dbClock.textContent='';
+  dbStatus.textContent=dbSolo?'✅ Submitted! The AI is looking at your drawing…':'✅ Submitted! Waiting for the other player…'; dbClock.textContent='';
 }
 socket.on('db_invite',d=>{ openModal('dbApp'); dbInv.style.display='flex'; dbInv.innerHTML=''; dbInv.append(el('b',{},'⚔️ '+d.from+' challenges you to a Draw Battle!'),
   el('button',{class:'btn sm green',onclick:()=>{ socket.emit('db_accept',d.id); dbInv.style.display='none'; dbStatus.textContent='Getting the topic…'; }},'Accept'),
   el('button',{class:'btn sm gray',onclick:()=>{ socket.emit('db_decline',d.id); dbInv.style.display='none'; }},'Decline')); });
 socket.on('db_start',d=>{
   openModal('dbApp'); dbRes.innerHTML=''; dbInv.style.display='none'; bClear(); dbId=d.id; dbSent=false; dbActive=true; dbStrokes=0; dbEr=false;
-  bc.style.display='block'; dbPrompt.style.display=dbClock.style.display=dbTools.style.display=''; dbPrompt.textContent='Draw: '+d.prompt; dbStatus.textContent='⚔️ '+d.a+' vs '+d.b;
+  bc.style.display='block'; dbPrompt.style.display=dbClock.style.display=dbTools.style.display=''; dbPrompt.textContent='Draw: '+d.prompt; dbSolo=!!d.solo; dbStatus.textContent=d.solo?'🎯 Solo round — draw it in 60 seconds!':'⚔️ '+d.a+' vs '+d.b;
   let left=d.secs; dbClock.textContent='⏱ '+left+'s'; clearInterval(dbTimer);
   dbTimer=setInterval(()=>{ left--; dbClock.textContent='⏱ '+Math.max(0,left)+'s'; if(left<=0) dbSubmit(); },1000); });
-socket.on('db_judging',()=>{ dbStatus.textContent='🤖 The AI is judging both drawings…'; });
+socket.on('db_judging',()=>{ dbStatus.textContent=dbSolo?'🤖 The AI is judging your drawing…':'🤖 The AI is judging both drawings…'; });
 socket.on('db_cancel',m=>{ dbReset(); dbInv.style.display='none'; dbStatus.textContent=m||'Battle cancelled.'; toast(m||'Battle cancelled'); });
 socket.on('db_result',r=>{
   dbReset(); dbStatus.textContent='🏁 Results for "'+r.prompt+'"'; dbRes.innerHTML='';
@@ -2612,7 +2555,8 @@ socket.on('db_result',r=>{
       el('div',{style:{fontSize:'26px',fontWeight:'bold',color:win?'#ffd54f':'#fff'}},p.score+'%'),
       el('div',{style:{height:'8px',background:'#333',borderRadius:'4px',overflow:'hidden',margin:'4px 0'}},el('div',{style:{width:p.score+'%',height:'100%',background:'var(--ac)'}})),
       el('div',{style:{color:'#ffd54f'}},'+'+p.coins+' 🪙'))); });
-  dbRes.append(row,el('div',{style:{textAlign:'center'}},r.winner?('🏆 '+r.winner+' wins! '):'🤝 It\'s a tie! ',r.comment||''));
+  dbRes.append(row,el('div',{style:{textAlign:'center'}},r.solo?(r.winner?'🎉 Nice drawing! ':'🙂 Keep practising! '):(r.winner?('🏆 '+r.winner+' wins! '):'🤝 It\'s a tie! '),r.comment||''));
+  if(r.solo) dbRes.append(el('button',{class:'btn green',style:{alignSelf:'center'},onclick:()=>{ dbRes.innerHTML=''; socket.emit('db_solo'); }},'🎯 Play again'));
   if(!r.ai) dbRes.append(el('small',{style:{color:'#ff9800',textAlign:'center'}},'The AI judge is not connected yet, so this was a basic score and pays fewer coins.')); });
 socket.on('disconnect',()=>{ if(dbId) dbReset(); });
 })();
