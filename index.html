@@ -575,6 +575,7 @@ h4{color:var(--hi);margin:14px 0 8px}
       <button class="btn" style="flex:1" onclick="upTarget=false;$('driveFileInput').click()">🔒 Upload to My Drive</button>
       <button class="btn green" style="flex:1" onclick="upTarget=true;$('driveFileInput').click()">🌍 Upload for everyone</button>
     </div>
+    <button class="btn" style="width:100%;margin-bottom:10px;background:#1a73e8" onclick="gdBackupAll()">☁️ Back up My Drive to my Google Drive</button>
     <small style="color:#888">Camera photos, camera videos and screen recordings are saved to My Drive automatically. Press 🌍 Share on a file to show it to everyone. Max 10 files, 10 MB each.</small>
     <h4>🔒 My Drive (private)</h4><div id="myDriveList"></div>
     <h4>🌍 Shared Drive</h4><div id="cloudDriveList"></div>
@@ -696,6 +697,7 @@ let onlineUsers=[], friends=[], requests=[], directory=[], blocks=[], dirMap={},
 let globalMsgs=[], dms={}, unread={}, cur='global';
 let authMode='signup', pendingGoogle=null, pendingCred=null;
 let REC=null, recList=[], upTarget=false;
+let GCID='', gdTok='', gdExp=0, gdFolder='', gdPend={};
 let outbox=[]; try{ outbox=JSON.parse(localStorage.getItem('outbox')||'[]'); }catch(e){}
 const saveOutbox = () => localStorage.setItem('outbox', JSON.stringify(outbox));
 let ccT;
@@ -765,6 +767,7 @@ async function logout(){
 }
 fetch((SERVER_URL||'')+'/config').then(r=>r.json()).then(c=>{
   if(c.persistent===false) $('storeWarn').style.display='block';
+  GCID=c.googleClientId||'';
   if(!c.googleClientId) return;
   const s=document.createElement('script'); s.src='https://accounts.google.com/gsi/client'; s.async=true;
   s.onload=()=>{
@@ -967,9 +970,73 @@ function renderCloudFile(f){
   else if(f.type.startsWith('video/')) m='<br><video controls src="'+f.url+'" style="max-width:180px;border-radius:6px"></video>';
   d.innerHTML='<div><strong>'+esc(f.name)+'</strong>'+(priv?'':' (by '+esc(f.uploader)+')')+m+'</div><div style="display:flex;gap:6px;align-items:center">'
     +(f.url?'<a href="'+f.url+'" download="'+esc(f.name)+'" style="color:#8ab4f8;text-decoration:none">⬇️</a>':'')
+    +'<button class="btn sm gray" title="Save to Google Drive" onclick="saveToGDrive(\''+f.id+'\')">☁️ Google Drive</button>'
     +(priv?'<button class="btn sm green" onclick="socket.emit(\'share_file\',\''+f.id+'\')">🌍 Share</button>':'')
     +(f.uploader===me?'<button onclick="socket.emit(\'delete_cloud_file\',\''+f.id+'\')" style="background:none;border:0;color:#ff8a8a;cursor:pointer">🗑</button>':'')+'</div>';
   $(priv?'myDriveList':'cloudDriveList').appendChild(d);
+}
+
+// ================= Save to Google Drive (runs in the browser, uses the Google permission "drive.file") =================
+function gdToken(){
+  return new Promise((res,rej)=>{
+    if(gdTok && Date.now()<gdExp) return res(gdTok);
+    if(!GCID) return rej(new Error('Google is not set up on this server'));
+    if(!window.google||!google.accounts||!google.accounts.oauth2) return rej(new Error('Google is still loading. Try again in a few seconds'));
+    const tc=google.accounts.oauth2.initTokenClient({
+      client_id:GCID, scope:'https://www.googleapis.com/auth/drive.file',
+      callback:r=>{ if(r.error) return rej(new Error(r.error)); gdTok=r.access_token; gdExp=Date.now()+((+r.expires_in||3600)-60)*1000; res(gdTok); },
+      error_callback:e=>rej(new Error((e&&e.type)||'Permission window closed'))
+    });
+    tc.requestAccessToken();
+  });
+}
+async function gdApi(url,opt,tok){
+  const r=await fetch(url,Object.assign({},opt,{headers:Object.assign({Authorization:'Bearer '+tok},(opt&&opt.headers)||{})}));
+  if(r.status===401){ gdTok=''; gdExp=0; gdFolder=''; throw new Error('Google login expired. Press the button again'); }
+  if(!r.ok){ let m=''; try{ m=(await r.json()).error.message; }catch(e){} throw new Error(m||('Google error '+r.status)); }
+  return r.json();
+}
+async function gdEnsureFolder(tok){
+  if(gdFolder) return gdFolder;
+  const q=encodeURIComponent("name='Gemini OS' and mimeType='application/vnd.google-apps.folder' and trashed=false");
+  const l=await gdApi('https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(id)',{},tok);
+  if(l.files&&l.files.length) return gdFolder=l.files[0].id;
+  const c=await gdApi('https://www.googleapis.com/drive/v3/files?fields=id',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Gemini OS',mimeType:'application/vnd.google-apps.folder'})},tok);
+  return gdFolder=c.id;
+}
+function gdFileUrl(id){
+  const f=FILES[id]; if(!f) return Promise.reject(new Error('File not found'));
+  if(f.url) return Promise.resolve(f.url);
+  return new Promise((res,rej)=>{
+    const t=setTimeout(()=>{ delete gdPend[id]; rej(new Error('Could not load the file. Try again')); },25000);
+    gdPend[id]=u=>{ clearTimeout(t); res(u); };
+    socket.emit('get_file',id);
+  });
+}
+async function gdUpload(id,tok){
+  const f=FILES[id], url=await gdFileUrl(id);
+  const blob=await (await fetch(url)).blob();
+  const folder=await gdEnsureFolder(tok), type=f.type||blob.type||'application/octet-stream', b='gdb'+Date.now()+Math.random().toString(36).slice(2);
+  const body=new Blob(['--'+b+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify({name:f.name,parents:[folder]})+'\r\n--'+b+'\r\nContent-Type: '+type+'\r\n\r\n',blob,'\r\n--'+b+'--'],{type:'multipart/related; boundary='+b});
+  return gdApi('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink',{method:'POST',body},tok);
+}
+async function saveToGDrive(id){
+  try{
+    const tok=await gdToken(); toast('☁️ Saving to Google Drive...');
+    await gdUpload(id,tok); toast('✅ Saved to your Google Drive (folder: Gemini OS)');
+  }catch(e){ toast('❌ '+e.message); }
+}
+async function gdBackupAll(){
+  const list=Object.values(FILES).filter(f=>f.scope==='private'&&f.uploader===me);
+  if(!list.length) return toast('Your My Drive is empty');
+  try{
+    const tok=await gdToken(); let ok=0;
+    for(let i=0;i<list.length;i++){
+      toast('☁️ Saving '+(i+1)+' of '+list.length+'...');
+      try{ await gdUpload(list[i].id,tok); ok++; }catch(e){ if(/expired/.test(e.message)) throw e; }
+    }
+    toast('✅ '+ok+' of '+list.length+' files saved to Google Drive (folder: Gemini OS)');
+  }catch(e){ toast('❌ '+e.message); }
 }
 function uploadToDrive(inp,shared){
   if(!socket.connected){ inp.value=''; return toast('📴 Offline: uploads need internet'); }
@@ -2189,6 +2256,7 @@ socket.on('media_data',({id,image,audio})=>{
 });
 socket.on('file_data',({id,url})=>{
   const f=FILES[id]; if(!f) return; f.url=url; f.big=false;
+  if(gdPend[id]){ gdPend[id](url); delete gdPend[id]; }
   const old=$('drive-file-'+id); if(old) old.remove(); renderCloudFile(f);
 });
 const _ru=renderUsers; let ruT;
