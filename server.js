@@ -440,6 +440,65 @@ app.post('/restore', express.json({ limit: '200mb' }), async (req, res) => {
 });
 
 // ================= SOCKETS =================
+// ---- Draw Battle (AI judge) (added) ----
+const DB_PROMPTS = ['cat', 'house', 'pizza', 'rocket', 'tree', 'robot', 'guitar', 'sun', 'car', 'fish', 'castle', 'phone', 'dragon', 'bridge', 'cake', 'planet', 'bicycle', 'ghost', 'clock', 'umbrella',
+  'elephant', 'airplane', 'icecream', 'mountain', 'butterfly', 'snowman', 'crown', 'lighthouse', 'owl', 'spaceship', 'sword', 'flower', 'penguin', 'pirate ship', 'volcano', 'teapot', 'dinosaur', 'rainbow', 'cactus', 'hot air balloon'];
+const battles = Object.create(null), battleOf = Object.create(null);
+const b64 = d => String(d).replace(/^data:image\/jpeg;base64,/, '');
+async function callAI(text, imgs) {
+  const aKey = process.env.ANTHROPIC_API_KEY, gKey = process.env.GEMINI_API_KEY;
+  try {
+    if (aKey) {
+      const models = [process.env.ANTHROPIC_MODEL, 'claude-sonnet-5-5', 'claude-sonnet-4-6'].filter(Boolean);
+      for (const model of models) {
+        const content = imgs.map(i => ({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64(i) } })).concat([{ type: 'text', text }]);
+        const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': aKey, 'anthropic-version': '2023-06-01' }, body: JSON.stringify({ model, max_tokens: 300, messages: [{ role: 'user', content }] }) });
+        const j = await r.json();
+        if (j && Array.isArray(j.content)) return j.content.map(c => c.text || '').join('');
+        console.error('Anthropic API:', model, JSON.stringify(j).slice(0, 200));
+      }
+    }
+    if (gKey) {
+      const models = [process.env.GEMINI_MODEL, 'gemini-2.0-flash', 'gemini-1.5-flash'].filter(Boolean);
+      for (const model of models) {
+        const parts = [{ text }].concat(imgs.map(i => ({ inline_data: { mime_type: 'image/jpeg', data: b64(i) } })));
+        const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', { method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': gKey }, body: JSON.stringify({ contents: [{ parts }] }) });
+        const j = await r.json();
+        const t = j && j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
+        if (t) return t.map(p => p.text || '').join('');
+        console.error('Gemini API:', model, JSON.stringify(j).slice(0, 200));
+      }
+    }
+  } catch (e) { console.error('AI error:', e.message); }
+  return null;
+}
+async function aiPrompt() {
+  const t = await callAI('Give ONE simple, fun thing that people can draw in 60 seconds (1 to 3 words, lowercase, a concrete object or animal, nothing else, no punctuation).', []);
+  const w = t && t.trim().toLowerCase().replace(/[^a-z ]/g, '').slice(0, 30).trim();
+  return w && w.length >= 3 ? w : DB_PROMPTS[Math.floor(Math.random() * DB_PROMPTS.length)];
+}
+// returns { a, b, comment, ai } with a and b = 0..100
+async function judgeDrawings(prompt, A, B) {
+  const flip = Math.random() < .5, first = flip ? B : A, second = flip ? A : B;
+  const t = await callAI('Two players each drew "' + prompt + '" in 60 seconds using a finger or mouse. Image 1 and image 2 are their drawings. Score each from 0 to 100 for how recognisable it is as "' + prompt + '", plus creativity and effort. A blank page or random scribble must score under 10. Be fair and use the full range. Reply with ONLY this JSON: {"s1":number,"s2":number,"comment":"one short friendly sentence"}', [first.img, second.img]);
+  const m = t && t.match(/\{[\s\S]*\}/);
+  if (m) {
+    try {
+      const j = JSON.parse(m[0]), c = v => Math.max(0, Math.min(100, Math.round(+v) || 0));
+      const s1 = c(j.s1), s2 = c(j.s2);
+      return { a: flip ? s2 : s1, b: flip ? s1 : s2, comment: String(j.comment || '').replace(/[<>]/g, '').slice(0, 160), ai: true };
+    } catch (e) {}
+  }
+  // basic fallback (no AI key set): based on how much was drawn
+  const basic = d => !d.img ? 0 : Math.round(Math.min(1, (+d.cov || 0) / .08) * 40 + Math.min(1, (+d.strokes || 0) / 25) * 20);
+  return { a: basic(A), b: basic(B), comment: 'Basic score (the AI judge is not set up yet).', ai: false };
+}
+
+// ---- Whiteboard + Pictionary rooms (added) ----
+const wbRooms = Object.create(null); // room -> { h: [strokes], game: { drawer, word } | null }
+const WB_WORDS = ['cat', 'house', 'pizza', 'rocket', 'tree', 'robot', 'guitar', 'sun', 'car', 'fish', 'castle', 'phone', 'dragon', 'bridge', 'cake', 'planet', 'bicycle', 'ghost', 'clock', 'umbrella'];
+const wbNum = v => typeof v === 'number' && isFinite(v);
+
 io.on('connection', (socket) => {
   let me = null, counted = false, clientId = null;
   socket.data.ip = ipOf(socket); socket.data.me = null;
@@ -469,6 +528,7 @@ io.on('connection', (socket) => {
     social(me);
     socket.emit('blocks', arr(db.blocks, me));
     socket.emit('shop_state', shopState()); // NEW
+    socket.emit('prefs', prof(me).prefs || null);
     stats();
   }
   const ok = (name, token) => {
@@ -940,7 +1000,7 @@ io.on('connection', (socket) => {
   // ---------- Coins & leaderboard ----------
   const GAME_COINS = { xo: 8, arena: 25, doom: 25, gd: 40 }; // coins for a win in the games that run on the player's device
   const lastGR = {};
-  socket.on('game_reward', ({ game, win, score } = {}) => {
+  socket.on('game_reward', ({ game, win, score, lvl } = {}) => {
     if (!me || !hasOwn(GAME_COINS, game)) return;
     score = Math.max(0, Math.min(Math.floor(+score) || 0, 1e6));
     const p = prof(me), k = me + '|' + game, now = Date.now(), day = new Date().toISOString().slice(0, 10);
@@ -948,7 +1008,7 @@ io.on('connection', (socket) => {
     if (now - (lastGR[k] || 0) >= 15000) { // at most one reward per game every 15 seconds
       lastGR[k] = now;
       if (p.day !== day) { p.day = day; p.dayCoins = 0; }
-      c = win ? GAME_COINS[game] : Math.min(10, 2 + Math.floor(score / 10));
+      c = win ? GAME_COINS[game] + (game === 'gd' ? Math.min(9, Math.max(0, Math.floor(+lvl) || 0)) * 10 : 0) : Math.min(10, 2 + Math.floor(score / 10));
       c = Math.max(0, Math.min(c, 400 - (p.dayCoins || 0))); // daily limit: 400 coins from these games
       p.dayCoins = (p.dayCoins || 0) + c;
     }
@@ -988,7 +1048,134 @@ io.on('connection', (socket) => {
     socket.emit('shop_state', shopState());
   });
 
+  // ---------- Draw Battle (added) ----------
+  function dbEnd(B, why) {
+    if (!B) return;
+    clearTimeout(B.t1); clearTimeout(B.t2);
+    delete battles[B.id]; if (battleOf[B.a] === B.id) delete battleOf[B.a]; if (battleOf[B.b] === B.id) delete battleOf[B.b];
+    if (why) { to(B.a, 'db_cancel', why); to(B.b, 'db_cancel', why); }
+  }
+  async function dbJudge(B) {
+    if (!B || B.state !== 'drawing') return;
+    B.state = 'judging'; clearTimeout(B.t2);
+    to(B.a, 'db_judging', {}); to(B.b, 'db_judging', {});
+    const A = B.subs[B.a] || {}, Bb = B.subs[B.b] || {};
+    if (!A.img && !Bb.img) return dbEnd(B, 'Nobody submitted a drawing.');
+    const r = await judgeDrawings(B.prompt, A, Bb);
+    const day = new Date().toISOString().slice(0, 10), out = {};
+    [[B.a, r.a, A], [B.b, r.b, Bb]].forEach(([n, sc, d]) => {
+      const p = prof(n); if (p.dbDay !== day) { p.dbDay = day; p.dbCoins = 0; }
+      let c = d.img ? sc : 0; if (!r.ai) c = Math.min(c, 30); // basic scores pay less
+      c = Math.max(0, Math.min(c, 500 - (p.dbCoins || 0))); p.dbCoins = (p.dbCoins || 0) + c;
+      out[n] = { name: n, img: d.img || '', score: sc, coins: c };
+    });
+    const win = r.a === r.b ? '' : (r.a > r.b ? B.a : B.b);
+    [B.a, B.b].forEach(n => reward(n, 'draw', out[n].coins, win === n, out[n].score));
+    pMeta();
+    const res = { prompt: B.prompt, players: [out[B.a], out[B.b]], winner: win, comment: r.comment, ai: r.ai };
+    to(B.a, 'db_result', res); to(B.b, 'db_result', res);
+    dbEnd(B);
+  }
+  socket.on('db_invite', (name) => {
+    const f = findUser(name);
+    if (!me || !f || f === me || !arr(db.friends, me).includes(f) || !online[f]) return socket.emit('toast', 'Your friend must be online');
+    if (battleOf[me] || battleOf[f]) return socket.emit('toast', 'Someone is already in a Draw Battle');
+    const B = { id: uid(), a: me, b: f, state: 'invited', subs: {} };
+    battles[B.id] = B; battleOf[me] = B.id; battleOf[f] = B.id;
+    B.t1 = setTimeout(() => { if (B.state === 'invited') dbEnd(B, 'Invite expired.'); }, 30000);
+    to(f, 'db_invite', { id: B.id, from: me }); socket.emit('toast', '⚔️ Challenge sent to ' + f);
+  });
+  socket.on('db_decline', (id) => { const B = battles[id]; if (B && B.b === me && B.state === 'invited') dbEnd(B, me + ' declined.'); });
+  socket.on('db_accept', async (id) => {
+    const B = battles[id];
+    if (!B || B.b !== me || B.state !== 'invited') return;
+    B.state = 'starting'; clearTimeout(B.t1);
+    B.prompt = await aiPrompt();
+    if (!battles[id]) return;
+    B.state = 'drawing';
+    const d = { id, prompt: B.prompt, secs: 60, a: B.a, b: B.b };
+    to(B.a, 'db_start', d); to(B.b, 'db_start', d);
+    B.t2 = setTimeout(() => dbJudge(B), 75000);
+  });
+  socket.on('db_submit', (d) => {
+    const B = d && battles[d.id];
+    if (!me || !B || B.state !== 'drawing' || (B.a !== me && B.b !== me) || B.subs[me]) return;
+    if (typeof d.img !== 'string' || d.img.length > 150000 || !/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(d.img)) return;
+    B.subs[me] = { img: d.img, cov: Math.max(0, Math.min(1, +d.cov || 0)), strokes: Math.max(0, Math.min(500, +d.strokes || 0)) };
+    if (B.subs[B.a] && B.subs[B.b]) dbJudge(B);
+  });
+  socket.on('db_leave', () => { const B = battles[battleOf[me]]; if (B && B.state !== 'judging') dbEnd(B, me + ' left the battle.'); });
+
+  // ---------- Whiteboard + Pictionary + look & feel sync (added) ----------
+  let wbRoom = null;
+  const wbCh = () => 'wb:' + wbRoom;
+  function wbLeave() {
+    if (!wbRoom) return;
+    const R = wbRooms[wbRoom];
+    if (R && R.game && R.game.drawer === me) { R.game = null; io.to(wbCh()).emit('pic_ended'); io.to(wbCh()).emit('pic_msg', 'Drawer left. Game ended.'); }
+    socket.leave(wbCh());
+    const mem = io.sockets.adapter.rooms.get(wbCh());
+    if (!mem || !mem.size) delete wbRooms[wbRoom];
+    wbRoom = null;
+  }
+  socket.on('wb_join', (name) => {
+    if (!me) return;
+    wbLeave();
+    wbRoom = String(name || 'lobby').replace(/[^\w -]/g, '').slice(0, 30) || 'lobby';
+    socket.join(wbCh());
+    const R = wbRooms[wbRoom] || (wbRooms[wbRoom] = { h: [], game: null });
+    socket.emit('wb_history', R.h);
+    if (R.game) socket.emit('pic_started', { drawer: R.game.drawer });
+  });
+  socket.on('wb_leave', wbLeave);
+  socket.on('wb_stroke', (d) => {
+    const R = wbRoom && wbRooms[wbRoom];
+    if (!me || !R || !d) return;
+    if (R.game && R.game.drawer !== me) return;
+    if (![d.x0, d.y0, d.x1, d.y1, d.s].every(wbNum)) return;
+    const s = { x0: d.x0, y0: d.y0, x1: d.x1, y1: d.y1, s: Math.min(60, Math.max(1, d.s)), c: /^#[0-9a-fA-F]{6}$/.test(String(d.c)) ? d.c : '#ffffff' };
+    R.h.push(s); if (R.h.length > 6000) R.h.shift();
+    socket.to(wbCh()).emit('wb_stroke', s);
+  });
+  socket.on('wb_clear', () => {
+    const R = wbRoom && wbRooms[wbRoom];
+    if (!me || !R || (R.game && R.game.drawer !== me)) return;
+    R.h = []; io.to(wbCh()).emit('wb_clear');
+  });
+  socket.on('pic_start', () => {
+    const R = wbRoom && wbRooms[wbRoom];
+    if (!me || !R) return;
+    R.h = []; io.to(wbCh()).emit('wb_clear');
+    R.game = { drawer: me, word: WB_WORDS[Math.floor(Math.random() * WB_WORDS.length)] };
+    socket.emit('pic_word', R.game.word);
+    io.to(wbCh()).emit('pic_started', { drawer: me });
+  });
+  socket.on('pic_guess', (g) => {
+    const R = wbRoom && wbRooms[wbRoom];
+    if (!me || !R || !R.game || R.game.drawer === me) return;
+    g = String(g || '').trim().toLowerCase().slice(0, 40);
+    if (!g || (!isAdmin(me) && isAbusive(g))) return;
+    if (g === R.game.word) { io.to(wbCh()).emit('pic_msg', '🎉 ' + me + ' guessed it! The word was "' + R.game.word + '".'); R.game = null; io.to(wbCh()).emit('pic_ended'); }
+    else io.to(wbCh()).emit('pic_msg', me + ': ' + g);
+  });
+  socket.on('pic_stop', () => {
+    const R = wbRoom && wbRooms[wbRoom];
+    if (me && R && R.game && R.game.drawer === me) { R.game = null; io.to(wbCh()).emit('pic_ended'); io.to(wbCh()).emit('pic_msg', 'Game stopped.'); }
+  });
+  socket.on('prefs_save', (d) => {
+    if (!me || !d || typeof d !== 'object') return;
+    const custom = typeof d.custom === 'string' && d.custom.length <= 150000 && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(d.custom) ? d.custom : null;
+    prof(me).prefs = {
+      wall: String(d.wall || 'Default').slice(0, 30),
+      accent: /^#[0-9a-fA-F]{6}$/.test(String(d.accent)) ? d.accent : null,
+      glow: Math.min(40, Math.max(0, +d.glow || 0)), crt: !!d.crt, pixel: !!d.pixel, custom
+    };
+    pMeta();
+  });
+
   socket.on('disconnect', () => {
+    wbLeave();
+    { const B = battles[battleOf[me]]; if (me && B && B.state !== 'judging') dbEnd(B, me + ' disconnected.'); }
     if (me && online[me] === socket.id) { dropMe(); pMeta(); stats(); }
   });
 });
