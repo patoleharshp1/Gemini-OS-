@@ -441,8 +441,18 @@ app.post('/restore', express.json({ limit: '200mb' }), async (req, res) => {
 
 // ================= SOCKETS =================
 // ---- Draw Battle (AI judge) (added) ----
-const DB_PROMPTS = ['cat', 'house', 'pizza', 'rocket', 'tree', 'robot', 'guitar', 'sun', 'car', 'fish', 'castle', 'phone', 'dragon', 'bridge', 'cake', 'planet', 'bicycle', 'ghost', 'clock', 'umbrella',
-  'elephant', 'airplane', 'icecream', 'mountain', 'butterfly', 'snowman', 'crown', 'lighthouse', 'owl', 'spaceship', 'sword', 'flower', 'penguin', 'pirate ship', 'volcano', 'teapot', 'dinosaur', 'rainbow', 'cactus', 'hot air balloon'];
+const DB_PROMPTS = [
+  'cat', 'dog', 'house', 'pizza', 'rocket', 'tree', 'robot', 'guitar', 'sun', 'car',
+  'fish', 'castle', 'phone', 'dragon', 'bridge', 'cake', 'planet', 'bicycle', 'ghost', 'clock',
+  'umbrella', 'elephant', 'airplane', 'icecream', 'mountain', 'butterfly', 'snowman', 'crown', 'lighthouse', 'owl',
+  'spaceship', 'sword', 'flower', 'penguin', 'pirate ship', 'volcano', 'teapot', 'dinosaur', 'rainbow', 'cactus',
+  'hot air balloon', 'apple', 'banana', 'boat', 'train', 'bus', 'helicopter', 'moon', 'star', 'cloud',
+  'lightning', 'snail', 'spider', 'bee', 'turtle', 'giraffe', 'lion', 'monkey', 'rabbit', 'horse',
+  'cow', 'pig', 'duck', 'frog', 'shark', 'whale', 'octopus', 'crab', 'jellyfish', 'parrot',
+  'tent', 'campfire', 'key', 'lamp', 'chair', 'table', 'bed', 'door', 'window', 'bell',
+  'balloon', 'heart', 'diamond', 'hat', 'glasses', 'shoe', 'backpack', 'book', 'pencil', 'scissors',
+  'hammer', 'ladder', 'anchor', 'trophy', 'drum', 'piano', 'burger', 'donut', 'pineapple', 'watermelon'
+]; // 100 things to draw
 const battles = Object.create(null), battleOf = Object.create(null);
 const b64 = d => String(d).replace(/^data:image\/jpeg;base64,/, '');
 async function callAI(text, imgs) {
@@ -472,10 +482,27 @@ async function callAI(text, imgs) {
   } catch (e) { console.error('AI error:', e.message); }
   return null;
 }
-async function aiPrompt() {
-  const t = await callAI('Give ONE simple, fun thing that people can draw in 60 seconds (1 to 3 words, lowercase, a concrete object or animal, nothing else, no punctuation).', []);
-  const w = t && t.trim().toLowerCase().replace(/[^a-z ]/g, '').slice(0, 30).trim();
-  return w && w.length >= 3 ? w : DB_PROMPTS[Math.floor(Math.random() * DB_PROMPTS.length)];
+const recentPrompts = Object.create(null);
+// picks one of the 100 words; avoids the last 15 words each player already got
+function pickPrompt(...names) {
+  const avoid = new Set(); names.forEach(n => n && (recentPrompts[n] || []).forEach(w => avoid.add(w)));
+  let pool = DB_PROMPTS.filter(w => !avoid.has(w)); if (!pool.length) pool = DB_PROMPTS;
+  const w = pool[Math.floor(Math.random() * pool.length)];
+  names.forEach(n => { if (!n) return; const l = recentPrompts[n] = (recentPrompts[n] || []).concat([w]); if (l.length > 15) l.shift(); });
+  return w;
+}
+const basicScore = d => !d.img ? 0 : Math.round(Math.min(1, (+d.cov || 0) / .08) * 40 + Math.min(1, (+d.strokes || 0) / 25) * 20);
+// SOLO: one drawing, the AI rates it 0..100
+async function judgeSolo(prompt, D) {
+  const t = await callAI('A player had 60 seconds to draw "' + prompt + '" using a finger or mouse. The image is their drawing. Score it from 0 to 100 for how recognisable it is as "' + prompt + '", plus creativity and effort. A blank page or random scribble must score under 10. Be fair and use the full range. Reply with ONLY this JSON: {"score":number,"comment":"one short friendly sentence"}', [D.img]);
+  const m = t && t.match(/\{[\s\S]*\}/);
+  if (m) {
+    try {
+      const j = JSON.parse(m[0]);
+      return { score: Math.max(0, Math.min(100, Math.round(+j.score) || 0)), comment: String(j.comment || '').replace(/[<>]/g, '').slice(0, 160), ai: true };
+    } catch (e) {}
+  }
+  return { score: basicScore(D), comment: 'Basic score (the AI judge is not set up yet).', ai: false };
 }
 // returns { a, b, comment, ai } with a and b = 0..100
 async function judgeDrawings(prompt, A, B) {
@@ -490,8 +517,7 @@ async function judgeDrawings(prompt, A, B) {
     } catch (e) {}
   }
   // basic fallback (no AI key set): based on how much was drawn
-  const basic = d => !d.img ? 0 : Math.round(Math.min(1, (+d.cov || 0) / .08) * 40 + Math.min(1, (+d.strokes || 0) / 25) * 20);
-  return { a: basic(A), b: basic(B), comment: 'Basic score (the AI judge is not set up yet).', ai: false };
+  return { a: basicScore(A), b: basicScore(B), comment: 'Basic score (the AI judge is not set up yet).', ai: false };
 }
 
 // ---- Whiteboard + Pictionary rooms (added) ----
@@ -1055,9 +1081,24 @@ io.on('connection', (socket) => {
     delete battles[B.id]; if (battleOf[B.a] === B.id) delete battleOf[B.a]; if (battleOf[B.b] === B.id) delete battleOf[B.b];
     if (why) { to(B.a, 'db_cancel', why); to(B.b, 'db_cancel', why); }
   }
+  async function dbJudgeSolo(B) {
+    to(B.a, 'db_judging', {});
+    const D = B.subs[B.a] || {};
+    if (!D.img) return dbEnd(B, 'You did not submit a drawing.');
+    const r = await judgeSolo(B.prompt, D);
+    const p = prof(B.a), day = new Date().toISOString().slice(0, 10);
+    if (p.dbDay !== day) { p.dbDay = day; p.dbCoins = 0; }
+    let c = Math.round(r.score / 2); if (!r.ai) c = Math.min(c, 15); // solo pays half of a battle; basic scores pay less
+    c = Math.max(0, Math.min(c, 500 - (p.dbCoins || 0))); p.dbCoins = (p.dbCoins || 0) + c;
+    const win = r.score >= 60;
+    reward(B.a, 'draw', c, win, r.score);
+    to(B.a, 'db_result', { prompt: B.prompt, solo: true, players: [{ name: B.a, img: D.img, score: r.score, coins: c }], winner: win ? B.a : '', comment: r.comment, ai: r.ai });
+    dbEnd(B);
+  }
   async function dbJudge(B) {
     if (!B || B.state !== 'drawing') return;
     B.state = 'judging'; clearTimeout(B.t2);
+    if (B.solo) return dbJudgeSolo(B);
     to(B.a, 'db_judging', {}); to(B.b, 'db_judging', {});
     const A = B.subs[B.a] || {}, Bb = B.subs[B.b] || {};
     if (!A.img && !Bb.img) return dbEnd(B, 'Nobody submitted a drawing.');
@@ -1085,12 +1126,20 @@ io.on('connection', (socket) => {
     B.t1 = setTimeout(() => { if (B.state === 'invited') dbEnd(B, 'Invite expired.'); }, 30000);
     to(f, 'db_invite', { id: B.id, from: me }); socket.emit('toast', '⚔️ Challenge sent to ' + f);
   });
+  socket.on('db_solo', () => { // SINGLE PLAYER: the server gives you a thing to draw, the AI rates it
+    if (!me) return;
+    if (battleOf[me]) return socket.emit('toast', 'You are already in a Draw Battle');
+    const B = { id: uid(), a: me, b: null, solo: true, state: 'drawing', subs: {}, prompt: pickPrompt(me) };
+    battles[B.id] = B; battleOf[me] = B.id;
+    socket.emit('db_start', { id: B.id, prompt: B.prompt, secs: 60, a: me, b: null, solo: true });
+    B.t2 = setTimeout(() => dbJudge(B), 75000);
+  });
   socket.on('db_decline', (id) => { const B = battles[id]; if (B && B.b === me && B.state === 'invited') dbEnd(B, me + ' declined.'); });
   socket.on('db_accept', async (id) => {
     const B = battles[id];
     if (!B || B.b !== me || B.state !== 'invited') return;
     B.state = 'starting'; clearTimeout(B.t1);
-    B.prompt = await aiPrompt();
+    B.prompt = pickPrompt(B.a, B.b);
     if (!battles[id]) return;
     B.state = 'drawing';
     const d = { id, prompt: B.prompt, secs: 60, a: B.a, b: B.b };
@@ -1102,9 +1151,9 @@ io.on('connection', (socket) => {
     if (!me || !B || B.state !== 'drawing' || (B.a !== me && B.b !== me) || B.subs[me]) return;
     if (typeof d.img !== 'string' || d.img.length > 150000 || !/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(d.img)) return;
     B.subs[me] = { img: d.img, cov: Math.max(0, Math.min(1, +d.cov || 0)), strokes: Math.max(0, Math.min(500, +d.strokes || 0)) };
-    if (B.subs[B.a] && B.subs[B.b]) dbJudge(B);
+    if (B.solo || (B.subs[B.a] && B.subs[B.b])) dbJudge(B);
   });
-  socket.on('db_leave', () => { const B = battles[battleOf[me]]; if (B && B.state !== 'judging') dbEnd(B, me + ' left the battle.'); });
+  socket.on('db_leave', () => { const B = battles[battleOf[me]]; if (B && B.state !== 'judging') dbEnd(B, B.solo ? '' : me + ' left the battle.'); });
 
   // ---------- Whiteboard + Pictionary + look & feel sync (added) ----------
   let wbRoom = null;
