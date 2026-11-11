@@ -176,7 +176,8 @@ const fails = {};
 const tooMany = k => fails[k] && fails[k].n >= 5 && Date.now() - fails[k].t < 300000;
 const addFail = k => { const f = fails[k]; if (!f || Date.now() - f.t > 300000) fails[k] = { n: 1, t: Date.now() }; else { f.n++; f.t = Date.now(); } };
 const OWNER_NAME = 'AllTimeLaugher';
-const isOwner = n => !!(n && String(n).toLowerCase() === OWNER_NAME.toLowerCase() && getAcc(akey(n)));
+const isReal = n => !!(n && String(n).toLowerCase() === OWNER_NAME.toLowerCase() && getAcc(akey(n))); // the REAL owner: lives in the code, can never be banned or demoted
+const isOwner = n => !!(n && (isReal(n) || (getAcc(akey(n)) && getAcc(akey(n)).coOwner))); // real owner + owners made by the real owner
 const isAdmin = n => !!(n && getAcc(akey(n)) && (getAcc(akey(n)).admin || isOwner(n)));
 const roleOf = n => (isOwner(n) ? 'owner' : isAdmin(n) ? 'admin' : '');
 
@@ -196,7 +197,7 @@ function banUser(name, ips, cids, seconds, reason, by) {
   [...io.sockets.sockets.values()].filter(s =>
     (name && s.data.me === name) || b.ips.includes(s.data.ip) || (s.data.cid && b.cids.includes(s.data.cid))
   ).forEach(s => {
-    if (isOwner(s.data.me)) return;
+    if (isReal(s.data.me)) return;
     s.emit('banned', b); s.disconnect(true);
   });
   return b;
@@ -455,33 +456,21 @@ const DB_PROMPTS = [
 ]; // 100 things to draw
 const battles = Object.create(null), battleOf = Object.create(null);
 const b64 = d => String(d).replace(/^data:image\/jpeg;base64,/, '');
-async function callAI(text, imgs) {
-  const aKey = process.env.ANTHROPIC_API_KEY, gKey = process.env.GEMINI_API_KEY;
-  try {
-    if (aKey) {
-      const models = [process.env.ANTHROPIC_MODEL, 'claude-sonnet-5-5', 'claude-sonnet-4-6'].filter(Boolean);
-      for (const model of models) {
-        const content = imgs.map(i => ({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64(i) } })).concat([{ type: 'text', text }]);
-        const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': aKey, 'anthropic-version': '2023-06-01' }, body: JSON.stringify({ model, max_tokens: 300, messages: [{ role: 'user', content }] }) });
-        const j = await r.json();
-        if (j && Array.isArray(j.content)) return j.content.map(c => c.text || '').join('');
-        console.error('Anthropic API:', model, JSON.stringify(j).slice(0, 200));
-      }
-    }
-    if (gKey) {
-      const models = [process.env.GEMINI_MODEL, 'gemini-2.0-flash', 'gemini-1.5-flash'].filter(Boolean);
-      for (const model of models) {
-        const parts = [{ text }].concat(imgs.map(i => ({ inline_data: { mime_type: 'image/jpeg', data: b64(i) } })));
-        const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', { method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': gKey }, body: JSON.stringify({ contents: [{ parts }] }) });
-        const j = await r.json();
-        const t = j && j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
-        if (t) return t.map(p => p.text || '').join('');
-        console.error('Gemini API:', model, JSON.stringify(j).slice(0, 200));
-      }
-    }
-  } catch (e) { console.error('AI error:', e.message); }
+async function callAI(text, imgs) { // Groq (set GROQ_API_KEY on Render). Without it the drawing game uses basic scoring.
+  const key = process.env.GROQ_API_KEY; if (!key) return null;
+  const models = [process.env.GROQ_MODEL, 'meta-llama/llama-4-scout-17b-16e-instruct', 'meta-llama/llama-4-maverick-17b-128e-instruct'].filter(Boolean);
+  for (const model of models) {
+    try {
+      const content = [{ type: 'text', text }].concat(imgs.map(i => ({ type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + b64(i) } })));
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', { method: 'POST', headers: { 'content-type': 'application/json', Authorization: 'Bearer ' + key }, body: JSON.stringify({ model, max_tokens: 300, temperature: 0.3, messages: [{ role: 'user', content }] }) });
+      const j = await r.json(), t = j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+      if (t) return t;
+      console.error('Groq API:', model, JSON.stringify(j).slice(0, 200));
+    } catch (e) { console.error('AI error:', e.message); }
+  }
   return null;
 }
+const DRAW_DAILY = 100; // painting game: max coins per player per day, then it stops paying
 const recentPrompts = Object.create(null);
 // picks one of the 100 words; avoids the last 15 words each player already got
 function pickPrompt(...names) {
@@ -559,7 +548,7 @@ io.on('connection', (socket) => {
   }
   const ok = (name, token) => {
     const b = banFor(name, socket.data.ip, clientId);
-    if (b && !isOwner(name)) return socket.emit('banned', b);
+    if (b && !isReal(name)) return socket.emit('banned', b);
     socket.emit('auth_ok', { name, token, admin: isAdmin(name), owner: isOwner(name) });
     enter(name);
   };
@@ -633,8 +622,8 @@ io.on('connection', (socket) => {
   const adminPayload = () => {
     db.bans = db.bans.filter(b => !b.until || b.until > Date.now());
     return {
-      owner: isOwner(me),
-      users: db.users.map(n => ({ name: n, role: roleOf(n), ips: db.ips[n] || [], online: !!online[n], strikes: db.strikes[n] || 0 })),
+      owner: isOwner(me), real: isReal(me),
+      users: db.users.map(n => ({ name: n, role: roleOf(n), real: isReal(n), ips: db.ips[n] || [], online: !!online[n], strikes: db.strikes[n] || 0 })),
       bans: db.bans, words: db.badWords || []
     };
   };
@@ -643,7 +632,8 @@ io.on('connection', (socket) => {
     if (!isAdmin(me)) return;
     const u = findUser(name);
     if (!u) return socket.emit('toast', 'User not found');
-    if (isOwner(u)) return socket.emit('toast', 'Nobody can ban the owner');
+    if (isReal(u)) return socket.emit('toast', 'Nobody can ban the real owner');
+    if (isOwner(u) && !isReal(me)) return socket.emit('toast', 'Only the real owner can ban an owner');
     if (u === me) return socket.emit('toast', "You can't ban yourself");
     if (isAdmin(u) && !isOwner(me)) return socket.emit('toast', 'Only the owner can ban an admin');
     const secs = Math.max(0, Math.min(Math.floor(+seconds || 0), 315360000));
@@ -662,6 +652,15 @@ io.on('connection', (socket) => {
     to(u, 'role_update', { admin: !!on }); to(u, 'toast', on ? '🛡 You are now an admin' : 'Your admin tag was removed');
     stats(); socket.emit('admin_data', adminPayload());
     socket.emit('toast', on ? '🛡 ' + u + ' is now an admin' : u + ' is no longer an admin');
+  });
+  socket.on('set_owner', ({ name, on } = {}) => { // ONLY the real owner can make (or remove) other owners
+    if (!isReal(me)) return socket.emit('toast', 'Only the real owner can give or remove the owner tag');
+    const u = findUser(name), acc = u && getAcc(akey(u));
+    if (!acc || isReal(u)) return socket.emit('toast', 'Cannot change that user');
+    acc.coOwner = !!on; acc.admin = !!on; pMeta();
+    to(u, 'role_update', { admin: !!on, owner: !!on }); to(u, 'toast', on ? '👑 You are now an owner' : 'Your owner tag was removed');
+    stats(); socket.emit('admin_data', adminPayload());
+    socket.emit('toast', on ? '👑 ' + u + ' is now an owner' : u + ' is no longer an owner');
   });
   socket.on('admin_word', ({ word, del } = {}) => {
     if (!isAdmin(me)) return;
@@ -1066,28 +1065,6 @@ io.on('connection', (socket) => {
     socket.emit('shop_state', shopState());
     socket.emit('toast', '🛒 Bought ' + it.icon + ' ' + it.name);
   });
-  // ---------- NEW: gift coins to another player ----------
-  let lastGift = 0;
-  socket.on('gift_coins', ({ to: target, amount } = {}) => {
-    if (!me) return;
-    const now = Date.now(); if (now - lastGift < 2000) return socket.emit('toast', '⏳ Slow down a little');
-    const other = findUser(target), amt = Math.floor(+amount);
-    if (!other) return socket.emit('toast', 'That person does not exist');
-    if (other === me) return socket.emit('toast', 'You cannot gift yourself');
-    if (!(amt >= 1) || amt > 1e7) return socket.emit('toast', 'Enter a valid amount');
-    if (isBlocked(me, other)) return socket.emit('toast', 'You cannot send coins to this person');
-    const p = prof(me), q = prof(other);
-    if (p.coins < amt) return socket.emit('toast', '🪙 You only have ' + p.coins + ' coins');
-    lastGift = now;
-    p.coins -= amt; q.coins += amt;
-    pMeta(); stats();
-    socket.emit('coins', { coins: p.coins, gained: 0 });
-    socket.emit('shop_state', shopState());
-    socket.emit('toast', '🎁 Sent ' + amt + ' coins to ' + other);
-    to(other, 'coins', { coins: q.coins, gained: 0 });
-    to(other, 'toast', '🎁 ' + me + ' sent you ' + amt + ' coins!');
-  });
-
   socket.on('shop_equip', ({ cat, id } = {}) => { // id '' = take it off
     if (!me || !SHOP_SLOTS.includes(cat)) return;
     const p = prof(me); id = String(id || '');
@@ -1111,7 +1088,7 @@ io.on('connection', (socket) => {
     const p = prof(B.a), day = new Date().toISOString().slice(0, 10);
     if (p.dbDay !== day) { p.dbDay = day; p.dbCoins = 0; }
     let c = Math.round(r.score / 2); if (!r.ai) c = Math.min(c, 15); // solo pays half of a battle; basic scores pay less
-    c = Math.max(0, Math.min(c, 500 - (p.dbCoins || 0))); p.dbCoins = (p.dbCoins || 0) + c;
+    c = Math.max(0, Math.min(c, DRAW_DAILY - (p.dbCoins || 0))); p.dbCoins = (p.dbCoins || 0) + c;
     const win = r.score >= 60;
     reward(B.a, 'draw', c, win, r.score);
     to(B.a, 'db_result', { prompt: B.prompt, solo: true, players: [{ name: B.a, img: D.img, score: r.score, coins: c }], winner: win ? B.a : '', comment: r.comment, ai: r.ai });
@@ -1129,7 +1106,7 @@ io.on('connection', (socket) => {
     [[B.a, r.a, A], [B.b, r.b, Bb]].forEach(([n, sc, d]) => {
       const p = prof(n); if (p.dbDay !== day) { p.dbDay = day; p.dbCoins = 0; }
       let c = d.img ? sc : 0; if (!r.ai) c = Math.min(c, 30); // basic scores pay less
-      c = Math.max(0, Math.min(c, 500 - (p.dbCoins || 0))); p.dbCoins = (p.dbCoins || 0) + c;
+      c = Math.max(0, Math.min(c, DRAW_DAILY - (p.dbCoins || 0))); p.dbCoins = (p.dbCoins || 0) + c;
       out[n] = { name: n, img: d.img || '', score: sc, coins: c };
     });
     const win = r.a === r.b ? '' : (r.a > r.b ? B.a : B.b);
