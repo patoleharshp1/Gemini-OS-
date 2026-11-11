@@ -1066,6 +1066,28 @@ io.on('connection', (socket) => {
     socket.emit('shop_state', shopState());
     socket.emit('toast', '🛒 Bought ' + it.icon + ' ' + it.name);
   });
+  // ---------- NEW: gift coins to another player ----------
+  let lastGift = 0;
+  socket.on('gift_coins', ({ to: target, amount } = {}) => {
+    if (!me) return;
+    const now = Date.now(); if (now - lastGift < 2000) return socket.emit('toast', '⏳ Slow down a little');
+    const other = findUser(target), amt = Math.floor(+amount);
+    if (!other) return socket.emit('toast', 'That person does not exist');
+    if (other === me) return socket.emit('toast', 'You cannot gift yourself');
+    if (!(amt >= 1) || amt > 1e7) return socket.emit('toast', 'Enter a valid amount');
+    if (isBlocked(me, other)) return socket.emit('toast', 'You cannot send coins to this person');
+    const p = prof(me), q = prof(other);
+    if (p.coins < amt) return socket.emit('toast', '🪙 You only have ' + p.coins + ' coins');
+    lastGift = now;
+    p.coins -= amt; q.coins += amt;
+    pMeta(); stats();
+    socket.emit('coins', { coins: p.coins, gained: 0 });
+    socket.emit('shop_state', shopState());
+    socket.emit('toast', '🎁 Sent ' + amt + ' coins to ' + other);
+    to(other, 'coins', { coins: q.coins, gained: 0 });
+    to(other, 'toast', '🎁 ' + me + ' sent you ' + amt + ' coins!');
+  });
+
   socket.on('shop_equip', ({ cat, id } = {}) => { // id '' = take it off
     if (!me || !SHOP_SLOTS.includes(cat)) return;
     const p = prof(me); id = String(id || '');
