@@ -27,8 +27,12 @@ h4{color:var(--hi);margin:14px 0 8px}
 
 /* ---------- PHONE LAYOUT (default) ---------- */
 #app{display:flex;min-height:100%}
-#main{flex:1;min-width:0;padding:12px}
-.tile-app b{color:#ffb300;font-size:12px;margin-left:4px}
+#side{position:fixed;bottom:0;left:0;right:0;height:58px;background:#1a0505;border-top:1px solid var(--bd);display:flex;z-index:50}
+.brand,.more{display:none}
+.nav{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;background:none;border:0;color:var(--tx);font-size:19px;cursor:pointer;position:relative}
+.nav span{font-size:10px}
+.nav b{position:absolute;top:4px;right:20%;color:#ffb300;font-size:11px}
+#main{flex:1;min-width:0;padding:12px 12px 76px}
 .topbar{display:flex;justify-content:space-between;align-items:center;gap:8px;background:#230a0a;border:1px solid var(--bd);padding:10px 12px;border-radius:12px;margin-bottom:12px;font-size:13px;font-weight:bold;color:var(--tx)}
 #display-username{cursor:pointer;text-decoration:underline}
 .hero{display:none}
@@ -47,6 +51,12 @@ h4{color:var(--hi);margin:14px 0 8px}
 
 /* ---------- LAPTOP LAYOUT ---------- */
 @media (min-width:900px){
+  #side{position:sticky;top:0;height:100vh;width:230px;flex-direction:column;border-top:0;border-right:1px solid var(--bd);padding:18px 10px;gap:6px;flex:none}
+  .brand{display:block;font-size:20px;font-weight:bold;color:var(--hi);padding:4px 12px 16px}
+  .more{display:flex}
+  .nav{flex:none;flex-direction:row;justify-content:flex-start;gap:12px;padding:11px 14px;font-size:18px;border-radius:10px}
+  .nav span{font-size:14px}.nav:hover{background:#2b0b0b}
+  .nav b{position:static;margin-left:auto}
   #main{padding:26px 34px}
   .hero{display:block;background:linear-gradient(135deg,#3a0d0d,#1a0505);border:1px solid var(--bd);border-radius:18px;padding:26px 30px;margin-bottom:22px}
   .hero h2{margin:0 0 6px;font-size:26px}.hero p{margin:0;color:var(--tx)}
@@ -227,6 +237,19 @@ h4{color:var(--hi);margin:14px 0 8px}
 
 <!-- ============ MAIN APP ============ -->
 <div id="app">
+  <nav id="side">
+    <div class="brand">✦ Gemini OS</div>
+    <button class="nav" onclick="goHome()">🏠<span>Home</span></button>
+    <button class="nav" onclick="openModal('chatApp')">💬<span>Messages</span><b id="unreadTotal"></b></button>
+    <button class="nav" onclick="openModal('phoneApp')">📞<span>Calls</span></button>
+    <button class="nav" onclick="openModal('usersModal')">👥<span>Friends</span><b id="reqBadge"></b></button>
+    <button class="nav" onclick="openGames()">🎮<span>Games</span></button>
+    <button class="nav more" onclick="openModal('storageApp')">☁️<span>Drive</span></button>
+    <button class="nav more" onclick="openModal('recModal')">🎬<span>Recorder</span></button>
+    <button class="nav more" onclick="openBrowser()">🌐<span>Browser</span></button>
+    <button class="nav more" onclick="openModal('localMusicApp')">🎵<span>Music</span></button>
+    <button class="nav more" onclick="openCamera()">📷<span>Camera</span></button>
+  </nav>
   <main id="main">
     <div id="recBanner"></div>
     <div id="offlineBar">📴 Offline — text messages will send when you reconnect</div>
@@ -240,9 +263,9 @@ h4{color:var(--hi);margin:14px 0 8px}
     </div>
     <div class="hero"><h2>Welcome, <span id="heroName"></span> 👋</h2><p>Chat, call up to 8 people, record your screen, play games and share files.</p></div>
     <div class="tiles">
-      <div class="tile-app" onclick="openModal('chatApp')"><i>💬</i>Messages<b id="unreadTotal"></b></div>
+      <div class="tile-app" onclick="openModal('chatApp')"><i>💬</i>Messages</div>
       <div class="tile-app" onclick="openModal('phoneApp')"><i>📞</i>Calls</div>
-      <div class="tile-app" onclick="openModal('usersModal')"><i>👥</i>Friends<b id="reqBadge"></b></div>
+      <div class="tile-app" onclick="openModal('usersModal')"><i>👥</i>Friends</div>
       <div class="tile-app" onclick="openGames()"><i>🎮</i>Games</div>
       <div class="tile-app" onclick="openShop()"><i>🛒</i>Shop</div>
       <div class="tile-app" onclick="openModal('storageApp')"><i>☁️</i>Drive</div>
@@ -552,7 +575,6 @@ h4{color:var(--hi);margin:14px 0 8px}
       <button class="btn" style="flex:1" onclick="upTarget=false;$('driveFileInput').click()">🔒 Upload to My Drive</button>
       <button class="btn green" style="flex:1" onclick="upTarget=true;$('driveFileInput').click()">🌍 Upload for everyone</button>
     </div>
-    <button class="btn" style="width:100%;margin-bottom:10px;background:#1a73e8" onclick="gdBackupAll()">☁️ Back up My Drive to my Google Drive</button>
     <small style="color:#888">Camera photos, camera videos and screen recordings are saved to My Drive automatically. Press 🌍 Share on a file to show it to everyone. Max 10 files, 10 MB each.</small>
     <h4>🔒 My Drive (private)</h4><div id="myDriveList"></div>
     <h4>🌍 Shared Drive</h4><div id="cloudDriveList"></div>
@@ -615,17 +637,9 @@ h4{color:var(--hi);margin:14px 0 8px}
       <button class="btn sm" id="sh-rank" onclick="shopTab('rank')">🏅 Ranks</button>
       <button class="btn sm gray" id="sh-color" onclick="shopTab('color')">🎨 Name colours</button>
       <button class="btn sm gray" id="sh-badge" onclick="shopTab('badge')">🎖 Badges</button>
-      <button class="btn sm gray" id="sh-gift" onclick="shopTab('gift')">🎁 Gift coins</button>
     </div>
     <small style="color:#888;display:block;margin:6px 0 10px">Earn 🪙 coins by winning games. 👑 Owner and 🛡 Admin tags cannot be bought.</small>
     <div id="shopList"></div>
-    <div id="giftBox" style="display:none">
-      <h4>🎁 Send coins to someone</h4>
-      <select id="giftTo" style="width:100%;margin-bottom:6px"></select>
-      <input type="number" id="giftAmt" min="1" step="1" placeholder="Amount of coins" style="width:100%;margin-bottom:6px" onkeydown="if(event.key==='Enter')giftSend()"/>
-      <button class="btn green" onclick="giftSend()">🎁 Send coins</button>
-      <small style="color:#888;display:block;margin-top:8px">Coins leave your balance right away and cannot be taken back.</small>
-    </div>
     <div style="text-align:center;margin-top:10px"><button class="btn gray" onclick="openGames()">🎮 Back to games</button></div>
   </div>
 </div>
@@ -682,7 +696,6 @@ let onlineUsers=[], friends=[], requests=[], directory=[], blocks=[], dirMap={},
 let globalMsgs=[], dms={}, unread={}, cur='global';
 let authMode='signup', pendingGoogle=null, pendingCred=null;
 let REC=null, recList=[], upTarget=false;
-let GCID='', gdTok='', gdExp=0, gdFolder='', gdPend={};
 let outbox=[]; try{ outbox=JSON.parse(localStorage.getItem('outbox')||'[]'); }catch(e){}
 const saveOutbox = () => localStorage.setItem('outbox', JSON.stringify(outbox));
 let ccT;
@@ -752,7 +765,6 @@ async function logout(){
 }
 fetch((SERVER_URL||'')+'/config').then(r=>r.json()).then(c=>{
   if(c.persistent===false) $('storeWarn').style.display='block';
-  GCID=c.googleClientId||'';
   if(!c.googleClientId) return;
   const s=document.createElement('script'); s.src='https://accounts.google.com/gsi/client'; s.async=true;
   s.onload=()=>{
@@ -955,73 +967,9 @@ function renderCloudFile(f){
   else if(f.type.startsWith('video/')) m='<br><video controls src="'+f.url+'" style="max-width:180px;border-radius:6px"></video>';
   d.innerHTML='<div><strong>'+esc(f.name)+'</strong>'+(priv?'':' (by '+esc(f.uploader)+')')+m+'</div><div style="display:flex;gap:6px;align-items:center">'
     +(f.url?'<a href="'+f.url+'" download="'+esc(f.name)+'" style="color:#8ab4f8;text-decoration:none">⬇️</a>':'')
-    +'<button class="btn sm gray" title="Save to Google Drive" onclick="saveToGDrive(\''+f.id+'\')">☁️ Google Drive</button>'
     +(priv?'<button class="btn sm green" onclick="socket.emit(\'share_file\',\''+f.id+'\')">🌍 Share</button>':'')
     +(f.uploader===me?'<button onclick="socket.emit(\'delete_cloud_file\',\''+f.id+'\')" style="background:none;border:0;color:#ff8a8a;cursor:pointer">🗑</button>':'')+'</div>';
   $(priv?'myDriveList':'cloudDriveList').appendChild(d);
-}
-
-// ================= Save to Google Drive (runs in the browser, uses the Google permission "drive.file") =================
-function gdToken(){
-  return new Promise((res,rej)=>{
-    if(gdTok && Date.now()<gdExp) return res(gdTok);
-    if(!GCID) return rej(new Error('Google is not set up on this server'));
-    if(!window.google||!google.accounts||!google.accounts.oauth2) return rej(new Error('Google is still loading. Try again in a few seconds'));
-    const tc=google.accounts.oauth2.initTokenClient({
-      client_id:GCID, scope:'https://www.googleapis.com/auth/drive.file',
-      callback:r=>{ if(r.error) return rej(new Error(r.error)); gdTok=r.access_token; gdExp=Date.now()+((+r.expires_in||3600)-60)*1000; res(gdTok); },
-      error_callback:e=>rej(new Error((e&&e.type)||'Permission window closed'))
-    });
-    tc.requestAccessToken();
-  });
-}
-async function gdApi(url,opt,tok){
-  const r=await fetch(url,Object.assign({},opt,{headers:Object.assign({Authorization:'Bearer '+tok},(opt&&opt.headers)||{})}));
-  if(r.status===401){ gdTok=''; gdExp=0; gdFolder=''; throw new Error('Google login expired. Press the button again'); }
-  if(!r.ok){ let m=''; try{ m=(await r.json()).error.message; }catch(e){} throw new Error(m||('Google error '+r.status)); }
-  return r.json();
-}
-async function gdEnsureFolder(tok){
-  if(gdFolder) return gdFolder;
-  const q=encodeURIComponent("name='Gemini OS' and mimeType='application/vnd.google-apps.folder' and trashed=false");
-  const l=await gdApi('https://www.googleapis.com/drive/v3/files?q='+q+'&fields=files(id)',{},tok);
-  if(l.files&&l.files.length) return gdFolder=l.files[0].id;
-  const c=await gdApi('https://www.googleapis.com/drive/v3/files?fields=id',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'Gemini OS',mimeType:'application/vnd.google-apps.folder'})},tok);
-  return gdFolder=c.id;
-}
-function gdFileUrl(id){
-  const f=FILES[id]; if(!f) return Promise.reject(new Error('File not found'));
-  if(f.url) return Promise.resolve(f.url);
-  return new Promise((res,rej)=>{
-    const t=setTimeout(()=>{ delete gdPend[id]; rej(new Error('Could not load the file. Try again')); },25000);
-    gdPend[id]=u=>{ clearTimeout(t); res(u); };
-    socket.emit('get_file',id);
-  });
-}
-async function gdUpload(id,tok){
-  const f=FILES[id], url=await gdFileUrl(id);
-  const blob=await (await fetch(url)).blob();
-  const folder=await gdEnsureFolder(tok), type=f.type||blob.type||'application/octet-stream', b='gdb'+Date.now()+Math.random().toString(36).slice(2);
-  const body=new Blob(['--'+b+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify({name:f.name,parents:[folder]})+'\r\n--'+b+'\r\nContent-Type: '+type+'\r\n\r\n',blob,'\r\n--'+b+'--'],{type:'multipart/related; boundary='+b});
-  return gdApi('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink',{method:'POST',body},tok);
-}
-async function saveToGDrive(id){
-  try{
-    const tok=await gdToken(); toast('☁️ Saving to Google Drive...');
-    await gdUpload(id,tok); toast('✅ Saved to your Google Drive (folder: Gemini OS)');
-  }catch(e){ toast('❌ '+e.message); }
-}
-async function gdBackupAll(){
-  const list=Object.values(FILES).filter(f=>f.scope==='private'&&f.uploader===me);
-  if(!list.length) return toast('Your My Drive is empty');
-  try{
-    const tok=await gdToken(); let ok=0;
-    for(let i=0;i<list.length;i++){
-      toast('☁️ Saving '+(i+1)+' of '+list.length+'...');
-      try{ await gdUpload(list[i].id,tok); ok++; }catch(e){ if(/expired/.test(e.message)) throw e; }
-    }
-    toast('✅ '+ok+' of '+list.length+' files saved to Google Drive (folder: Gemini OS)');
-  }catch(e){ toast('❌ '+e.message); }
 }
 function uploadToDrive(inp,shared){
   if(!socket.connected){ inp.value=''; return toast('📴 Offline: uploads need internet'); }
@@ -1199,9 +1147,10 @@ function renderAdmin(){
   const q=($('admSearch').value||'').trim().toLowerCase();
   const list=AD.users.filter(u=>u.name.toLowerCase().includes(q)).sort((a,b)=>(b.online-a.online)||a.name.localeCompare(b.name));
   $('admUsers').innerHTML=list.map(u=>{
-    const n=enc(u.name), canBan=u.role!=='owner'&&u.name!==me&&(u.role!=='admin'||AD.owner);
+    const n=enc(u.name), canBan=!u.real&&u.name!==me&&(u.role!=='owner'||AD.real)&&(u.role!=='admin'||AD.owner);
     return '<div class="user-card"><div>'+(u.online?'🟢 ':'⚪ ')+esc(u.name)+tag(u.role)+'<br><small style="color:#888">IP: '+esc(u.ips.join(', ')||'unknown')+' · strikes '+u.strikes+'</small></div><div class="user-actions">'
       +(AD.owner&&u.role!=='owner'?'<button class="btn sm '+(u.role==='admin'?'gray':'blue')+'" onclick="admSetAdmin(\''+n+'\','+(u.role==='admin'?'false':'true')+')">'+(u.role==='admin'?'Remove admin':'🛡 Make admin')+'</button>':'')
+      +(AD.real&&!u.real?'<button class="btn sm '+(u.role==='owner'?'gray':'green')+'" onclick="admSetOwner(\''+n+'\','+(u.role==='owner'?'false':'true')+')">'+(u.role==='owner'?'Remove owner':'\ud83d\udc51 Make owner')+'</button>':'')
       +(canBan?'<button class="btn sm" onclick="admBan(\''+n+'\')">🔨 Ban</button>':'')+'</div></div>';
   }).join('')||'<small style="color:#888">No users found</small>';
 }
@@ -1217,6 +1166,7 @@ function admBan(e){
   socket.emit('admin_ban',{name,seconds:secs,reason:$('admReason').value.trim()||'No reason given',ipToo:!!$('admIp').value});
 }
 function admUnban(id){ socket.emit('admin_unban',id); }
+function admSetOwner(e,on){ const name=decodeURIComponent(e); if(confirm((on?'Make ':'Remove owner from ')+name+(on?' an OWNER? They will be able to ban admins and make admins.':'?'))) socket.emit('set_owner',{name,on}); }
 function admSetAdmin(e,on){ socket.emit('set_admin',{name:decodeURIComponent(e),on}); }
 function admAddWord(){ const w=$('admWord').value.trim(); if(w){ socket.emit('admin_word',{word:w}); $('admWord').value=''; } }
 function admDelWord(e){ socket.emit('admin_word',{word:decodeURIComponent(e),del:true}); }
@@ -2241,7 +2191,6 @@ socket.on('media_data',({id,image,audio})=>{
 });
 socket.on('file_data',({id,url})=>{
   const f=FILES[id]; if(!f) return; f.url=url; f.big=false;
-  if(gdPend[id]){ gdPend[id](url); delete gdPend[id]; }
   const old=$('drive-file-'+id); if(old) old.remove(); renderCloudFile(f);
 });
 const _ru=renderUsers; let ruT;
@@ -2379,12 +2328,8 @@ socket.on('coins',({coins,gained})=>{ showCoins(coins); if(gained>0) toast('🪙
 
 // ================= SHOP (ranks, name colours, badges) =================
 let shopCat='rank';
-function openShop(){ openModal('shopModal'); socket.emit('shop_get'); if(shopCat==='gift') giftFill(); renderShop(); }
-function shopTab(k){ shopCat=k; if(k==='gift') giftFill(); renderShop(); }
-function giftFill(){ const s=$('giftTo'), v=s.value; s.innerHTML='<option value="">Choose a person…</option>'+Object.keys(dirMap).filter(n=>n!==me).sort((a,b)=>a.localeCompare(b)).map(n=>'<option value="'+esc(n)+'">'+esc((dirMap[n].emoji||'')+' '+n)+'</option>').join(''); s.value=v; }
-function giftSend(){ const to=$('giftTo').value, amt=Math.floor(+$('giftAmt').value);
-  if(!to) return toast('Choose who gets the coins'); if(!(amt>=1)) return toast('Enter an amount of 1 or more'); if(amt>(SHOP.coins||0)) return toast('🪙 You only have '+(SHOP.coins||0)+' coins');
-  socket.emit('gift_coins',{to,amount:amt}); $('giftAmt').value=''; }
+function openShop(){ openModal('shopModal'); socket.emit('shop_get'); renderShop(); }
+function shopTab(k){ shopCat=k; renderShop(); }
 function shopBuy(id){ socket.emit('shop_buy',id); }
 function shopEquip(cat,id){ socket.emit('shop_equip',{cat,id}); }
 function shopPreview(id,it){
@@ -2393,9 +2338,8 @@ function shopPreview(id,it){
   return '<span style="font-size:22px">'+it.icon+'</span> <b>'+esc(it.name)+'</b>';
 }
 function renderShop(){
-  ['rank','color','badge','gift'].forEach(k=>{ const b=$('sh-'+k); if(b) b.className='btn sm'+(k===shopCat?'':' gray'); });
+  ['rank','color','badge'].forEach(k=>{ const b=$('sh-'+k); if(b) b.className='btn sm'+(k===shopCat?'':' gray'); });
   showCoins(SHOP.coins||0);
-  $('giftBox').style.display=shopCat==='gift'?'block':'none'; $('shopList').style.display=shopCat==='gift'?'none':'block'; if(shopCat==='gift') return;
   const rows=Object.entries(SHOP.items).filter(([id,it])=>it.cat===shopCat);
   $('shopList').innerHTML=rows.length?rows.map(([id,it])=>{
     const own=SHOP.own.includes(id), on=SHOP[shopCat]===id;
@@ -2452,6 +2396,7 @@ function mkApp(id,title,icon,label,body){
   const m=el('div',{id,class:'modal'});
   m.append(el('div',{class:'modal-header'},el('h3',{},title),el('button',{class:'close-btn',onclick:()=>closeModal(id)},'X')));
   const b=el('div',{class:'modal-body'}); b.append(body); m.append(b); document.body.append(m);
+  $('side').append(el('button',{class:'nav more',onclick:()=>openModal(id)},icon,el('span',{},label)));
   const tiles=document.querySelector('.tiles'); tiles.insertBefore(el('div',{class:'tile-app',onclick:()=>openModal(id)},el('i',{},icon),label),tiles.lastElementChild);
 }
 
