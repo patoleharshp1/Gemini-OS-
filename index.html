@@ -27,12 +27,8 @@ h4{color:var(--hi);margin:14px 0 8px}
 
 /* ---------- PHONE LAYOUT (default) ---------- */
 #app{display:flex;min-height:100%}
-#side{position:fixed;bottom:0;left:0;right:0;height:58px;background:#1a0505;border-top:1px solid var(--bd);display:flex;z-index:50}
-.brand,.more{display:none}
-.nav{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;background:none;border:0;color:var(--tx);font-size:19px;cursor:pointer;position:relative}
-.nav span{font-size:10px}
-.nav b{position:absolute;top:4px;right:20%;color:#ffb300;font-size:11px}
-#main{flex:1;min-width:0;padding:12px 12px 76px}
+#main{flex:1;min-width:0;padding:12px}
+.tile-app b{color:#ffb300;font-size:12px;margin-left:4px}
 .topbar{display:flex;justify-content:space-between;align-items:center;gap:8px;background:#230a0a;border:1px solid var(--bd);padding:10px 12px;border-radius:12px;margin-bottom:12px;font-size:13px;font-weight:bold;color:var(--tx)}
 #display-username{cursor:pointer;text-decoration:underline}
 .hero{display:none}
@@ -51,12 +47,6 @@ h4{color:var(--hi);margin:14px 0 8px}
 
 /* ---------- LAPTOP LAYOUT ---------- */
 @media (min-width:900px){
-  #side{position:sticky;top:0;height:100vh;width:230px;flex-direction:column;border-top:0;border-right:1px solid var(--bd);padding:18px 10px;gap:6px;flex:none}
-  .brand{display:block;font-size:20px;font-weight:bold;color:var(--hi);padding:4px 12px 16px}
-  .more{display:flex}
-  .nav{flex:none;flex-direction:row;justify-content:flex-start;gap:12px;padding:11px 14px;font-size:18px;border-radius:10px}
-  .nav span{font-size:14px}.nav:hover{background:#2b0b0b}
-  .nav b{position:static;margin-left:auto}
   #main{padding:26px 34px}
   .hero{display:block;background:linear-gradient(135deg,#3a0d0d,#1a0505);border:1px solid var(--bd);border-radius:18px;padding:26px 30px;margin-bottom:22px}
   .hero h2{margin:0 0 6px;font-size:26px}.hero p{margin:0;color:var(--tx)}
@@ -237,19 +227,6 @@ h4{color:var(--hi);margin:14px 0 8px}
 
 <!-- ============ MAIN APP ============ -->
 <div id="app">
-  <nav id="side">
-    <div class="brand">✦ Gemini OS</div>
-    <button class="nav" onclick="goHome()">🏠<span>Home</span></button>
-    <button class="nav" onclick="openModal('chatApp')">💬<span>Messages</span><b id="unreadTotal"></b></button>
-    <button class="nav" onclick="openModal('phoneApp')">📞<span>Calls</span></button>
-    <button class="nav" onclick="openModal('usersModal')">👥<span>Friends</span><b id="reqBadge"></b></button>
-    <button class="nav" onclick="openGames()">🎮<span>Games</span></button>
-    <button class="nav more" onclick="openModal('storageApp')">☁️<span>Drive</span></button>
-    <button class="nav more" onclick="openModal('recModal')">🎬<span>Recorder</span></button>
-    <button class="nav more" onclick="openBrowser()">🌐<span>Browser</span></button>
-    <button class="nav more" onclick="openModal('localMusicApp')">🎵<span>Music</span></button>
-    <button class="nav more" onclick="openCamera()">📷<span>Camera</span></button>
-  </nav>
   <main id="main">
     <div id="recBanner"></div>
     <div id="offlineBar">📴 Offline — text messages will send when you reconnect</div>
@@ -263,9 +240,9 @@ h4{color:var(--hi);margin:14px 0 8px}
     </div>
     <div class="hero"><h2>Welcome, <span id="heroName"></span> 👋</h2><p>Chat, call up to 8 people, record your screen, play games and share files.</p></div>
     <div class="tiles">
-      <div class="tile-app" onclick="openModal('chatApp')"><i>💬</i>Messages</div>
+      <div class="tile-app" onclick="openModal('chatApp')"><i>💬</i>Messages<b id="unreadTotal"></b></div>
       <div class="tile-app" onclick="openModal('phoneApp')"><i>📞</i>Calls</div>
-      <div class="tile-app" onclick="openModal('usersModal')"><i>👥</i>Friends</div>
+      <div class="tile-app" onclick="openModal('usersModal')"><i>👥</i>Friends<b id="reqBadge"></b></div>
       <div class="tile-app" onclick="openGames()"><i>🎮</i>Games</div>
       <div class="tile-app" onclick="openShop()"><i>🛒</i>Shop</div>
       <div class="tile-app" onclick="openModal('storageApp')"><i>☁️</i>Drive</div>
@@ -638,9 +615,17 @@ h4{color:var(--hi);margin:14px 0 8px}
       <button class="btn sm" id="sh-rank" onclick="shopTab('rank')">🏅 Ranks</button>
       <button class="btn sm gray" id="sh-color" onclick="shopTab('color')">🎨 Name colours</button>
       <button class="btn sm gray" id="sh-badge" onclick="shopTab('badge')">🎖 Badges</button>
+      <button class="btn sm gray" id="sh-gift" onclick="shopTab('gift')">🎁 Gift coins</button>
     </div>
     <small style="color:#888;display:block;margin:6px 0 10px">Earn 🪙 coins by winning games. 👑 Owner and 🛡 Admin tags cannot be bought.</small>
     <div id="shopList"></div>
+    <div id="giftBox" style="display:none">
+      <h4>🎁 Send coins to someone</h4>
+      <select id="giftTo" style="width:100%;margin-bottom:6px"></select>
+      <input type="number" id="giftAmt" min="1" step="1" placeholder="Amount of coins" style="width:100%;margin-bottom:6px" onkeydown="if(event.key==='Enter')giftSend()"/>
+      <button class="btn green" onclick="giftSend()">🎁 Send coins</button>
+      <small style="color:#888;display:block;margin-top:8px">Coins leave your balance right away and cannot be taken back.</small>
+    </div>
     <div style="text-align:center;margin-top:10px"><button class="btn gray" onclick="openGames()">🎮 Back to games</button></div>
   </div>
 </div>
@@ -2394,8 +2379,12 @@ socket.on('coins',({coins,gained})=>{ showCoins(coins); if(gained>0) toast('🪙
 
 // ================= SHOP (ranks, name colours, badges) =================
 let shopCat='rank';
-function openShop(){ openModal('shopModal'); socket.emit('shop_get'); renderShop(); }
-function shopTab(k){ shopCat=k; renderShop(); }
+function openShop(){ openModal('shopModal'); socket.emit('shop_get'); if(shopCat==='gift') giftFill(); renderShop(); }
+function shopTab(k){ shopCat=k; if(k==='gift') giftFill(); renderShop(); }
+function giftFill(){ const s=$('giftTo'), v=s.value; s.innerHTML='<option value="">Choose a person…</option>'+Object.keys(dirMap).filter(n=>n!==me).sort((a,b)=>a.localeCompare(b)).map(n=>'<option value="'+esc(n)+'">'+esc((dirMap[n].emoji||'')+' '+n)+'</option>').join(''); s.value=v; }
+function giftSend(){ const to=$('giftTo').value, amt=Math.floor(+$('giftAmt').value);
+  if(!to) return toast('Choose who gets the coins'); if(!(amt>=1)) return toast('Enter an amount of 1 or more'); if(amt>(SHOP.coins||0)) return toast('🪙 You only have '+(SHOP.coins||0)+' coins');
+  socket.emit('gift_coins',{to,amount:amt}); $('giftAmt').value=''; }
 function shopBuy(id){ socket.emit('shop_buy',id); }
 function shopEquip(cat,id){ socket.emit('shop_equip',{cat,id}); }
 function shopPreview(id,it){
@@ -2404,8 +2393,9 @@ function shopPreview(id,it){
   return '<span style="font-size:22px">'+it.icon+'</span> <b>'+esc(it.name)+'</b>';
 }
 function renderShop(){
-  ['rank','color','badge'].forEach(k=>{ const b=$('sh-'+k); if(b) b.className='btn sm'+(k===shopCat?'':' gray'); });
+  ['rank','color','badge','gift'].forEach(k=>{ const b=$('sh-'+k); if(b) b.className='btn sm'+(k===shopCat?'':' gray'); });
   showCoins(SHOP.coins||0);
+  $('giftBox').style.display=shopCat==='gift'?'block':'none'; $('shopList').style.display=shopCat==='gift'?'none':'block'; if(shopCat==='gift') return;
   const rows=Object.entries(SHOP.items).filter(([id,it])=>it.cat===shopCat);
   $('shopList').innerHTML=rows.length?rows.map(([id,it])=>{
     const own=SHOP.own.includes(id), on=SHOP[shopCat]===id;
@@ -2462,7 +2452,6 @@ function mkApp(id,title,icon,label,body){
   const m=el('div',{id,class:'modal'});
   m.append(el('div',{class:'modal-header'},el('h3',{},title),el('button',{class:'close-btn',onclick:()=>closeModal(id)},'X')));
   const b=el('div',{class:'modal-body'}); b.append(body); m.append(b); document.body.append(m);
-  $('side').append(el('button',{class:'nav more',onclick:()=>openModal(id)},icon,el('span',{},label)));
   const tiles=document.querySelector('.tiles'); tiles.insertBefore(el('div',{class:'tile-app',onclick:()=>openModal(id)},el('i',{},icon),label),tiles.lastElementChild);
 }
 
