@@ -15,14 +15,14 @@ const io = new Server(server, { maxHttpBufferSize: 5e7, cors: { origin: '*' } })
 const DB_FILE = path.join(process.env.DATA_DIR || __dirname, 'db.json');
 let db = {
   totalVisits: 0, visitors: [], users: [], friends: {}, requests: {}, global: [], dms: {}, files: [],
-  profiles: {}, blocks: {}, accounts: {}, sessions: {}, push: {}, bans: [], strikes: {}, ips: {}, cids: {}, badWords: []
+  profiles: {}, blocks: {}, accounts: {}, sessions: {}, push: {}, bans: [], strikes: {}, ips: {}, cids: {}, badWords: [], reports: []
 };
 let M = null;
 const logErr = e => console.error('Storage error:', e.message);
 const metaOf = () => ({
   totalVisits: db.totalVisits, visitors: db.visitors, users: db.users, friends: db.friends, requests: db.requests,
   profiles: db.profiles, blocks: db.blocks, accounts: db.accounts, sessions: db.sessions, push: db.push,
-  bans: db.bans, strikes: db.strikes, ips: db.ips, cids: db.cids, badWords: db.badWords
+  bans: db.bans, strikes: db.strikes, ips: db.ips, cids: db.cids, badWords: db.badWords, reports: db.reports
 });
 
 async function initStorage() {
@@ -115,7 +115,44 @@ const ACH = { // id: [icon, title, test]
   dash_done: ['🔷', 'Finished a Dash level', p => (p.best.gd || 0) >= 100],
   all_games: ['🎮', 'Played all 5 games', p => Object.keys(p.played).length >= 5]
 };
+// ---- daily login reward + streak, daily quests (a "day" changes at 00:00 UTC = 05:30 AM India time) ----
+const reps = () => db.reports || (db.reports = []);
+const dayStr = (off = 0) => new Date(Date.now() + off * 864e5).toISOString().slice(0, 10);
+const QUESTS = [
+  { id: 'msg', t: 'Send 5 chat messages', goal: 5, coins: 10 },
+  { id: 'play', t: 'Finish 3 games', goal: 3, coins: 15 },
+  { id: 'win', t: 'Win 1 game', goal: 1, coins: 20 }
+];
+function questState(name) {
+  const p = prof(name);
+  if (!p.q || p.q.day !== dayStr()) p.q = { day: dayStr(), list: QUESTS.map(q => ({ id: q.id, n: 0, done: 0 })) };
+  return { streak: (p.loginDay === dayStr() || p.loginDay === dayStr(-1)) ? (p.streak || 0) : 0, list: QUESTS.map((q, i) => ({ ...q, n: p.q.list[i].n, done: p.q.list[i].done })) };
+}
+function questProg(name, id, n = 1) {
+  const p = prof(name); questState(name);
+  const q = p.q.list.find(x => x.id === id), def = QUESTS.find(x => x.id === id);
+  if (!q || q.done) return;
+  q.n = Math.min(def.goal, q.n + n);
+  if (q.n >= def.goal) {
+    q.done = 1; p.coins += def.coins;
+    to(name, 'coins', { coins: p.coins, gained: def.coins });
+    to(name, 'toast', '✅ Quest done: ' + def.t + ' (+' + def.coins + ' coins)'); stats();
+  }
+  pMeta(); to(name, 'quests', questState(name));
+}
+function dailyLogin(name) {
+  const p = prof(name), today = dayStr();
+  if (p.loginDay !== today) {
+    p.streak = p.loginDay === dayStr(-1) ? (p.streak || 0) + 1 : 1; p.loginDay = today;
+    const c = Math.min(5 + (p.streak - 1) * 2, 25) + (p.streak % 7 === 0 ? 50 : 0);
+    p.coins += c; to(name, 'coins', { coins: p.coins, gained: c });
+    to(name, 'toast', '🎁 Daily reward +' + c + ' coins · 🔥 ' + p.streak + '-day streak' + (p.streak % 7 === 0 ? ' (7-day bonus!)' : ''));
+    pMeta(); stats();
+  }
+  to(name, 'quests', questState(name));
+}
 function reward(name, game, coins, win, score) {
+  questProg(name, 'play', 1); if (win) questProg(name, 'win', 1);
   const p = prof(name);
   p.coins += coins; if (win) p.wins = (p.wins || 0) + 1;
   p.played[game] = (p.played[game] || 0) + 1;
@@ -175,6 +212,23 @@ const newSession = name => {
 const fails = {};
 const tooMany = k => fails[k] && fails[k].n >= 5 && Date.now() - fails[k].t < 300000;
 const addFail = k => { const f = fails[k]; if (!f || Date.now() - f.t > 300000) fails[k] = { n: 1, t: Date.now() }; else { f.n++; f.t = Date.now(); } };
+// ---- phone sign-in with OTP: Twilio Verify (set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_VERIFY_SID on Render) ----
+// For testing without SMS set OTP_DEV=1: the code is then printed in the Render logs instead of being sent.
+const TW = { sid: process.env.TWILIO_ACCOUNT_SID, tok: process.env.TWILIO_AUTH_TOKEN, ver: process.env.TWILIO_VERIFY_SID };
+const TW_ON = !!(TW.sid && TW.tok && TW.ver), PHONE_ON = TW_ON || process.env.OTP_DEV === '1';
+const otpDev = Object.create(null), phoneOk = Object.create(null), otpSent = Object.create(null);
+const normPhone = s => { s = String(s || '').replace(/[\s\-().]/g, ''); if (/^\d{10}$/.test(s)) s = '+91' + s; return /^\+[1-9]\d{7,14}$/.test(s) ? s : ''; };
+const twHead = () => ({ Authorization: 'Basic ' + Buffer.from(TW.sid + ':' + TW.tok).toString('base64'), 'content-type': 'application/x-www-form-urlencoded' });
+async function otpSend(phone) {
+  if (!TW_ON) { const c = String(crypto.randomInt(100000, 1000000)); otpDev[phone] = { c, exp: Date.now() + 600000, n: 0 }; console.log('[OTP_DEV] code for ' + phone + ': ' + c); return; }
+  const r = await fetch('https://verify.twilio.com/v2/Services/' + TW.ver + '/Verifications', { method: 'POST', headers: twHead(), body: new URLSearchParams({ To: phone, Channel: 'sms' }) });
+  if (!r.ok) { let m = ''; try { m = (await r.json()).message; } catch (e) {} throw new Error(m || 'SMS service error ' + r.status); }
+}
+async function otpCheck(phone, code) {
+  if (!TW_ON) { const o = otpDev[phone]; if (!o || o.exp < Date.now() || ++o.n > 5) { delete otpDev[phone]; return false; } if (o.c !== code) return false; delete otpDev[phone]; return true; }
+  const r = await fetch('https://verify.twilio.com/v2/Services/' + TW.ver + '/VerificationCheck', { method: 'POST', headers: twHead(), body: new URLSearchParams({ To: phone, Code: code }) });
+  const j = await r.json().catch(() => ({})); return j.status === 'approved';
+}
 const OWNER_NAME = 'AllTimeLaugher';
 const isReal = n => !!(n && String(n).toLowerCase() === OWNER_NAME.toLowerCase() && getAcc(akey(n))); // the REAL owner: lives in the code, can never be banned or demoted
 const isOwner = n => !!(n && (isReal(n) || (getAcc(akey(n)) && getAcc(akey(n)).coOwner))); // real owner + owners made by the real owner
@@ -390,7 +444,7 @@ app.get('/manifest.webmanifest', (req, res) => {
 });
 app.get('/sw.js', (req, res) => { res.set('Content-Type', 'application/javascript'); res.sendFile(path.join(__dirname, 'sw.js')); });
 app.get('/vapid', (req, res) => { res.set('Access-Control-Allow-Origin', '*'); res.json({ key: pushOn ? process.env.VAPID_PUBLIC : '' }); });
-app.get('/config', (req, res) => { res.set('Access-Control-Allow-Origin', '*'); res.json({ googleClientId: process.env.GOOGLE_CLIENT_ID || '', persistent: !!M }); });
+app.get('/config', (req, res) => { res.set('Access-Control-Allow-Origin', '*'); res.json({ googleClientId: process.env.GOOGLE_CLIENT_ID || '', persistent: !!M, phone: PHONE_ON }); });
 // ---- In-app YouTube + Google search through the official APIs (needs keys on Render) ----
 const searchHits = {};
 const decodeHtml = s => String(s || '').replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
@@ -544,6 +598,7 @@ io.on('connection', (socket) => {
     socket.emit('blocks', arr(db.blocks, me));
     socket.emit('shop_state', shopState()); // NEW
     socket.emit('prefs', prof(me).prefs || null);
+    dailyLogin(me);
     stats();
   }
   const ok = (name, token) => {
@@ -581,7 +636,7 @@ io.on('connection', (socket) => {
     name = cleanName(name); const k = akey(name);
     if (tooMany(k)) return socket.emit('auth_error', 'Too many tries. Wait 5 minutes.');
     const acc = getAcc(k);
-    if (acc && !acc.hash) return socket.emit('auth_error', 'This name uses Google sign-in');
+    if (acc && !acc.hash) return socket.emit('auth_error', 'This name uses Google or phone sign-in');
     let good = false;
     if (acc) { try { good = crypto.timingSafeEqual(Buffer.from(hashPw(String(password || ''), acc.salt), 'hex'), Buffer.from(acc.hash, 'hex')); } catch (e) {} }
     if (!good) { addFail(k); return socket.emit('auth_error', 'Wrong name or password'); }
@@ -604,6 +659,46 @@ io.on('connection', (socket) => {
     db.accounts[akey(display)] = { name: display, google: p.sub, email: p.email, created: Date.now() };
     ok(display, newSession(display));
   });
+  // ---------- phone sign-in / sign-up with OTP ----------
+  socket.on('phone_send', async ({ phone, clientId: c } = {}) => {
+    clientId = c || clientId;
+    if (!PHONE_ON) return socket.emit('auth_error', 'Phone sign-in is not set up yet');
+    const p = normPhone(phone);
+    if (!p) return socket.emit('auth_error', 'Enter a valid phone number, for example +919876543210');
+    const ipk = 'otpip:' + socket.data.ip;
+    if (tooMany(ipk)) return socket.emit('auth_error', 'Too many tries. Wait 5 minutes.');
+    if (Date.now() - (otpSent[p] || 0) < 30000) return socket.emit('auth_error', 'Wait 30 seconds before asking for a new code');
+    otpSent[p] = Date.now(); addFail(ipk);
+    try { await otpSend(p); socket.emit('phone_sent', { phone: p }); }
+    catch (e) { socket.emit('auth_error', 'Could not send the code: ' + String(e.message).slice(0, 140)); }
+  });
+  socket.on('phone_verify', async ({ phone, code, clientId: c } = {}) => {
+    clientId = c || clientId;
+    if (!PHONE_ON) return socket.emit('auth_error', 'Phone sign-in is not set up yet');
+    const p = normPhone(phone), vk = 'otpv:' + p;
+    code = String(code || '').replace(/\D/g, '');
+    if (!p || !code) return socket.emit('auth_error', 'Enter the code you received');
+    if (tooMany(vk)) return socket.emit('auth_error', 'Too many wrong codes. Wait 5 minutes.');
+    let good = false; try { good = await otpCheck(p, code); } catch (e) {}
+    if (!good) { addFail(vk); return socket.emit('auth_error', 'Wrong or expired code'); }
+    delete fails[vk];
+    const acc = Object.values(db.accounts).find(a => a.phone === p);
+    if (acc) return ok(acc.name, newSession(acc.name));
+    phoneOk[p] = { sid: socket.id, exp: Date.now() + 600000 };
+    socket.emit('phone_need_name', {});
+  });
+  socket.on('phone_name', ({ phone, name } = {}) => {
+    const p = normPhone(phone), v = phoneOk[p];
+    if (!p || !v || v.sid !== socket.id || v.exp < Date.now()) return socket.emit('auth_error', 'Verification expired. Start again.');
+    name = cleanName(name);
+    if (!name || badName(name)) return socket.emit('phone_need_name', { error: 'Choose another name (2-24 characters)' });
+    if (getAcc(akey(name))) return socket.emit('phone_need_name', { error: 'That name is already taken' });
+    if (Object.values(db.accounts).some(a => a.phone === p)) return socket.emit('auth_error', 'This number is already registered. Sign in again.');
+    const display = findUser(name) || name;
+    db.accounts[akey(display)] = { name: display, phone: p, created: Date.now() };
+    delete phoneOk[p];
+    ok(display, newSession(display));
+  });
   socket.on('logout', ({ token, endpoint } = {}) => {
     const h = sha(String(token || ''));
     if (hasOwn(db.sessions, h)) delete db.sessions[h];
@@ -624,7 +719,7 @@ io.on('connection', (socket) => {
     return {
       owner: isOwner(me), real: isReal(me),
       users: db.users.map(n => ({ name: n, role: roleOf(n), real: isReal(n), ips: db.ips[n] || [], online: !!online[n], strikes: db.strikes[n] || 0 })),
-      bans: db.bans, words: db.badWords || []
+      bans: db.bans, words: db.badWords || [], reports: reps().filter(r => r.open)
     };
   };
   socket.on('admin_data', () => { if (isAdmin(me)) socket.emit('admin_data', adminPayload()); });
@@ -652,6 +747,25 @@ io.on('connection', (socket) => {
     to(u, 'role_update', { admin: !!on }); to(u, 'toast', on ? '🛡 You are now an admin' : 'Your admin tag was removed');
     stats(); socket.emit('admin_data', adminPayload());
     socket.emit('toast', on ? '🛡 ' + u + ' is now an admin' : u + ' is no longer an admin');
+  });
+  socket.on('quests_get', () => { if (me) socket.emit('quests', questState(me)); });
+  socket.on('report_user', ({ name, reason } = {}) => {
+    if (!me) return;
+    const u = findUser(name);
+    if (!u || u === me) return socket.emit('toast', 'Cannot report that user');
+    reason = String(reason || '').trim().slice(0, 300);
+    if (reason.length < 3) return socket.emit('toast', 'Please write a short reason');
+    const R = reps(), now = Date.now();
+    if (R.filter(r => r.by === me && now - r.at < 3600e3).length >= 5) return socket.emit('toast', 'Too many reports. Try again later.');
+    if (R.some(r => r.by === me && r.name === u && r.open)) return socket.emit('toast', 'You already reported this user');
+    R.push({ id: uid(), by: me, name: u, reason, at: now, open: true });
+    if (R.length > 300) R.splice(0, R.length - 300);
+    pMeta(); socket.emit('toast', '🚩 Report sent to the admins');
+    Object.keys(online).filter(a => isAdmin(a)).forEach(a => to(a, 'toast', '🚩 New report about ' + u));
+  });
+  socket.on('report_close', (id) => {
+    if (!isAdmin(me)) return;
+    const r = reps().find(x => x.id === id); if (r) { r.open = false; pMeta(); socket.emit('admin_data', adminPayload()); }
   });
   socket.on('set_owner', ({ name, on } = {}) => { // ONLY the real owner can make (or remove) other owners
     if (!isReal(me)) return socket.emit('toast', 'Only the real owner can give or remove the owner tag');
@@ -763,6 +877,7 @@ io.on('connection', (socket) => {
     if ((data.image && data.image.length > MAX_BYTES) || (data.audio && data.audio.length > MAX_BYTES)) return socket.emit('toast', 'File too big (max 10 MB)');
     if (data.image && !/^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(data.image)) return socket.emit('toast', 'Only PNG, JPG, WebP or GIF pictures are allowed');
     if (data.audio && !/^data:audio\/(webm|ogg|mp4|mpeg|wav|aac|x-m4a)(;codecs=[\w.,-]+)?;base64,[A-Za-z0-9+/=]+$/.test(data.audio)) return socket.emit('toast', 'Unsupported voice note format');
+    questProg(me, 'msg', 1);
     const m = { user: me, id: uid(), t: Date.now(), timestamp: data.timestamp || '', text: data.text ? String(data.text).slice(0, 2000) : undefined, image: data.image, audio: data.audio };
     if (data.to) {
       const target = findUser(data.to);
