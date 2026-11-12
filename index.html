@@ -38,7 +38,7 @@ h4{color:var(--hi);margin:14px 0 8px}
 #display-username{cursor:pointer;text-decoration:underline}
 .hero{display:none}
 .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-.tile-app{background:none;border:0;border-radius:16px;padding:16px 4px;text-align:center;cursor:pointer;color:var(--tx);font-size:12px}
+.tile-app{background:var(--tbg,#1e0808);border:var(--tbd,1px solid #421818);border-radius:16px;padding:16px 4px;text-align:center;cursor:pointer;color:var(--tx);font-size:12px}
 .tile-app i{display:block;font-style:normal;font-size:34px;margin-bottom:6px}
 .tile-app:active{transform:scale(.94)}
 #offlineBar{display:none;background:#8a1c1c;text-align:center;padding:6px;border-radius:8px;margin-bottom:10px;font-size:12px}
@@ -2591,7 +2591,175 @@ function renderQuests(){
 }
 socket.on('quests',d=>{ QS=d; renderQuests(); });
 const _omQ=openModal; openModal=function(id){ _omQ(id); if(id==='questApp'){ socket.emit('quests_get'); renderQuests(); } };
+/* ===== icon style: cutout on/off + colour ===== */
+const TSX=(()=>{ try{ return JSON.parse(localStorage.getItem('tileStyle'))||{}; }catch(e){ return {}; } })();
+function tsApply(save){
+  const r=document.documentElement.style;
+  if(TSX.cut){ r.setProperty('--tbg','transparent'); r.setProperty('--tbd','0'); }
+  else if(TSX.col){ r.setProperty('--tbg',TSX.col); r.setProperty('--tbd','1px solid rgba(255,255,255,.15)'); }
+  else { r.removeProperty('--tbg'); r.removeProperty('--tbd'); }
+  if(save){ try{ localStorage.setItem('tileStyle',JSON.stringify(TSX)); }catch(e){} }
+  const b=$('tsCut'); if(b) b.innerText=TSX.cut?'✂️ Cutout is ON (tap to show boxes)':'✂️ Cutout is OFF (tap to remove boxes)';
+}
+const tsBody=el('div',{}); tsBody.innerHTML=`<button class="btn" id="tsCut" style="width:100%;margin-bottom:10px" onclick="tsToggle()"></button><div class="user-card"><div>Icon box colour</div><input type="color" id="tsCol" oninput="tsColor(this.value)" style="width:70px;height:34px"></div><button class="btn gray" style="width:100%;margin-top:10px" onclick="tsReset()">Reset to default</button>`;
+mkApp('iconApp','Icon style','🎨','Icons',tsBody);
+window.tsToggle=()=>{ TSX.cut=TSX.cut?0:1; tsApply(1); };
+window.tsColor=v=>{ TSX.col=v; TSX.cut=0; tsApply(1); };
+window.tsReset=()=>{ delete TSX.cut; delete TSX.col; tsApply(1); $('tsCol').value='#1e0808'; };
+$('tsCol').value=TSX.col||'#1e0808'; tsApply(0);
+const swipeOn=(e,cb)=>{ let sx=0,sy=0; e.addEventListener('touchstart',t=>{ sx=t.touches[0].clientX; sy=t.touches[0].clientY; },{passive:true}); e.addEventListener('touchend',t=>{ const q=t.changedTouches[0],dx=q.clientX-sx,dy=q.clientY-sy; if(Math.max(Math.abs(dx),Math.abs(dy))<25) return; cb(Math.abs(dx)>Math.abs(dy)?(dx>0?'r':'l'):(dy>0?'d':'u')); },{passive:true}); };
+/* ===== Snake ===== */
+const snBody=el('div',{style:{textAlign:'center'}});
+snBody.innerHTML=`<canvas id="snCv" width="300" height="300" style="background:#0b1a0b;border-radius:8px;max-width:100%;touch-action:none"></canvas><div id="snInfo" style="margin:6px 0">Score 0</div><div style="display:grid;grid-template-columns:repeat(3,64px);gap:6px;justify-content:center"><span></span><button class="btn" onclick="snDir(0,-1)">▲</button><span></span><button class="btn" onclick="snDir(-1,0)">◀</button><button class="btn gray" onclick="snNew()">🔄</button><button class="btn" onclick="snDir(1,0)">▶</button><span></span><button class="btn" onclick="snDir(0,1)">▼</button><span></span></div><small style="color:#888">Arrows, WASD or swipe. Score 10+ to win coins.</small>`;
+mkApp('snakeApp','Snake','🐍','Snake',snBody);
+let SNK=null;
+function snNew(){ if(SNK) clearInterval(SNK.t); SNK={s:[{x:7,y:7},{x:6,y:7},{x:5,y:7}],d:{x:1,y:0},nd:{x:1,y:0},f:null,sc:0,over:0,t:0}; snFood(); SNK.t=setInterval(snTick,130); snDraw(); }
+function snFood(){ const S=SNK; do{ S.f={x:Math.floor(Math.random()*15),y:Math.floor(Math.random()*15)}; }while(S.s.some(c=>c.x===S.f.x&&c.y===S.f.y)); }
+window.snDir=(x,y)=>{ const S=SNK; if(!S||S.over||(x===-S.d.x&&y===-S.d.y)) return; S.nd={x,y}; };
+function snTick(){
+  const S=SNK; if(!S||S.over) return; S.d=S.nd; const h={x:S.s[0].x+S.d.x,y:S.s[0].y+S.d.y};
+  if(h.x<0||h.y<0||h.x>14||h.y>14||S.s.some(c=>c.x===h.x&&c.y===h.y)){ S.over=1; clearInterval(S.t); socket.emit('game_reward',{game:'snake',win:S.sc>=10,score:S.sc}); snDraw(); return; }
+  S.s.unshift(h); if(h.x===S.f.x&&h.y===S.f.y){ S.sc++; snFood(); } else S.s.pop(); snDraw();
+}
+function snDraw(){
+  const c=$('snCv').getContext('2d'), S=SNK; c.clearRect(0,0,300,300); c.fillStyle='#e53935'; c.fillRect(S.f.x*20+2,S.f.y*20+2,16,16);
+  S.s.forEach((p,i)=>{ c.fillStyle=i?'#66bb6a':'#c6ff00'; c.fillRect(p.x*20+1,p.y*20+1,18,18); });
+  $('snInfo').innerText=S.over?'💀 Game over · Score '+S.sc+(S.sc>=10?' · coins sent!':' (10+ wins coins)'):'Score '+S.sc;
+}
+swipeOn($('snCv'),d=>{ const m={l:[-1,0],r:[1,0],u:[0,-1],d:[0,1]}[d]; snDir(m[0],m[1]); });
+/* ===== 2048 ===== */
+function g48slide(row){ const a=row.filter(v=>v); let sc=0; for(let i=0;i<a.length-1;i++) if(a[i]===a[i+1]){ a[i]*=2; sc+=a[i]; a.splice(i+1,1); } while(a.length<4) a.push(0); return {row:a,sc}; }
+function g48move(g,dir){ // dir 0 left, 1 right, 2 up, 3 down
+  let sc=0, ch=false; const out=g.slice();
+  for(let i=0;i<4;i++){ const idx=[0,1,2,3].map(j=>dir<2?i*4+j:j*4+i); const line=idx.map(k=>g[k]); if(dir%2) line.reverse();
+    const r=g48slide(line); if(dir%2) r.row.reverse(); idx.forEach((k,j)=>{ if(out[k]!==r.row[j]) ch=true; out[k]=r.row[j]; }); sc+=r.sc; }
+  return {g:out,sc,changed:ch};
+}
+const g48dead=g=>g.every(v=>v)&&[0,1,2,3].every(d=>!g48move(g,d).changed);
+
+const g48Body=el('div',{style:{textAlign:'center'}});
+g48Body.innerHTML=`<div id="g48Info" style="margin-bottom:6px">Score 0</div><div id="g48Grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;max-width:320px;margin:0 auto;background:#2a1010;padding:6px;border-radius:10px;touch-action:none"></div><div style="display:grid;grid-template-columns:repeat(3,64px);gap:6px;justify-content:center;margin-top:8px"><span></span><button class="btn" onclick="g48go(2)">▲</button><span></span><button class="btn" onclick="g48go(0)">◀</button><button class="btn gray" onclick="g48New()">🔄</button><button class="btn" onclick="g48go(1)">▶</button><span></span><button class="btn" onclick="g48go(3)">▼</button><span></span></div><small style="color:#888">Merge tiles. Reach 2048 to win coins.</small>`;
+mkApp('g48App','2048','🔢','2048',g48Body);
+let G48=null;
+function g48Add(g){ const e=g.map((v,i)=>v?-1:i).filter(i=>i>=0); if(e.length) g[e[Math.floor(Math.random()*e.length)]]=Math.random()<.9?2:4; }
+function g48New(){ G48={g:Array(16).fill(0),sc:0,won:0,over:0}; g48Add(G48.g); g48Add(G48.g); g48Draw(); }
+window.g48go=d=>{
+  const S=G48; if(!S||S.over) return; const r=g48move(S.g,d); if(!r.changed) return; S.g=r.g; S.sc+=r.sc; g48Add(S.g);
+  if(!S.won&&S.g.includes(2048)){ S.won=1; socket.emit('game_reward',{game:'g2048',win:true,score:S.sc}); }
+  if(g48dead(S.g)){ S.over=1; if(!S.won) socket.emit('game_reward',{game:'g2048',win:false,score:S.sc}); }
+  g48Draw();
+};
+function g48Draw(){
+  const S=G48; $('g48Info').innerText='Score '+S.sc+(S.won?' · 🏆 2048 reached!':'')+(S.over?' · Game over':'');
+  $('g48Grid').innerHTML=S.g.map(v=>`<div style="aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;border-radius:8px;font:bold ${v>=1024?18:v>=128?22:26}px sans-serif;color:#222;background:${v?`hsl(${(30+Math.log2(v)*28)%360},75%,${Math.max(35,72-Math.log2(v)*3)}%)`:'#3a1818'}">${v||''}</div>`).join('');
+}
+swipeOn($('g48Grid'),d=>g48go({l:0,r:1,u:2,d:3}[d]));
+/* ===== Ludo (you are Red, 3 computer players) ===== */
+const LCOL=['#e53935','#43a047','#fdd835','#1e88e5'], LNAME=['Red (you)','Green','Yellow','Blue'];
+const LP=[]; const lseg=(x,y,dx,dy,n)=>{ for(let i=0;i<n;i++) LP.push([x+dx*i,y+dy*i]); };
+lseg(1,6,1,0,5); lseg(6,5,0,-1,6); lseg(7,0,1,0,2); lseg(8,1,0,1,5); lseg(9,6,1,0,6); lseg(14,7,0,1,2);
+lseg(13,8,-1,0,5); lseg(8,9,0,1,6); lseg(7,14,-1,0,2); lseg(6,13,0,-1,5); lseg(5,8,-1,0,6); lseg(0,7,0,-1,2);
+const LST=[0,13,26,39], LSAFE=new Set([0,13,26,39,8,21,34,47]);
+const LH=[[1,7,1,0],[7,1,0,1],[13,7,-1,0],[7,13,0,-1]].map(([x,y,dx,dy])=>[0,1,2,3,4,5].map(i=>[x+dx*i,y+dy*i]));
+const LY=[[[2,2],[4,2],[2,4],[4,4]],[[10,2],[12,2],[10,4],[12,4]],[[10,10],[12,10],[10,12],[12,12]],[[2,10],[4,10],[2,12],[4,12]]];
+function lCell(c,p,k){ return p<0?LY[c][k]:p<=50?LP[(LST[c]+p)%52]:p<=56?LH[c][p-51]:[7,7]; }
+function lLegal(T,c,d){ const r=[]; T[c].forEach((p,k)=>{ if(p<0?d===6:p+d<=57) r.push(k); }); return r; }
+function lMove(T,c,k,d){
+  const p=T[c][k], np=p<0?0:p+d, cap=[]; T[c][k]=np;
+  if(np<=50){ const idx=(LST[c]+np)%52; if(!LSAFE.has(idx)) for(let o=0;o<4;o++) if(o!==c) T[o].forEach((q,j)=>{ if(q>=0&&q<=50&&(LST[o]+q)%52===idx){ T[o][j]=-1; cap.push([o,j]); } }); }
+  return cap;
+}
+function lAI(T,c,d){
+  let best=-1,bs=-1e9;
+  lLegal(T,c,d).forEach(k=>{ const p=T[c][k], np=p<0?0:p+d; let s=np/10;
+    if(p<0) s+=60; if(np===57) s+=80; if(np>=51&&np<57) s+=15;
+    if(np<=50){ const idx=(LST[c]+np)%52; if(LSAFE.has(idx)) s+=30; else for(let o=0;o<4;o++) if(o!==c) T[o].forEach(q=>{ if(q>=0&&q<=50&&(LST[o]+q)%52===idx) s+=100; }); }
+    if(s>bs){ bs=s; best=k; } });
+  return best;
+}
+let LUD=null;
+function ludNew(){ LUD={T:[0,1,2,3].map(()=>[-1,-1,-1,-1]),turn:0,d:0,rolled:0,sixes:0,over:0,msg:'Your turn: roll the dice'}; ludDraw(); }
+function ludRoll(){ const L=LUD; if(!L||L.over||L.turn!==0||L.rolled) return; ludDo(0); }
+function ludDo(c){
+  const L=LUD; L.d=1+Math.floor(Math.random()*6); L.rolled=1; L.sixes=L.d===6?L.sixes+1:0;
+  const lg=lLegal(L.T,c,L.d);
+  if(L.sixes>=3||!lg.length){ L.msg=LNAME[c]+' rolled '+L.d+(L.sixes>=3?' (three 6s: turn lost)':': no move'); return ludEnd(c,0); }
+  if(c===0){ if(lg.length===1) return ludPick(lg[0]); L.msg='You rolled '+L.d+'. Tap a glowing token.'; ludDraw(); }
+  else setTimeout(()=>{ if(LUD===L&&!L.over) ludPick(lAI(L.T,c,L.d)); },600);
+}
+function ludPick(k){
+  const L=LUD; if(!L||L.over) return; const c=L.turn;
+  if(!lLegal(L.T,c,L.d).includes(k)) return;
+  const cap=lMove(L.T,c,k,L.d); L.msg=LNAME[c]+' rolled '+L.d+(cap.length?' and captured a token!':'');
+  if(L.T[c].every(p=>p===57)){ L.over=1; L.msg='🏆 '+LNAME[c]+' wins!'; ludDraw(); ludReward(c===0); return; }
+  ludEnd(c,L.d===6);
+}
+function ludEnd(c,again){
+  const L=LUD; L.rolled=0; if(!again){ L.turn=(c+1)%4; L.sixes=0; } ludDraw();
+  if(L.turn!==0) setTimeout(()=>{ if(LUD===L&&!L.over) ludDo(L.turn); },700);
+}
+
+const ludBody=el('div',{style:{textAlign:'center'}});
+ludBody.innerHTML=`<canvas id="ludCv" width="360" height="360" style="width:100%;max-width:420px;border-radius:8px"></canvas><div id="ludInfo" style="margin:6px 0;min-height:20px"></div><button class="btn green" onclick="ludRoll()">🎲 Roll dice</button> <button class="btn gray" onclick="ludNew()">🔄 New game</button><br><small style="color:#888">Roll a 6 to leave the yard. Land on another colour to send it home (★ and start squares are safe). Get all 4 tokens to the centre to win.</small>`;
+mkApp('ludApp','Ludo','🎲','Ludo',ludBody);
+function ludDraw(){
+  const cv=$('ludCv'); if(!cv||!LUD) return; const c=cv.getContext('2d'), S=24, L=LUD; c.clearRect(0,0,360,360); c.fillStyle='#fff8e1'; c.fillRect(0,0,360,360);
+  [[0,0],[9,0],[9,9],[0,9]].forEach((q,i)=>{ c.fillStyle=LCOL[i]; c.fillRect(q[0]*S,q[1]*S,6*S,6*S); c.fillStyle='#fff'; c.fillRect((q[0]+1)*S,(q[1]+1)*S,4*S,4*S); });
+  LP.forEach((p,i)=>{ const st=LST.indexOf(i); c.fillStyle=st>=0?LCOL[st]:'#fff'; c.fillRect(p[0]*S,p[1]*S,S,S); c.strokeStyle='#888'; c.lineWidth=1; c.strokeRect(p[0]*S,p[1]*S,S,S); if(LSAFE.has(i)&&st<0){ c.fillStyle='#999'; c.font='16px sans-serif'; c.fillText('★',p[0]*S+4,p[1]*S+19); } });
+  LH.forEach((h,i)=>h.forEach(p=>{ c.fillStyle=LCOL[i]; c.fillRect(p[0]*S,p[1]*S,S,S); c.strokeStyle='#fff'; c.strokeRect(p[0]*S,p[1]*S,S,S); }));
+  const mid=7.5*S; [[6,6,6,9,0],[6,6,9,6,1],[9,6,9,9,2],[6,9,9,9,3]].forEach(([ax,ay,bx,by,i])=>{ c.fillStyle=LCOL[i]; c.beginPath(); c.moveTo(ax*S,ay*S); c.lineTo(bx*S,by*S); c.lineTo(mid,mid); c.closePath(); c.fill(); });
+  const mv=(L.turn===0&&L.rolled&&!L.over)?lLegal(L.T,0,L.d):[], seen={};
+  L.T.forEach((t,ci)=>t.forEach((p,k)=>{
+    const q=lCell(ci,p,k), key=q[0]+','+q[1], n=seen[key]=(seen[key]||0)+1, px=(q[0]+.5)*S+(p>=0?(n-1)*5-5:0), py=(q[1]+.5)*S;
+    c.beginPath(); c.arc(px,py,9,0,7); c.fillStyle=LCOL[ci]; c.fill(); c.lineWidth=2; c.strokeStyle='#000'; c.stroke();
+    if(ci===0&&mv.includes(k)){ c.beginPath(); c.arc(px,py,12,0,7); c.strokeStyle='#ff9100'; c.lineWidth=3; c.stroke(); }
+  }));
+  $('ludInfo').innerText=L.msg+(L.d?'   🎲 '+L.d:'');
+}
+function ludReward(win){ socket.emit('game_reward',{game:'ludo',win:!!win,score:win?100:LUD.T[0].filter(p=>p===57).length*10}); }
+$('ludCv').addEventListener('click',e=>{
+  const L=LUD; if(!L||L.turn!==0||!L.rolled||L.over) return; const r=e.target.getBoundingClientRect(), x=Math.floor((e.clientX-r.left)/r.width*15), y=Math.floor((e.clientY-r.top)/r.height*15);
+  const k=lLegal(L.T,0,L.d).find(k=>{ const q=lCell(0,L.T[0][k],k); return q[0]===x&&q[1]===y; }); if(k!==undefined) ludPick(k);
+});
+/* ===== Quiz (AI writes the questions) ===== */
+const qzBody=el('div',{});
+qzBody.innerHTML=`<div style="display:flex;gap:6px;margin-bottom:10px"><input id="qzTopic" placeholder="Topic (e.g. India, space, cricket)" maxlength="40" style="flex:1"><button class="btn" onclick="qzStart()">Start</button></div><div id="qzBox"><small style="color:#888">5 questions. 4 coins for each right answer (daily limit 60). Leave the topic empty for general knowledge.</small></div>`;
+mkApp('quizApp','Quiz','🧠','Quiz',qzBody);
+window.qzStart=()=>socket.emit('quiz_start',{topic:$('qzTopic').value});
+socket.on('quiz_loading',()=>{ $('qzBox').innerHTML='<b>⏳ Writing questions…</b>'; });
+socket.on('quiz_q',d=>{ $('qzBox').innerHTML=`<div class="user-card" style="display:block"><small style="color:#999">Question ${d.i+1} / ${d.n}${d.ai?' · AI':''}</small><br><b>${esc(d.q)}</b></div>`+d.a.map((o,i)=>`<button class="btn gray" style="display:block;width:100%;margin:6px 0;text-align:left" onclick="qzPick(${d.i},${i})">${esc(o)}</button>`).join(''); });
+window.qzPick=(i,p)=>{ document.querySelectorAll('#qzBox button').forEach(b=>b.disabled=true); socket.emit('quiz_answer',{i,pick:p}); };
+socket.on('quiz_r',d=>{ const bs=document.querySelectorAll('#qzBox button'); if(bs[d.correct]) bs[d.correct].style.background='#2e7d32'; if(!d.ok&&bs[d.pick]) bs[d.pick].style.background='#c62828'; if(!d.last) setTimeout(()=>socket.emit('quiz_next'),1200); });
+socket.on('quiz_end',d=>{ $('qzBox').insertAdjacentHTML('beforeend',`<div class="user-card" style="display:block;margin-top:10px"><b>🏁 Score ${d.score} / ${d.n}</b><br>${d.coins?'🪙 +'+d.coins+' coins':'No coins this time (score 0 or daily quiz limit reached)'}</div>`); });
+/* ===== Group chats ===== */
+const gpBody=el('div',{});
+gpBody.innerHTML=`<div id="gpHome"><div id="gpList"></div><h4>Create a group</h4><input id="gpName" placeholder="Group name" maxlength="30" style="width:100%;margin-bottom:6px"><input id="gpMem" placeholder="Members (names, comma separated)" style="width:100%;margin-bottom:6px"><button class="btn" style="width:100%" onclick="gpCreate()">Create group</button></div><div id="gpChat" style="display:none"><div style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><button class="btn sm gray" onclick="gpBack()">⬅</button><b id="gpTitle" style="flex:1"></b><button class="btn sm" onclick="gpAdd()">➕ Add</button><button class="btn sm gray" onclick="gpLeave()">Leave</button><button class="btn sm red" id="gpDel" onclick="gpDelete()">Delete</button></div><small id="gpMembers" style="color:#888"></small><div id="gpMsgs" style="height:50vh;overflow:auto;background:#140606;border-radius:8px;padding:8px;margin:6px 0"></div><div style="display:flex;gap:6px"><input id="gpText" placeholder="Message" maxlength="1000" style="flex:1" onkeydown="if(event.key==='Enter')gpSend()"><button class="btn" onclick="gpSend()">Send</button></div></div>`;
+mkApp('groupApp','Group Chats','👥','Groups',gpBody);
+let GRP={list:[],cur:null};
+const gpLine=m=>`<div style="margin:4px 0"><b style="color:${m.user===me?'#80cbc4':'#ffcc80'}">${esc(m.user)}</b> <small style="color:#777">${new Date(m.t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</small><br>${esc(m.text)}</div>`;
+function gpRender(){ $('gpList').innerHTML=GRP.list.map(g=>`<div class="user-card"><div><b>👥 ${esc(g.name)}</b><br><small style="color:#888">${g.members.length} members${g.last?' · '+esc(g.last.user)+': '+esc(g.last.text.slice(0,30)):''}</small></div><button class="btn sm" onclick="gpOpen('${g.id}')">Open</button></div>`).join('')||'<small style="color:#888">No groups yet. Create one below.</small>'; }
+socket.on('groups',l=>{ GRP.list=l; gpRender(); if(GRP.cur){ if(l.some(g=>g.id===GRP.cur)) socket.emit('group_open',GRP.cur); else gpBack(); } });
+window.gpOpen=id=>{ GRP.cur=id; socket.emit('group_open',id); };
+window.gpBack=()=>{ GRP.cur=null; $('gpChat').style.display='none'; $('gpHome').style.display='block'; socket.emit('groups_get'); };
+socket.on('group_msgs',d=>{ if(d.id!==GRP.cur) return; $('gpHome').style.display='none'; $('gpChat').style.display='block'; $('gpTitle').innerText=d.name; $('gpMembers').innerText='Members: '+d.members.join(', '); $('gpDel').style.display=d.owner===me?'':'none'; $('gpMsgs').innerHTML=d.msgs.map(gpLine).join(''); $('gpMsgs').scrollTop=1e9; });
+socket.on('group_msg',({gid,m})=>{ if(gid===GRP.cur){ $('gpMsgs').insertAdjacentHTML('beforeend',gpLine(m)); $('gpMsgs').scrollTop=1e9; } else if(m.user!==me){ const g=GRP.list.find(x=>x.id===gid); toast('👥 '+(g?g.name:'Group')+' · '+m.user+': '+m.text.slice(0,40)); } });
+window.gpSend=()=>{ const t=$('gpText').value.trim(); if(t&&GRP.cur){ socket.emit('group_send',{id:GRP.cur,text:t}); $('gpText').value=''; } };
+window.gpCreate=()=>{ socket.emit('group_create',{name:$('gpName').value,members:$('gpMem').value}); $('gpName').value=''; $('gpMem').value=''; };
+window.gpAdd=()=>{ const n=prompt('Add which user?'); if(n&&n.trim()) socket.emit('group_add',{id:GRP.cur,name:n.trim()}); };
+window.gpLeave=()=>{ if(confirm('Leave this group?')) socket.emit('group_leave',GRP.cur); };
+window.gpDelete=()=>{ if(confirm('Delete this group for everyone?')) socket.emit('group_delete',GRP.cur); };
+/* ===== open / close / keys for the new apps ===== */
+const _omN=openModal; openModal=function(id){ _omN(id);
+  if(id==='snakeApp'&&(!SNK||SNK.over)) snNew(); if(id==='snakeApp'&&SNK&&!SNK.over&&!SNK.t) SNK.t=setInterval(snTick,130);
+  if(id==='g48App'&&!G48) g48New(); if(id==='ludApp'&&!LUD) ludNew();
+  if(id==='groupApp'){ GRP.cur=null; $('gpChat').style.display='none'; $('gpHome').style.display='block'; socket.emit('groups_get'); } };
+const _cmN=closeModal; closeModal=function(id){ if(id==='snakeApp'&&SNK){ clearInterval(SNK.t); SNK.t=0; } _cmN(id); };
+addEventListener('keydown',e=>{
+  const sn=$('snakeApp'), gb=$('g48App');
+  if(sn&&sn.style.display==='flex'){ const m={ArrowUp:[0,-1],w:[0,-1],ArrowDown:[0,1],s:[0,1],ArrowLeft:[-1,0],a:[-1,0],ArrowRight:[1,0],d:[1,0]}[e.key]; if(m){ snDir(m[0],m[1]); e.preventDefault(); } }
+  if(gb&&gb.style.display==='flex'){ const m={ArrowLeft:0,a:0,ArrowRight:1,d:1,ArrowUp:2,w:2,ArrowDown:3,s:3}[e.key]; if(m!==undefined){ g48go(m); e.preventDefault(); } }
+});
 })();
 </script>
 </body>
-  </html>
+</html>
