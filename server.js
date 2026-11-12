@@ -15,14 +15,14 @@ const io = new Server(server, { maxHttpBufferSize: 5e7, cors: { origin: '*' } })
 const DB_FILE = path.join(process.env.DATA_DIR || __dirname, 'db.json');
 let db = {
   totalVisits: 0, visitors: [], users: [], friends: {}, requests: {}, global: [], dms: {}, files: [],
-  profiles: {}, blocks: {}, accounts: {}, sessions: {}, push: {}, bans: [], strikes: {}, ips: {}, cids: {}, badWords: [], reports: []
+  profiles: {}, blocks: {}, accounts: {}, sessions: {}, push: {}, bans: [], strikes: {}, ips: {}, cids: {}, badWords: [], reports: [], groups: {}
 };
 let M = null;
 const logErr = e => console.error('Storage error:', e.message);
 const metaOf = () => ({
   totalVisits: db.totalVisits, visitors: db.visitors, users: db.users, friends: db.friends, requests: db.requests,
   profiles: db.profiles, blocks: db.blocks, accounts: db.accounts, sessions: db.sessions, push: db.push,
-  bans: db.bans, strikes: db.strikes, ips: db.ips, cids: db.cids, badWords: db.badWords, reports: db.reports
+  bans: db.bans, strikes: db.strikes, ips: db.ips, cids: db.cids, badWords: db.badWords, reports: db.reports, groups: db.groups
 });
 
 async function initStorage() {
@@ -113,8 +113,36 @@ const ACH = { // id: [icon, title, test]
   coins_100: ['🪙', '100 coins', p => p.coins >= 100],
   coins_1000: ['💰', '1000 coins', p => p.coins >= 1000],
   dash_done: ['🔷', 'Finished a Dash level', p => (p.best.gd || 0) >= 100],
-  all_games: ['🎮', 'Played all 5 games', p => Object.keys(p.played).length >= 5]
+  all_games: ['🎮', 'Played all 5 games', p => ['xo', 'arena', 'doom', 'gd', 'draw'].every(g => p.played[g])]
 };
+// ---- quiz (AI writes the questions; a built-in bank is the fallback) and group chats ----
+const QZ_BANK = [
+  { q: 'What is the capital of India?', a: ['Mumbai', 'New Delhi', 'Kolkata', 'Chennai'], c: 1 },
+  { q: 'Which planet is called the Red Planet?', a: ['Venus', 'Jupiter', 'Mars', 'Saturn'], c: 2 },
+  { q: 'Which is the largest ocean?', a: ['Atlantic', 'Indian', 'Arctic', 'Pacific'], c: 3 },
+  { q: 'What is the chemical formula of water?', a: ['CO2', 'H2O', 'O2', 'NaCl'], c: 1 },
+  { q: 'Who wrote the Indian national anthem?', a: ['Rabindranath Tagore', 'Bankim Chandra', 'Mahatma Gandhi', 'Sarojini Naidu'], c: 0 },
+  { q: 'How many days are in a leap year?', a: ['365', '364', '366', '367'], c: 2 },
+  { q: 'Which is the fastest land animal?', a: ['Lion', 'Cheetah', 'Horse', 'Leopard'], c: 1 },
+  { q: 'Which is the largest planet in our solar system?', a: ['Earth', 'Saturn', 'Neptune', 'Jupiter'], c: 3 },
+  { q: 'What is the currency of Japan?', a: ['Yen', 'Won', 'Yuan', 'Dollar'], c: 0 },
+  { q: 'What is the national animal of India?', a: ['Lion', 'Elephant', 'Tiger', 'Peacock'], c: 2 },
+  { q: 'What is the chemical symbol for gold?', a: ['Ag', 'Au', 'Gd', 'Go'], c: 1 },
+  { q: 'How many continents are there?', a: ['5', '6', '8', '7'], c: 3 }
+];
+const quizOf = Object.create(null), lastQuiz = Object.create(null), lastGM = Object.create(null), QUIZ_DAILY = 60;
+function parseQuiz(t) {
+  const m = t && String(t).match(/\[[\s\S]*\]/); if (!m) return null;
+  let a; try { a = JSON.parse(m[0]); } catch (e) { return null; }
+  if (!Array.isArray(a)) return null;
+  const qs = a.map(x => ({ q: String((x && x.q) || '').slice(0, 200), a: Array.isArray(x && x.a) ? x.a.slice(0, 4).map(s => String(s).slice(0, 80)) : [], c: Math.floor(+(x && x.c)) }))
+    .filter(x => x.q && x.a.length === 4 && x.c >= 0 && x.c < 4);
+  return qs.length >= 3 ? qs.slice(0, 5) : null;
+}
+const grp = () => db.groups || (db.groups = {});
+const myGroups = n => Object.values(grp()).filter(g => g.members.includes(n));
+const gInfo = g => ({ id: g.id, name: g.name, owner: g.owner, members: g.members, last: g.msgs.length ? g.msgs[g.msgs.length - 1] : null });
+const gRefresh = (g, extra) => { [...new Set(g.members.concat(extra || []))].forEach(n => to(n, 'groups', myGroups(n).map(gInfo))); };
 // ---- daily login reward + streak, daily quests (a "day" changes at 00:00 UTC = 05:30 AM India time) ----
 const reps = () => db.reports || (db.reports = []);
 const dayStr = (off = 0) => new Date(Date.now() + off * 864e5).toISOString().slice(0, 10);
@@ -748,6 +776,83 @@ io.on('connection', (socket) => {
     stats(); socket.emit('admin_data', adminPayload());
     socket.emit('toast', on ? '🛡 ' + u + ' is now an admin' : u + ' is no longer an admin');
   });
+  // ---------- quiz ----------
+  const quizSend = () => { const Q = quizOf[me]; if (!Q) return; const q = Q.qs[Q.i]; socket.emit('quiz_q', { i: Q.i, n: Q.qs.length, q: q.q, a: q.a, ai: Q.ai }); };
+  socket.on('quiz_start', async ({ topic } = {}) => {
+    if (!me) return;
+    const now = Date.now(); if (now - (lastQuiz[me] || 0) < 20000) return socket.emit('toast', 'Wait a few seconds before the next quiz');
+    lastQuiz[me] = now;
+    topic = String(topic || '').replace(/[^\p{L}\p{N} ,.\-]/gu, '').trim().slice(0, 40);
+    if (topic && !isAdmin(me) && isAbusive(topic)) return socket.emit('toast', 'That topic is not allowed');
+    socket.emit('quiz_loading', {});
+    let qs = null;
+    if (process.env.GROQ_API_KEY) {
+      const t = await callAI('Write 5 multiple-choice quiz questions about "' + (topic || 'general knowledge') + '" for a general audience. Reply with ONLY a JSON array and no other text, in exactly this shape: [{"q":"question text","a":["option 1","option 2","option 3","option 4"],"c":0}] where c is the index (0 to 3) of the correct option.', []);
+      qs = parseQuiz(t);
+    }
+    const ai = !!qs; if (!qs) qs = QZ_BANK.slice().sort(() => Math.random() - .5).slice(0, 5);
+    quizOf[me] = { qs, i: 0, score: 0, ai, ans: false }; quizSend();
+  });
+  socket.on('quiz_answer', ({ i, pick } = {}) => {
+    const Q = me && quizOf[me]; if (!Q || Q.ans || i !== Q.i) return;
+    pick = Math.floor(+pick); const q = Q.qs[Q.i], ok = pick === q.c; if (ok) Q.score++; Q.ans = true;
+    const last = Q.i + 1 >= Q.qs.length;
+    socket.emit('quiz_r', { ok, correct: q.c, pick, last });
+    if (!last) return;
+    const p = prof(me), day = dayStr(); if (p.qzDay !== day) { p.qzDay = day; p.qzCoins = 0; }
+    let c = Q.score * (Q.ai ? 4 : 2); c = Math.max(0, Math.min(c, QUIZ_DAILY - (p.qzCoins || 0))); p.qzCoins = (p.qzCoins || 0) + c;
+    reward(me, 'quiz', c, Q.score >= 4, Q.score * 20);
+    socket.emit('quiz_end', { score: Q.score, n: Q.qs.length, coins: c }); delete quizOf[me];
+  });
+  socket.on('quiz_next', () => { const Q = me && quizOf[me]; if (!Q || !Q.ans) return; Q.i++; Q.ans = false; quizSend(); });
+  // ---------- group chats ----------
+  socket.on('groups_get', () => { if (me) socket.emit('groups', myGroups(me).map(gInfo)); });
+  socket.on('group_create', ({ name, members } = {}) => {
+    if (!me) return;
+    name = String(name || '').replace(/[<>]/g, '').trim().slice(0, 30);
+    if (name.length < 2) return socket.emit('toast', 'Group name is too short');
+    if (!isAdmin(me) && isAbusive(name)) return socket.emit('toast', 'That name is not allowed');
+    if (Object.values(grp()).filter(g => g.owner === me).length >= 10) return socket.emit('toast', 'You can own up to 10 groups');
+    const list = [me];
+    String(Array.isArray(members) ? members.join(',') : members || '').split(',').forEach(x => {
+      const u = findUser(x.trim()); if (u && !list.includes(u) && !isBlocked(u, me) && list.length < 20) list.push(u);
+    });
+    const g = { id: uid(), name, owner: me, members: list, msgs: [], t: Date.now() };
+    grp()[g.id] = g; pMeta(); gRefresh(g);
+    list.forEach(n => { if (n !== me) to(n, 'toast', '👥 ' + me + ' added you to "' + name + '"'); });
+    socket.emit('toast', '👥 Group created');
+  });
+  socket.on('group_open', (id) => {
+    const g = grp()[id]; if (!me || !g || !g.members.includes(me)) return;
+    socket.emit('group_msgs', { id, name: g.name, owner: g.owner, members: g.members, msgs: g.msgs.slice(-100) });
+  });
+  socket.on('group_send', ({ id, text } = {}) => {
+    const g = grp()[id]; if (!me || !g || !g.members.includes(me)) return;
+    text = String(text || '').trim().slice(0, 1000); if (!text) return;
+    if (!isAdmin(me) && isAbusive(text)) { autoBan(me, clientId); return; }
+    const now = Date.now(); if (now - (lastGM[me] || 0) < 400) return; lastGM[me] = now;
+    const m = { id: uid(), user: me, text, t: now }; g.msgs.push(m); if (g.msgs.length > 200) g.msgs.shift();
+    pMeta(); questProg(me, 'msg', 1); g.members.forEach(n => to(n, 'group_msg', { gid: id, m }));
+  });
+  socket.on('group_add', ({ id, name } = {}) => {
+    const g = grp()[id]; if (!me || !g || g.owner !== me) return socket.emit('toast', 'Only the group owner can add people');
+    const u = findUser(name);
+    if (!u) return socket.emit('toast', 'User not found');
+    if (g.members.includes(u)) return socket.emit('toast', 'Already in the group');
+    if (g.members.length >= 20) return socket.emit('toast', 'Group is full (20 people)');
+    if (isBlocked(u, me)) return socket.emit('toast', 'You cannot add this user');
+    g.members.push(u); pMeta(); gRefresh(g); to(u, 'toast', '👥 ' + me + ' added you to "' + g.name + '"');
+  });
+  socket.on('group_leave', (id) => {
+    const g = grp()[id]; if (!me || !g || !g.members.includes(me)) return;
+    g.members = g.members.filter(n => n !== me);
+    if (!g.members.length) delete grp()[id]; else if (g.owner === me) g.owner = g.members[0];
+    pMeta(); if (grp()[id]) gRefresh(g, [me]); else socket.emit('groups', myGroups(me).map(gInfo));
+  });
+  socket.on('group_delete', (id) => {
+    const g = grp()[id]; if (!me || !g || (g.owner !== me && !isAdmin(me))) return;
+    delete grp()[id]; pMeta(); g.members.forEach(n => to(n, 'groups', myGroups(n).map(gInfo)));
+  });
   socket.on('quests_get', () => { if (me) socket.emit('quests', questState(me)); });
   socket.on('report_user', ({ name, reason } = {}) => {
     if (!me) return;
@@ -1138,7 +1243,7 @@ io.on('connection', (socket) => {
   });
 
   // ---------- Coins & leaderboard ----------
-  const GAME_COINS = { xo: 8, arena: 25, doom: 25, gd: 40 }; // coins for a win in the games that run on the player's device
+  const GAME_COINS = { xo: 8, arena: 25, doom: 25, gd: 40, snake: 10, g2048: 30, ludo: 20 }; // coins for a win in the games that run on the player's device
   const lastGR = {};
   socket.on('game_reward', ({ game, win, score, lvl } = {}) => {
     if (!me || !hasOwn(GAME_COINS, game)) return;
