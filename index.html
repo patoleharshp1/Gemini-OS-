@@ -12,6 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-title" content="Gemini OS"/>
 <style>
+#adminBtn{display:none!important}
 :root{--bg:#0c0202;--pn:#1f0606;--bd:#3d1515;--ac:#e05656;--tx:#e5b3b3;--hi:#ff8a8a}
 *{box-sizing:border-box}
 html,body{height:100%}
@@ -37,7 +38,7 @@ h4{color:var(--hi);margin:14px 0 8px}
 #display-username{cursor:pointer;text-decoration:underline}
 .hero{display:none}
 .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-.tile-app{background:#1e0808;border:1px solid #421818;border-radius:16px;padding:16px 4px;text-align:center;cursor:pointer;color:var(--tx);font-size:12px}
+.tile-app{background:none;border:0;border-radius:16px;padding:16px 4px;text-align:center;cursor:pointer;color:var(--tx);font-size:12px}
 .tile-app i{display:block;font-style:normal;font-size:34px;margin-bottom:6px}
 .tile-app:active{transform:scale(.94)}
 #offlineBar{display:none;background:#8a1c1c;text-align:center;padding:6px;border-radius:8px;margin-bottom:10px;font-size:12px}
@@ -189,6 +190,11 @@ h4{color:var(--hi);margin:14px 0 8px}
         <div style="color:#888;font-size:12px;margin-bottom:8px">or</div>
         <div id="googleBtn" style="display:flex;justify-content:center"></div>
       </div>
+      <div id="phoneWrap" style="display:none;margin-top:16px;text-align:center">
+        <div style="color:#888;font-size:12px;margin-bottom:8px">or use your phone number</div>
+        <div id="phStep1"><input type="tel" id="phNum" placeholder="Phone, e.g. +91 98765 43210" autocomplete="tel" style="width:100%;margin-bottom:8px"/><button type="button" class="btn" style="width:100%" onclick="phSend()">&#128241; Send code</button></div>
+        <div id="phStep2" style="display:none"><input type="text" id="phCode" inputmode="numeric" maxlength="8" placeholder="Enter the code" autocomplete="one-time-code" style="width:100%;margin-bottom:8px"/><button type="button" class="btn" style="width:100%" onclick="phVerify()">Verify &amp; continue</button><button type="button" class="btn gray" style="width:100%;margin-top:6px" onclick="phReset()">Change number</button></div>
+      </div>
     </div>
   </div>
 </div>
@@ -273,6 +279,7 @@ h4{color:var(--hi);margin:14px 0 8px}
       <div class="tile-app" onclick="openBrowser()"><i>🌐</i>Browser</div>
       <div class="tile-app" onclick="openModal('localMusicApp')"><i>🎵</i>Local MP3</div>
       <div class="tile-app" onclick="openCamera()"><i>📷</i>Camera</div>
+      <div class="tile-app" id="adminTile" style="display:none" onclick="openAdmin()"><i>🛡️</i>Admin</div>
       <div class="tile-app" onclick="openModal('settingsModal')"><i>⚙️</i>Settings</div>
     </div>
   </main>
@@ -559,6 +566,7 @@ h4{color:var(--hi);margin:14px 0 8px}
     <h4>Users</h4>
     <input type="text" id="admSearch" placeholder="🔍 Search user..." oninput="renderAdmin()" style="width:100%;margin-bottom:6px"/>
     <div id="admUsers"></div>
+    <h4>🚩 Reports</h4><div id="admReports"></div>
     <h4>Active bans</h4><div id="admBans"></div>
     <h4>🤬 Abusive words (auto-ban, any language)</h4>
     <div style="display:flex;gap:6px"><input type="text" id="admWord" placeholder="Add a word" style="flex:1"/><button class="btn sm" onclick="admAddWord()">Add</button></div>
@@ -743,7 +751,7 @@ socket.on('auth_ok',({name,token,admin,owner})=>{
   me=name; localStorage.setItem('token',token); localStorage.setItem('saved_name',name);
   if(pendingCred && window.PasswordCredential){ try{ navigator.credentials.store(new PasswordCredential({id:pendingCred.name,password:pendingCred.password,name})); }catch(e){} }
   pendingCred=null;
-  $('adminBtn').style.display = admin ? 'block' : 'none';
+  $('adminBtn').style.display = admin ? 'block' : 'none'; $('adminTile').style.display = admin ? 'block' : 'none';
   $('authModal').style.display='none'; $('authPass').value=''; $('authPass2').value=''; showName();
 });
 socket.on('auth_fail',()=>{ ['token','saved_name','chat_cache'].forEach(k=>localStorage.removeItem(k)); me=''; showName(); setAuthMode('login','Please log in again'); showAuth(); });
@@ -760,11 +768,12 @@ async function logout(){
   socket.emit('logout',{token:localStorage.getItem('token'),endpoint:ep});
   ['token','saved_name','chat_cache','outbox'].forEach(k=>localStorage.removeItem(k));
   outbox=[]; me=''; globalMsgs=[]; dms={}; friends=[]; requests=[]; blocks=[]; directory=[]; dirMap={}; unread={}; cur='global'; profileLoaded=false; SHOP.fx=0;
-  $('adminBtn').style.display='none';
+  $('adminBtn').style.display='none'; $('adminTile').style.display='none';
   goHome(); showName(); refreshLists(); renderChat(); setAuthMode('signup'); showAuth();
 }
 fetch((SERVER_URL||'')+'/config').then(r=>r.json()).then(c=>{
   if(c.persistent===false) $('storeWarn').style.display='block';
+  if(c.phone) $('phoneWrap').style.display='block';
   if(!c.googleClientId) return;
   const s=document.createElement('script'); s.src='https://accounts.google.com/gsi/client'; s.async=true;
   s.onload=()=>{
@@ -774,6 +783,13 @@ fetch((SERVER_URL||'')+'/config').then(r=>r.json()).then(c=>{
   };
   document.head.appendChild(s);
 }).catch(()=>{});
+let phNumber='';
+function phSend(){ socket.emit('phone_send',{phone:$('phNum').value,clientId}); }
+function phVerify(){ socket.emit('phone_verify',{phone:phNumber,code:$('phCode').value,clientId}); }
+function phReset(){ phNumber=''; $('phStep2').style.display='none'; $('phStep1').style.display='block'; $('phCode').value=''; }
+socket.on('phone_sent',({phone})=>{ phNumber=phone; $('phStep1').style.display='none'; $('phStep2').style.display='block'; $('authMsg').innerText='Code sent to '+phone; $('phCode').focus(); });
+socket.on('phone_need_name',({error})=>{ const n=prompt((error?error+'\n':'')+'Phone verified! Choose your display name (spaces allowed):',''); if(n&&n.trim()) socket.emit('phone_name',{phone:phNumber,name:n.trim()}); else phReset(); });
+socket.on('auth_ok',()=>phReset());
 socket.on('google_need_name',({suggested,error})=>{
   const n=prompt((error?error+'\n':'')+'Choose your display name (spaces allowed):',suggested||'');
   if(n&&n.trim()) socket.emit('google_auth',{credential:pendingGoogle,name:n.trim(),clientId});
@@ -840,6 +856,7 @@ function renderDirectory(){
       +(u.status?'<br><small style="color:#aaa">'+esc(u.status)+'</small>':'')
       +'<br><small style="color:#888">'+(on?'online now':'last seen '+timeAgo(u.lastSeen))+' · 👁 '+(u.visits||0)+' visits'+(u.wins?' · 🏆 '+u.wins+' wins':'')+'</small></div><div class="user-actions">'
       +watchBtn(u.name)
+      +'<button class="btn sm gray" title="Report" onclick="reportUser(\''+n+'\')">🚩</button>'
       +(bl?'':'<button class="btn sm" onclick="act(\'chat\',\''+n+'\')">💬</button>')
       +(on&&!bl?'<button class="btn sm blue" onclick="act(\'call\',\''+n+'\')">📞</button>':'')
       +(!isF&&!bl?'<button class="btn sm green" onclick="act(\'add\',\''+n+'\')">➕</button>':'')
@@ -1156,6 +1173,7 @@ function renderAdmin(){
 }
 socket.on('admin_data',d=>{
   AD=d;
+  $('admReports').innerHTML=(d.reports||[]).map(r=>'<div class="user-card"><div><b>'+esc(r.name)+'</b> reported by '+esc(r.by)+'<br><small style="color:#888">'+esc(r.reason)+' · '+new Date(r.at).toLocaleString()+'</small></div><button class="btn sm gray" onclick="socket.emit(\'report_close\',\''+r.id+'\')">Dismiss</button></div>').join('')||'<small style="color:#888">No open reports</small>';
   renderAdmin();
   $('admBans').innerHTML=d.bans.map(b=>'<div class="user-card"><div>'+esc(b.name||'?')+' · '+(((b.ips&&b.ips.length)||b.ip)?'name + device + IP':'name + device only')+'<br><small style="color:#888">'+esc(b.reason)+' · by '+esc(b.by||'?')+' · '+(b.until?'until '+new Date(b.until).toLocaleString():'permanent')+'</small></div><button class="btn sm green" onclick="admUnban(\''+b.id+'\')">Unban</button></div>').join('')||'<small style="color:#888">No active bans</small>';
   $('admWords').innerHTML=(d.words||[]).map(w=>'<span style="display:inline-block;background:#2a0d0d;border:1px solid var(--bd);border-radius:10px;padding:2px 8px;margin:2px;font-size:12px">'+esc(w)+' <a href="#" style="color:#ff8a8a;text-decoration:none" onclick="admDelWord(\''+enc(w)+'\');return false">✕</a></span>').join('')||'<small style="color:#888">No custom words yet (a large built-in list already works)</small>';
@@ -1170,7 +1188,7 @@ function admSetOwner(e,on){ const name=decodeURIComponent(e); if(confirm((on?'Ma
 function admSetAdmin(e,on){ socket.emit('set_admin',{name:decodeURIComponent(e),on}); }
 function admAddWord(){ const w=$('admWord').value.trim(); if(w){ socket.emit('admin_word',{word:w}); $('admWord').value=''; } }
 function admDelWord(e){ socket.emit('admin_word',{word:decodeURIComponent(e),del:true}); }
-socket.on('role_update',r=>{ myRole=r.admin?'admin':''; $('adminBtn').style.display=r.admin?'block':'none'; });
+socket.on('role_update',r=>{ myRole=r.admin?'admin':''; $('adminBtn').style.display=r.admin?'block':'none'; $('adminTile').style.display=r.admin?'block':'none'; });
 socket.on('banned',b=>{
   $('banReason').innerText='Reason: '+(b.reason||'No reason given');
   $('banUntil').innerText=b.until?'Ban ends at '+new Date(b.until).toLocaleTimeString():'This ban is permanent';
@@ -2561,7 +2579,19 @@ socket.on('db_result',r=>{
   if(r.solo) dbRes.append(el('button',{class:'btn green',style:{alignSelf:'center'},onclick:()=>{ dbRes.innerHTML=''; socket.emit('db_solo'); }},'🎯 Play again'));
   if(!r.ai) dbRes.append(el('small',{style:{color:'#ff9800',textAlign:'center'}},'The AI judge is not connected yet, so this was a basic score and pays fewer coins.')); });
 socket.on('disconnect',()=>{ if(dbId) dbReset(); });
+function reportUser(e){ const name=decodeURIComponent(e), r=prompt('Why are you reporting '+name+'?'); if(r&&r.trim()) socket.emit('report_user',{name,reason:r.trim()}); }
+const qBody=el('div',{id:'questBody'}); mkApp('questApp','Daily Quests','🎯','Quests',qBody);
+let QS=null;
+function renderQuests(){
+  if(!QS) return;
+  const card=(inner)=>'<div class="user-card" style="display:block">'+inner+'</div>';
+  $('questBody').innerHTML=card('<b>🔥 Login streak: '+QS.streak+' day'+(QS.streak===1?'':'s')+'</b><br><small style="color:#999">Come back every day. Every 7th day gives a bonus.</small>')
+   +QS.list.map(q=>card('<b>'+(q.done?'✅ ':'⬜ ')+esc(q.t)+'</b> · 🪙 '+q.coins+'<div style="background:#2a1010;border-radius:6px;height:8px;margin-top:6px"><div style="background:#66bb6a;height:8px;border-radius:6px;width:'+Math.round(q.n/q.goal*100)+'%"></div></div><small style="color:#999">'+q.n+' / '+q.goal+'</small>')).join('')
+   +'<small style="color:#888">Quests reset every day.</small>';
+}
+socket.on('quests',d=>{ QS=d; renderQuests(); });
+const _omQ=openModal; openModal=function(id){ _omQ(id); if(id==='questApp'){ socket.emit('quests_get'); renderQuests(); } };
 })();
 </script>
 </body>
-</html>
+  </html>
