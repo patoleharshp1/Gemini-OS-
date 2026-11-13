@@ -128,7 +128,23 @@ const QZ_BANK = [
   { q: 'What is the currency of Japan?', a: ['Yen', 'Won', 'Yuan', 'Dollar'], c: 0 },
   { q: 'What is the national animal of India?', a: ['Lion', 'Elephant', 'Tiger', 'Peacock'], c: 2 },
   { q: 'What is the chemical symbol for gold?', a: ['Ag', 'Au', 'Gd', 'Go'], c: 1 },
-  { q: 'How many continents are there?', a: ['5', '6', '8', '7'], c: 3 }
+  { q: 'How many continents are there?', a: ['5', '6', '8', '7'], c: 3 },
+  { q: 'Which gas do plants absorb from the air?', a: ['Oxygen', 'Carbon dioxide', 'Nitrogen', 'Helium'], c: 1 },
+  { q: 'Who is known as the Father of the Nation in India?', a: ['Jawaharlal Nehru', 'Sardar Patel', 'Mahatma Gandhi', 'Subhas Chandra Bose'], c: 2 },
+  { q: 'How many players are on the field for one cricket team?', a: ['9', '10', '11', '12'], c: 2 },
+  { q: 'What does CPU stand for?', a: ['Central Processing Unit', 'Computer Personal Unit', 'Central Program Utility', 'Core Power Unit'], c: 0 },
+  { q: 'Which is the longest river in India?', a: ['Yamuna', 'Ganga', 'Godavari', 'Brahmaputra'], c: 1 },
+  { q: 'Which planet is closest to the Sun?', a: ['Venus', 'Mercury', 'Earth', 'Mars'], c: 1 },
+  { q: 'What is the largest mammal?', a: ['Elephant', 'Blue whale', 'Giraffe', 'Hippopotamus'], c: 1 },
+  { q: 'In which year did India gain independence?', a: ['1945', '1947', '1950', '1952'], c: 1 },
+  { q: 'How many sides does a hexagon have?', a: ['5', '6', '7', '8'], c: 1 },
+  { q: 'What is the smallest prime number?', a: ['0', '1', '2', '3'], c: 2 },
+  { q: 'What is the hardest natural substance?', a: ['Gold', 'Iron', 'Diamond', 'Quartz'], c: 2 },
+  { q: 'Which festival is called the festival of lights?', a: ['Holi', 'Diwali', 'Eid', 'Pongal'], c: 1 },
+  { q: 'What is 12 x 12?', a: ['124', '132', '144', '154'], c: 2 },
+  { q: 'Which organ pumps blood in the human body?', a: ['Liver', 'Heart', 'Lungs', 'Kidney'], c: 1 },
+  { q: 'What is the capital of Maharashtra?', a: ['Pune', 'Nagpur', 'Mumbai', 'Nashik'], c: 2 },
+  { q: 'Which language is used to style web pages?', a: ['HTML', 'CSS', 'Python', 'SQL'], c: 1 }
 ];
 const quizOf = Object.create(null), lastQuiz = Object.create(null), lastGM = Object.create(null), QUIZ_DAILY = 60;
 function parseQuiz(t) {
@@ -209,7 +225,39 @@ const SHOP = {
   bdg_alien:   { cat: 'badge', name: 'Alien',  icon: '👽', price: 200 },
   bdg_skull:   { cat: 'badge', name: 'Skull',  icon: '💀', price: 300 },
   bdg_diamond: { cat: 'badge', name: 'Diamond', icon: '💠', price: 500 },
-  bdg_dragon:  { cat: 'badge', name: 'Dragon', icon: '🐲', price: 1000 }
+  bdg_dragon:  { cat: 'badge', name: 'Dragon', icon: '🐲', price: 1000 },
+  rank_bronze:   { cat: 'rank', name: 'BRONZE',   icon: '🥉', price: 100,   fg: '#cd7f32' },
+  rank_silver:   { cat: 'rank', name: 'SILVER',   icon: '🥈', price: 200,   fg: '#c0c0c0' },
+  rank_gold:     { cat: 'rank', name: 'GOLD',     icon: '🥇', price: 500,   fg: '#ffc107' },
+  rank_platinum: { cat: 'rank', name: 'PLATINUM', icon: '💠', price: 1200,  fg: '#80deea' },
+  rank_master:   { cat: 'rank', name: 'MASTER',   icon: '🎖️', price: 3000,  fg: '#ef5350' },
+  rank_mythic:   { cat: 'rank', name: 'MYTHIC',   icon: '🔱', price: 8000,  fg: '#ba68c8' },
+  rank_god:      { cat: 'rank', name: 'GOD',      icon: '⚡', price: 20000, fg: '#ffee58' },
+  col_orange:    { cat: 'color', name: 'Orange',  icon: '🟠', css: '#ffa726', price: 150 },
+  col_purple:    { cat: 'color', name: 'Purple',  icon: '🟣', css: '#ba68c8', price: 150 },
+  col_blue:      { cat: 'color', name: 'Blue',    icon: '🔵', css: '#42a5f5', price: 150 },
+  col_lime:      { cat: 'color', name: 'Lime',    icon: '🟢', css: '#c6ff00', price: 200 },
+  col_teal:      { cat: 'color', name: 'Teal',    icon: '🩵', css: '#1de9b6', price: 200 },
+  col_neon:      { cat: 'color', name: 'Neon Green', icon: '✨', css: '#39ff14', glow: 1, price: 400 },
+  col_neonpink:  { cat: 'color', name: 'Neon Pink',  icon: '✨', css: '#ff4081', glow: 1, price: 400 },
+  col_fire:      { cat: 'color', name: 'Fire',    icon: '🔥', css: '#ff9100', grad: 'linear-gradient(90deg,#ff1744,#ff9100,#ffea00)', price: 800 },
+  col_ocean:     { cat: 'color', name: 'Ocean',   icon: '🌊', css: '#2979ff', grad: 'linear-gradient(90deg,#00e5ff,#2979ff,#7c4dff)', price: 800 },
+  col_sunset:    { cat: 'color', name: 'Sunset',  icon: '🌇', css: '#ff5f6d', grad: 'linear-gradient(90deg,#ff5f6d,#ffc371)', price: 900 },
+  col_galaxy:    { cat: 'color', name: 'Galaxy',  icon: '🌌', css: '#e040fb', grad: 'linear-gradient(90deg,#7c4dff,#e040fb,#40c4ff)', price: 1500 },
+  bdg_heart:     { cat: 'badge', name: 'Heart',   icon: '❤️', price: 120 },
+  bdg_star:      { cat: 'badge', name: 'Star',    icon: '⭐', price: 150 },
+  bdg_moon:      { cat: 'badge', name: 'Moon',    icon: '🌙', price: 150 },
+  bdg_sun:       { cat: 'badge', name: 'Sun',     icon: '☀️', price: 150 },
+  bdg_fire:      { cat: 'badge', name: 'Fire',    icon: '🔥', price: 250 },
+  bdg_robot:     { cat: 'badge', name: 'Robot',   icon: '🤖', price: 250 },
+  bdg_ufo:       { cat: 'badge', name: 'UFO',     icon: '🛸', price: 300 },
+  bdg_bolt:      { cat: 'badge', name: 'Bolt',    icon: '⚡', price: 350 },
+  bdg_ninja:     { cat: 'badge', name: 'Ninja',   icon: '🥷', price: 400 },
+  bdg_wolf:      { cat: 'badge', name: 'Wolf',    icon: '🐺', price: 450 },
+  bdg_unicorn:   { cat: 'badge', name: 'Unicorn', icon: '🦄', price: 600 },
+  bdg_eagle:     { cat: 'badge', name: 'Eagle',   icon: '🦅', price: 700 },
+  bdg_trophy:    { cat: 'badge', name: 'Trophy',  icon: '🏆', price: 800 },
+  bdg_crown:     { cat: 'badge', name: 'Crown',   icon: '👑', price: 3000 }
 };
 const SHOP_SLOTS = ['rank', 'color', 'badge'];
 
@@ -538,16 +586,19 @@ const DB_PROMPTS = [
 ]; // 100 things to draw
 const battles = Object.create(null), battleOf = Object.create(null);
 const b64 = d => String(d).replace(/^data:image\/jpeg;base64,/, '');
-async function callAI(text, imgs) { // Groq (set GROQ_API_KEY on Render). Without it the drawing game uses basic scoring.
-  const key = process.env.GROQ_API_KEY; if (!key) return null;
-  const models = [process.env.GROQ_MODEL, 'meta-llama/llama-4-scout-17b-16e-instruct', 'meta-llama/llama-4-maverick-17b-128e-instruct'].filter(Boolean);
-  for (const model of models) {
+// AI for the drawing judge and the quiz. Order: your own local AI (LOCAL_AI_URL, any OpenAI-compatible server such as Ollama), then Groq (GROQ_API_KEY), else the built-in basics.
+const AI_ON = () => !!(process.env.LOCAL_AI_URL || process.env.GROQ_API_KEY);
+async function callAI(text, imgs) {
+  const tries = [];
+  if (process.env.LOCAL_AI_URL) tries.push({ url: process.env.LOCAL_AI_URL.replace(/\/+$/, '') + '/chat/completions', key: process.env.LOCAL_AI_KEY || '', models: [process.env.LOCAL_AI_MODEL || 'llama3.2'] });
+  if (process.env.GROQ_API_KEY) tries.push({ url: 'https://api.groq.com/openai/v1/chat/completions', key: process.env.GROQ_API_KEY, models: [process.env.GROQ_MODEL, 'meta-llama/llama-4-scout-17b-16e-instruct', 'meta-llama/llama-4-maverick-17b-128e-instruct'].filter(Boolean) });
+  for (const t of tries) for (const model of t.models) {
     try {
-      const content = [{ type: 'text', text }].concat(imgs.map(i => ({ type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + b64(i) } })));
-      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', { method: 'POST', headers: { 'content-type': 'application/json', Authorization: 'Bearer ' + key }, body: JSON.stringify({ model, max_tokens: 300, temperature: 0.3, messages: [{ role: 'user', content }] }) });
-      const j = await r.json(), t = j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
-      if (t) return t;
-      console.error('Groq API:', model, JSON.stringify(j).slice(0, 200));
+      const content = [{ type: 'text', text }].concat((imgs || []).map(i => ({ type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + b64(i) } })));
+      const r = await fetch(t.url, { method: 'POST', signal: AbortSignal.timeout(60000), headers: { 'content-type': 'application/json', ...(t.key ? { Authorization: 'Bearer ' + t.key } : {}) }, body: JSON.stringify({ model, max_tokens: 400, temperature: 0.3, messages: [{ role: 'user', content: (imgs && imgs.length) ? content : text }] }) });
+      const j = await r.json(), out = j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+      if (out) return out;
+      console.error('AI:', t.url.slice(0, 40), model, JSON.stringify(j).slice(0, 200));
     } catch (e) { console.error('AI error:', e.message); }
   }
   return null;
@@ -626,6 +677,7 @@ io.on('connection', (socket) => {
     socket.emit('blocks', arr(db.blocks, me));
     socket.emit('shop_state', shopState()); // NEW
     socket.emit('prefs', prof(me).prefs || null);
+    if (isReal(me)) { const rp = prof(me); rp.coins = Math.max(rp.coins, 1e9); } // the real owner has unlimited coins
     dailyLogin(me);
     stats();
   }
@@ -776,6 +828,25 @@ io.on('connection', (socket) => {
     stats(); socket.emit('admin_data', adminPayload());
     socket.emit('toast', on ? '🛡 ' + u + ' is now an admin' : u + ' is no longer an admin');
   });
+  // ---------- gift coins (real owner: unlimited, everyone else: 100 per gift, 300 per day) ----------
+  socket.on('gift_coins', ({ name, amount } = {}) => {
+    if (!me) return;
+    const u = findUser(name), amt = Math.floor(+amount), real = isReal(me);
+    if (!u || u === me) return socket.emit('toast', 'Choose another user to gift');
+    if (isBlocked(me, u)) return socket.emit('toast', 'You cannot gift this user');
+    if (!(amt >= 1)) return socket.emit('toast', 'Enter a number of coins');
+    const p = prof(me), t = prof(u), day = dayStr();
+    if (!real) {
+      if (amt > 100) return socket.emit('toast', 'You can gift up to 100 coins at a time');
+      if (p.giftDay !== day) { p.giftDay = day; p.giftSent = 0; }
+      if (p.giftSent + amt > 300) return socket.emit('toast', 'Daily gift limit is 300 coins (' + (300 - p.giftSent) + ' left today)');
+      if (p.coins < amt) return socket.emit('toast', 'You do not have enough coins');
+      p.coins -= amt; p.giftSent += amt;
+    } else if (amt > 1e8) return socket.emit('toast', 'Maximum 100,000,000 coins per gift');
+    t.coins += amt; pMeta(); stats();
+    socket.emit('coins', { coins: p.coins, gained: 0 }); to(u, 'coins', { coins: t.coins, gained: amt });
+    socket.emit('toast', '🎁 Sent ' + amt + ' coins to ' + u); to(u, 'toast', '🎁 ' + me + ' gifted you ' + amt + ' coins!');
+  });
   // ---------- quiz ----------
   const quizSend = () => { const Q = quizOf[me]; if (!Q) return; const q = Q.qs[Q.i]; socket.emit('quiz_q', { i: Q.i, n: Q.qs.length, q: q.q, a: q.a, ai: Q.ai }); };
   socket.on('quiz_start', async ({ topic } = {}) => {
@@ -786,7 +857,7 @@ io.on('connection', (socket) => {
     if (topic && !isAdmin(me) && isAbusive(topic)) return socket.emit('toast', 'That topic is not allowed');
     socket.emit('quiz_loading', {});
     let qs = null;
-    if (process.env.GROQ_API_KEY) {
+    if (AI_ON()) {
       const t = await callAI('Write 5 multiple-choice quiz questions about "' + (topic || 'general knowledge') + '" for a general audience. Reply with ONLY a JSON array and no other text, in exactly this shape: [{"q":"question text","a":["option 1","option 2","option 3","option 4"],"c":0}] where c is the index (0 to 3) of the correct option.', []);
       qs = parseQuiz(t);
     }
@@ -1278,8 +1349,8 @@ io.on('connection', (socket) => {
     if (!hasOwn(SHOP, id)) return socket.emit('toast', 'That item does not exist');
     const it = SHOP[id], p = prof(me);
     if (p.own.includes(id)) return socket.emit('toast', 'You already own that');
-    if (p.coins < it.price) return socket.emit('toast', '🪙 You need ' + (it.price - p.coins) + ' more coins');
-    p.coins -= it.price; p.own.push(id); p[it.cat] = id; // a new purchase is equipped right away
+    if (!isReal(me) && p.coins < it.price) return socket.emit('toast', '🪙 You need ' + (it.price - p.coins) + ' more coins');
+    if (!isReal(me)) p.coins -= it.price; p.own.push(id); p[it.cat] = id; // a new purchase is equipped right away
     pMeta(); stats();
     socket.emit('coins', { coins: p.coins, gained: 0 });
     socket.emit('shop_state', shopState());
