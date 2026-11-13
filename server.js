@@ -674,6 +674,12 @@ io.on('connection', (socket) => {
     if (!wasOnline) arr(db.friends, me).forEach(f => to(f, 'toast', '🟢 ' + me + ' is online'));
     socket.emit('init', { global: lastN(db.global, 50), dms: Object.fromEntries(Object.entries(dmsFor(me)).map(([k, v]) => [k, lastN(v, 50)])), files: filesFor(me).map(slimF) });
     social(me);
+    { // messages sent to me while I was offline are now delivered
+      const got = {};
+      Object.keys(db.dms).forEach(k => { const p2 = k.split('|'); if (p2[0] !== me && p2[1] !== me) return;
+        db.dms[k].forEach(m => { if (m.to === me && m.st === 1) { m.st = 2; pMsg(m); (got[m.user] = got[m.user] || []).push(m.id); } }); });
+      Object.keys(got).forEach(u => to(u, 'msg_status', { ids: got[u], st: 2 }));
+    }
     socket.emit('blocks', arr(db.blocks, me));
     socket.emit('shop_state', shopState()); // NEW
     socket.emit('prefs', prof(me).prefs || null);
@@ -846,6 +852,9 @@ io.on('connection', (socket) => {
     t.coins += amt; pMeta(); stats();
     socket.emit('coins', { coins: p.coins, gained: 0 }); to(u, 'coins', { coins: t.coins, gained: amt });
     socket.emit('toast', '🎁 Sent ' + amt + ' coins to ' + u); to(u, 'toast', '🎁 ' + me + ' gifted you ' + amt + ' coins!');
+    const gm = { user: me, id: uid(), t: Date.now(), timestamp: '', to: u, chat: key(me, u), text: '🎁 Gifted ' + amt + ' coins', gift: amt, st: online[u] ? 2 : 1 };
+    arr(db.dms, gm.chat).push(gm); pMsg(gm); to(me, 'receive_message', gm); to(u, 'receive_message', gm);
+    socket.emit('gift_sent', { to: u, amount: amt }); to(u, 'gift_received', { from: me, amount: amt });
   });
   // ---------- quiz ----------
   const quizSend = () => { const Q = quizOf[me]; if (!Q) return; const q = Q.qs[Q.i]; socket.emit('quiz_q', { i: Q.i, n: Q.qs.length, q: q.q, a: q.a, ai: Q.ai }); };
@@ -1060,6 +1069,7 @@ io.on('connection', (socket) => {
       if (!target) return socket.emit('toast', 'User not found');
       if (isBlocked(me, target)) return socket.emit('toast', '🚫 You cannot message this user');
       m.to = target; m.chat = key(me, target);
+      if (target !== me) m.st = online[target] ? 2 : 1; // 1 sent, 2 delivered, 3 seen
       arr(db.dms, m.chat).push(m);
       to(me, 'receive_message', m);
       if (target !== me) {
@@ -1083,6 +1093,14 @@ io.on('connection', (socket) => {
     list.splice(i, 1); pMsgDel(id);
     if (chat === 'global') A().emit('message_deleted', { id });
     else { to(me, 'message_deleted', { id }); to(chat, 'message_deleted', { id }); }
+  });
+  socket.on('chat_seen', ({ chat: w } = {}) => {
+    if (!me || !w) return;
+    const other = findUser(w); if (!other) return;
+    const list = db.dms[key(me, other)]; if (!list) return;
+    const ids = [];
+    list.forEach(m => { if (m.to === me && m.st && m.st < 3) { m.st = 3; pMsg(m); ids.push(m.id); } });
+    if (ids.length) to(other, 'msg_status', { ids, st: 3 });
   });
   socket.on('typing_status', (d = {}) => {
     if (!me) return;
