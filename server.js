@@ -1055,6 +1055,12 @@ io.on('connection', (socket) => {
     if (ok) to(t, 'live_signal', { from: me, data });
   });
 
+  // ---------- Ludo relay (friends only) ----------
+  socket.on('ludo_send', ({ to: names, data } = {}) => {
+    if (!me || !data || !Array.isArray(names)) return;
+    names.slice(0, 4).forEach(n => { n = findUser(n); if (n && n !== me && arr(db.friends, me).includes(n)) to(n, 'ludo_msg', { from: me, data }); });
+  });
+
   // ---------- Messages ----------
   socket.on('send_message', (data) => {
     if (!me || !data) return;

@@ -2770,8 +2770,8 @@ function g48Draw(){
   $('g48Grid').innerHTML=S.g.map(v=>`<div style="aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;border-radius:8px;font:bold ${v>=1024?18:v>=128?22:26}px sans-serif;color:#222;background:${v?`hsl(${(30+Math.log2(v)*28)%360},75%,${Math.max(35,72-Math.log2(v)*3)}%)`:'#3a1818'}">${v||''}</div>`).join('');
 }
 swipeOn($('g48Grid'),d=>g48go({l:0,r:1,u:2,d:3}[d]));
-/* ===== Ludo (you are Red, 3 computer players) ===== */
-const LCOL=['#e53935','#43a047','#fdd835','#1e88e5'], LNAME=['Red (you)','Green','Yellow','Blue'];
+/* ===== Ludo: vs computer (1-3) or online with friends (1-3), Ludo-King style dice + hopping tokens ===== */
+const LCOL=['#e53935','#43a047','#fdd835','#1e88e5'], LCN=['Red','Green','Yellow','Blue'];
 const LP=[]; const lseg=(x,y,dx,dy,n)=>{ for(let i=0;i<n;i++) LP.push([x+dx*i,y+dy*i]); };
 lseg(1,6,1,0,5); lseg(6,5,0,-1,6); lseg(7,0,1,0,2); lseg(8,1,0,1,5); lseg(9,6,1,0,6); lseg(14,7,0,1,2);
 lseg(13,8,-1,0,5); lseg(8,9,0,1,6); lseg(7,14,-1,0,2); lseg(6,13,0,-1,5); lseg(5,8,-1,0,6); lseg(0,7,0,-1,2);
@@ -2780,63 +2780,148 @@ const LH=[[1,7,1,0],[7,1,0,1],[13,7,-1,0],[7,13,0,-1]].map(([x,y,dx,dy])=>[0,1,2
 const LY=[[[2,2],[4,2],[2,4],[4,4]],[[10,2],[12,2],[10,4],[12,4]],[[10,10],[12,10],[10,12],[12,12]],[[2,10],[4,10],[2,12],[4,12]]];
 function lCell(c,p,k){ return p<0?LY[c][k]:p<=50?LP[(LST[c]+p)%52]:p<=56?LH[c][p-51]:[7,7]; }
 function lLegal(T,c,d){ const r=[]; T[c].forEach((p,k)=>{ if(p<0?d===6:p+d<=57) r.push(k); }); return r; }
-function lMove(T,c,k,d){
-  const p=T[c][k], np=p<0?0:p+d, cap=[]; T[c][k]=np;
+function lMove(T,c,k,d){ const p=T[c][k], np=p<0?0:p+d, cap=[]; T[c][k]=np;
   if(np<=50){ const idx=(LST[c]+np)%52; if(!LSAFE.has(idx)) for(let o=0;o<4;o++) if(o!==c) T[o].forEach((q,j)=>{ if(q>=0&&q<=50&&(LST[o]+q)%52===idx){ T[o][j]=-1; cap.push([o,j]); } }); }
-  return cap;
-}
-function lAI(T,c,d){
-  let best=-1,bs=-1e9;
-  lLegal(T,c,d).forEach(k=>{ const p=T[c][k], np=p<0?0:p+d; let s=np/10;
-    if(p<0) s+=60; if(np===57) s+=80; if(np>=51&&np<57) s+=15;
+  return cap; }
+function lAI(T,c,d){ let best=-1,bs=-1e9;
+  lLegal(T,c,d).forEach(k=>{ const p=T[c][k], np=p<0?0:p+d; let s=np/10; if(p<0) s+=60; if(np===57) s+=80; if(np>=51&&np<57) s+=15;
     if(np<=50){ const idx=(LST[c]+np)%52; if(LSAFE.has(idx)) s+=30; else for(let o=0;o<4;o++) if(o!==c) T[o].forEach(q=>{ if(q>=0&&q<=50&&(LST[o]+q)%52===idx) s+=100; }); }
-    if(s>bs){ bs=s; best=k; } });
-  return best;
+    if(s>bs){ bs=s; best=k; } }); return best; }
+let LUD=null, LSET={mode:'ai',n:1,pick:[]}, LHOST=false, LROOM=null, LMYSEAT=0, LACC=[], LANIM=null, LSHOWD=0, LRID=0;
+const lSeats=n=>n===2?[0,2]:n===3?[0,1,2]:[0,1,2,3];
+const ludBody=el('div',{style:{textAlign:'center'}});
+ludBody.innerHTML=`<div id="ludSetup"></div><div id="ludPlay" style="display:none"><canvas id="ludCv" width="360" height="360" style="width:100%;max-width:420px;border-radius:10px"></canvas><div id="ludInfo" style="margin:6px 0;min-height:20px"></div><div style="display:flex;justify-content:center;align-items:center;gap:14px"><div id="ludDice" onclick="ludRoll()"></div><button class="btn gray" onclick="ludMenu()">⬅ Menu</button></div></div>`;
+mkApp('ludApp','Ludo','🎲','Ludo',ludBody);
+const ludCss=document.createElement('style'); ludCss.textContent=`#ludDice{width:68px;height:68px;border-radius:16px;background:#fff;border:4px solid #e53935;display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);padding:7px;cursor:pointer;box-shadow:0 5px 14px #0008;transition:border-color .2s}#ludDice i{width:11px;height:11px;border-radius:50%;background:#222;place-self:center}#ludDice.roll{animation:ludSp .12s linear infinite}#ludDice.off{opacity:.55}@keyframes ludSp{to{transform:rotate(90deg) scale(.92)}}.lchip{display:inline-block;margin:4px;padding:8px 14px;border-radius:20px;background:#2a0b0b;border:2px solid #4a1a1a;color:#fff;cursor:pointer}.lchip.on{border-color:#ff9100;background:#5c1818}`;
+document.head.append(ludCss);
+const DOTS=[[],[4],[0,8],[0,4,8],[0,2,6,8],[0,2,4,6,8],[0,2,3,5,6,8]];
+function ludDiceShow(v){ const d=$('ludDice'); d.innerHTML=''; (DOTS[v]||[]).forEach(i=>{ const e=document.createElement('i'); e.style.gridArea=(Math.floor(i/3)+1)+'/'+(i%3+1); d.append(e); }); }
+function ludDiceRoll(v){ const d=$('ludDice'); d.classList.add('roll'); let n=0; const t=setInterval(()=>{ ludDiceShow(1+Math.floor(Math.random()*6)); if(++n>=5){ clearInterval(t); d.classList.remove('roll'); ludDiceShow(v); } },110); }
+function ludSetup(){
+  const S=LSET, fr=(typeof friends!=='undefined'?friends:[]);
+  let h='<h4>🎲 Ludo</h4><div><span class="lchip '+(S.mode==='ai'?'on':'')+'" onclick="LSET.mode=\'ai\';LSET.n=1;ludSetup()">🤖 Play with computer</span><span class="lchip '+(S.mode==='fr'?'on':'')+'" onclick="LSET.mode=\'fr\';LSET.n=1;LSET.pick=[];ludSetup()">👥 Play with friends</span></div>';
+  if(S.mode==='ai') h+='<p>How many computer players?</p>'+[1,2,3].map(n=>'<span class="lchip '+(S.n===n?'on':'')+'" onclick="LSET.n='+n+';ludSetup()">'+n+'</span>').join('')+'<br><br><button class="btn green" onclick="ludStartAI()">▶ Start game</button>';
+  else { h+='<p>How many friends? (pick that many)</p>'+[1,2,3].map(n=>'<span class="lchip '+(S.n===n?'on':'')+'" onclick="LSET.n='+n+';LSET.pick=LSET.pick.slice(0,'+n+');ludSetup()">'+n+'</span>').join('')+'<p>Choose friends'+(fr.length?'':' (add friends first)')+':</p>'+fr.map(f=>'<span class="lchip '+(S.pick.includes(f)?'on':'')+'" onclick="ludPickF(\''+encodeURIComponent(f)+'\')">'+(onlineUsers.includes(f)?'🟢 ':'⚪ ')+esc(f)+'</span>').join('')+'<br><br><button class="btn green" onclick="ludInvite()">📨 Send invites</button><p id="ludWait" style="color:#ffb300"></p>'; }
+  $('ludSetup').innerHTML=h; $('ludSetup').style.display=''; $('ludPlay').style.display='none';
 }
-let LUD=null;
-function ludNew(){ LUD={T:[0,1,2,3].map(()=>[-1,-1,-1,-1]),turn:0,d:0,rolled:0,sixes:0,over:0,msg:'Your turn: roll the dice'}; ludDraw(); }
-function ludRoll(){ const L=LUD; if(!L||L.over||L.turn!==0||L.rolled) return; ludDo(0); }
+window.ludPickF=e=>{ const f=decodeURIComponent(e), p=LSET.pick; if(p.includes(f)) p.splice(p.indexOf(f),1); else if(p.length<LSET.n) p.push(f); ludSetup(); };
+function ludMenu(){ if(LHOST&&LROOM) ludSend(LROOM.names,{t:'end'}); LUD=null; LROOM=null; LHOST=false; ludSetup(); }
+function ludNew(seats,names,types){
+  const T=[0,1,2,3].map(c=>seats.includes(c)?[-1,-1,-1,-1]:[]);
+  LUD={T,seats,names,types,turn:seats[0],d:0,rolled:0,sixes:0,over:0,msg:'',anim:null};
+  LUD.msg=names[LUD.turn]+' – roll the dice'; $('ludSetup').style.display='none'; $('ludPlay').style.display='';
+  ludPush(); if(LHOST||!LROOM) ludAuto();
+}
+function ludStartAI(){ const n=LSET.n+1, seats=lSeats(n), names=[],types=[]; seats.forEach((s,i)=>{ names[s]=i?LCN[s]+' (CPU)':'You'; types[s]=i?'ai':'me'; }); LMYSEAT=seats[0]; LHOST=false; LROOM=null; ludNew(seats,names,types); }
+function ludSend(to,data){ socket.emit('ludo_send',{to,data}); }
+function ludInvite(){ const p=LSET.pick; if(p.length!==LSET.n) return toastL('Pick exactly '+LSET.n+' friend(s)'); LROOM={id:Date.now(),names:p.slice()}; LACC=[]; ludSend(p,{t:'inv',id:LROOM.id,host:me,players:[me,...p]}); $('ludWait').innerHTML='Waiting for friends… <button class="btn sm green" onclick="ludGo()">Start now</button>'; }
+function toastL(m){ try{ toast(m); }catch(e){ alert(m); } }
+function ludGo(){
+  const seats=lSeats(LROOM.names.length+1), names=[],types=[]; LHOST=true; LMYSEAT=seats[0]; LROOM.seat={};
+  seats.forEach((s,i)=>{ if(!i){ names[s]='You'; types[s]='me'; } else { const f=LROOM.names[i-1]; LROOM.seat[f]=s; if(LACC.includes(f)){ names[s]=f; types[s]='fr:'+f; } else { names[s]=LCN[s]+' (CPU)'; types[s]='ai'; } } });
+  ludNew(seats,names,types);
+}
+function ludPush(){ const L=LUD; if(!L) return; if(LHOST&&LROOM) LROOM.names.forEach(f=>{ if(LACC.includes(f)) ludSend([f],{t:'st',s:L,seat:LROOM.seat[f]}); }); ludDraw(); }
+function ludMine(){ const L=LUD; return L&&!L.over&&L.turn===LMYSEAT; }
+function ludRoll(){ const L=LUD; if(!L||L.over||L.rolled||!ludMine()) return; if(LROOM&&!LHOST) return ludSend([LROOM.host],{t:'roll'}); ludDo(L.turn); }
 function ludDo(c){
-  const L=LUD; L.d=1+Math.floor(Math.random()*6); L.rolled=1; L.sixes=L.d===6?L.sixes+1:0;
-  const lg=lLegal(L.T,c,L.d);
-  if(L.sixes>=3||!lg.length){ L.msg=LNAME[c]+' rolled '+L.d+(L.sixes>=3?' (three 6s: turn lost)':': no move'); return ludEnd(c,0); }
-  if(c===0){ if(lg.length===1) return ludPick(lg[0]); L.msg='You rolled '+L.d+'. Tap a glowing token.'; ludDraw(); }
-  else setTimeout(()=>{ if(LUD===L&&!L.over) ludPick(lAI(L.T,c,L.d)); },600);
+  const L=LUD; L.d=1+Math.floor(Math.random()*6); L.rolled=1; L.rid=++LRID; L.sixes=L.d===6?L.sixes+1:0; L.anim=null;
+  const lg=lLegal(L.T,c,L.d); ludPush();
+  setTimeout(()=>{ if(LUD!==L||L.over) return;
+    if(L.sixes>=3||!lg.length){ L.msg=L.names[c]+' rolled '+L.d+(L.sixes>=3?' (three 6s: turn lost)':': no move'); return ludEnd(c,0); }
+    if(L.types[c]==='ai') return ludPick(lAI(L.T,c,L.d));
+    if(lg.length===1) return ludPick(lg[0]);
+    L.msg=(c===LMYSEAT?'You':L.names[c])+' rolled '+L.d+'. Tap a glowing token.'; ludPush(); },700);
 }
 function ludPick(k){
-  const L=LUD; if(!L||L.over) return; const c=L.turn;
-  if(!lLegal(L.T,c,L.d).includes(k)) return;
-  const cap=lMove(L.T,c,k,L.d); L.msg=LNAME[c]+' rolled '+L.d+(cap.length?' and captured a token!':'');
-  if(L.T[c].every(p=>p===57)){ L.over=1; L.msg='🏆 '+LNAME[c]+' wins!'; ludDraw(); ludReward(c===0); return; }
-  ludEnd(c,L.d===6);
+  const L=LUD; if(!L||L.over||L.anim_busy) return; L.anim_busy=1; const c=L.turn; if(!lLegal(L.T,c,L.d).includes(k)) return;
+  const from=L.T[c][k], cap=lMove(L.T,c,k,L.d), to=L.T[c][k]; L.anim={c,k,from,to,id:++LRID};
+  L.msg=L.names[c]+' rolled '+L.d+(cap.length?' and captured a token!':''); ludPush();
+  const wait=(from<0?1:L.d)*190+350;
+  setTimeout(()=>{ if(LUD!==L) return;
+    if(L.T[c].every(p=>p===57)){ L.over=1; L.msg='🏆 '+L.names[c]+' wins!'; ludPush(); if(L.types[c]==='me'||L.types[c]===('fr:'+me)) ludReward(1); return; }
+    ludEnd(c,L.d===6||cap.length>0); },wait);
 }
-function ludEnd(c,again){
-  const L=LUD; L.rolled=0; if(!again){ L.turn=(c+1)%4; L.sixes=0; } ludDraw();
-  if(L.turn!==0) setTimeout(()=>{ if(LUD===L&&!L.over) ludDo(L.turn); },700);
-}
-
-const ludBody=el('div',{style:{textAlign:'center'}});
-ludBody.innerHTML=`<canvas id="ludCv" width="360" height="360" style="width:100%;max-width:420px;border-radius:8px"></canvas><div id="ludInfo" style="margin:6px 0;min-height:20px"></div><button class="btn green" onclick="ludRoll()">🎲 Roll dice</button> <button class="btn gray" onclick="ludNew()">🔄 New game</button><br><small style="color:#888">Roll a 6 to leave the yard. Land on another colour to send it home (★ and start squares are safe). Get all 4 tokens to the centre to win.</small>`;
-mkApp('ludApp','Ludo','🎲','Ludo',ludBody);
+function ludEnd(c,again){ const L=LUD; L.rolled=0; L.anim_busy=0; if(!again){ const s=L.seats; L.turn=s[(s.indexOf(c)+1)%s.length]; L.sixes=0; } L.msg=L.names[L.turn]+(L.turn===LMYSEAT?' – your turn, roll!':"'s turn"); ludPush(); ludAuto(); }
+function ludAuto(){ const L=LUD; if(!L||L.over) return; if(L.types[L.turn]==='ai') setTimeout(()=>{ if(LUD===L&&!L.over&&!L.rolled) ludDo(L.turn); },900); }
 function ludDraw(){
-  const cv=$('ludCv'); if(!cv||!LUD) return; const c=cv.getContext('2d'), S=24, L=LUD; c.clearRect(0,0,360,360); c.fillStyle='#fff8e1'; c.fillRect(0,0,360,360);
-  [[0,0],[9,0],[9,9],[0,9]].forEach((q,i)=>{ c.fillStyle=LCOL[i]; c.fillRect(q[0]*S,q[1]*S,6*S,6*S); c.fillStyle='#fff'; c.fillRect((q[0]+1)*S,(q[1]+1)*S,4*S,4*S); });
+  const cv=$('ludCv'), L=LUD; if(!cv||!L) return; const c=cv.getContext('2d'), S=24;
+  if(L.rid&&L.rid!==LSHOWD){ LSHOWD=L.rid; ludDiceRoll(L.d); } else if(!L.rid) ludDiceShow(0);
+  const dv=$('ludDice'); dv.style.borderColor=LCOL[L.turn]; dv.classList.toggle('off',!ludMine()||!!L.rolled);
+  if(L.anim&&L.anim.id!==(LANIM&&LANIM.id)) LANIM={...L.anim,t0:performance.now()};
+  const now=performance.now(); let anim=null; if(LANIM){ const steps=LANIM.from<0?1:LANIM.to-LANIM.from, el_=(now-LANIM.t0)/190; if(el_<steps) anim=LANIM; }
+  c.clearRect(0,0,360,360); c.fillStyle='#fff8e1'; c.fillRect(0,0,360,360);
+  [[0,0],[9,0],[9,9],[0,9]].forEach((q,i)=>{ c.globalAlpha=L.seats.includes(i)?1:.3; c.fillStyle=LCOL[i]; c.fillRect(q[0]*S,q[1]*S,6*S,6*S); c.fillStyle='#fff'; c.fillRect((q[0]+1)*S,(q[1]+1)*S,4*S,4*S); if(i===L.turn&&!L.over){ c.strokeStyle='#000'; c.lineWidth=3; c.strokeRect(q[0]*S+2,q[1]*S+2,6*S-4,6*S-4); } c.globalAlpha=1; });
   LP.forEach((p,i)=>{ const st=LST.indexOf(i); c.fillStyle=st>=0?LCOL[st]:'#fff'; c.fillRect(p[0]*S,p[1]*S,S,S); c.strokeStyle='#888'; c.lineWidth=1; c.strokeRect(p[0]*S,p[1]*S,S,S); if(LSAFE.has(i)&&st<0){ c.fillStyle='#999'; c.font='16px sans-serif'; c.fillText('★',p[0]*S+4,p[1]*S+19); } });
   LH.forEach((h,i)=>h.forEach(p=>{ c.fillStyle=LCOL[i]; c.fillRect(p[0]*S,p[1]*S,S,S); c.strokeStyle='#fff'; c.strokeRect(p[0]*S,p[1]*S,S,S); }));
   const mid=7.5*S; [[6,6,6,9,0],[6,6,9,6,1],[9,6,9,9,2],[6,9,9,9,3]].forEach(([ax,ay,bx,by,i])=>{ c.fillStyle=LCOL[i]; c.beginPath(); c.moveTo(ax*S,ay*S); c.lineTo(bx*S,by*S); c.lineTo(mid,mid); c.closePath(); c.fill(); });
-  const mv=(L.turn===0&&L.rolled&&!L.over)?lLegal(L.T,0,L.d):[], seen={};
+  const mv=ludMine()&&L.rolled&&L.types[L.turn]!=='ai'&&!L.anim_busy?lLegal(L.T,L.turn,L.d):[], seen={}, hop=[];
   L.T.forEach((t,ci)=>t.forEach((p,k)=>{
-    const q=lCell(ci,p,k), key=q[0]+','+q[1], n=seen[key]=(seen[key]||0)+1, px=(q[0]+.5)*S+(p>=0?(n-1)*5-5:0), py=(q[1]+.5)*S;
-    c.beginPath(); c.arc(px,py,9,0,7); c.fillStyle=LCOL[ci]; c.fill(); c.lineWidth=2; c.strokeStyle='#000'; c.stroke();
-    if(ci===0&&mv.includes(k)){ c.beginPath(); c.arc(px,py,12,0,7); c.strokeStyle='#ff9100'; c.lineWidth=3; c.stroke(); }
+    if(anim&&anim.c===ci&&anim.k===k){ const st=Math.min(anim.to-anim.from||1,Math.floor((now-anim.t0)/190)), f=((now-anim.t0)/190)%1, a=anim.from<0?-1:anim.from+st, b=anim.from<0?0:Math.min(anim.to,a+1), q1=lCell(ci,a,k), q2=lCell(ci,b,k); hop.push([ci,(q1[0]+(q2[0]-q1[0])*f+.5)*S,(q1[1]+(q2[1]-q1[1])*f+.5)*S-Math.sin(f*Math.PI)*10]); return; }
+    const q=lCell(ci,p,k), key=q[0]+','+q[1], n=seen[key]=(seen[key]||0)+1, px=(q[0]+.5)*S+(p>=0?(n-1)*5-5:0), py=(q[1]+.5)*S; ludTok(c,px,py,ci,ci===L.turn&&mv.includes(k));
   }));
-  $('ludInfo').innerText=L.msg+(L.d?'   🎲 '+L.d:'');
+  hop.forEach(h=>ludTok(c,h[1],h[2],h[0],0));
+  $('ludInfo').innerText=L.msg; if(anim) requestAnimationFrame(ludDraw);
 }
-function ludReward(win){ socket.emit('game_reward',{game:'ludo',win:!!win,score:win?100:LUD.T[0].filter(p=>p===57).length*10}); }
+function ludTok(c,x,y,ci,glow){ c.beginPath(); c.arc(x,y+2,9,0,7); c.fillStyle='#0004'; c.fill(); c.beginPath(); c.arc(x,y,9,0,7); c.fillStyle=LCOL[ci]; c.fill(); c.lineWidth=2; c.strokeStyle='#000'; c.stroke(); c.beginPath(); c.arc(x,y,3.5,0,7); c.fillStyle='#fff'; c.fill(); if(glow){ c.beginPath(); c.arc(x,y,12.5,0,7); c.strokeStyle='#ff9100'; c.lineWidth=3; c.stroke(); } }
+function ludReward(win){ socket.emit('game_reward',{game:'ludo',win:!!win,score:win?100:10}); }
 $('ludCv').addEventListener('click',e=>{
-  const L=LUD; if(!L||L.turn!==0||!L.rolled||L.over) return; const r=e.target.getBoundingClientRect(), x=Math.floor((e.clientX-r.left)/r.width*15), y=Math.floor((e.clientY-r.top)/r.height*15);
-  const k=lLegal(L.T,0,L.d).find(k=>{ const q=lCell(0,L.T[0][k],k); return q[0]===x&&q[1]===y; }); if(k!==undefined) ludPick(k);
+  const L=LUD; if(!ludMine()||!L.rolled||L.anim_busy) return; const r=e.target.getBoundingClientRect(), x=Math.floor((e.clientX-r.left)/r.width*15), y=Math.floor((e.clientY-r.top)/r.height*15);
+  const k=lLegal(L.T,L.turn,L.d).find(k=>{ const q=lCell(L.turn,L.T[L.turn][k],k); return q[0]===x&&q[1]===y; }); if(k===undefined) return;
+  if(LROOM&&!LHOST) ludSend([LROOM.host],{t:'pick',k}); else ludPick(k);
 });
+socket.on('ludo_msg',({from,data})=>{
+  if(!data) return;
+  if(data.t==='inv'){ if(confirm(from+' invited you to play Ludo with '+data.players.join(', ')+'. Join?')){ LROOM={id:data.id,host:data.host,names:[data.host]}; LHOST=false; openModal('ludApp'); $('ludSetup').innerHTML='<p>Joined! Waiting for '+esc(data.host)+' to start…</p>'; ludSend([data.host],{t:'acc',id:data.id}); } }
+  else if(data.t==='acc'&&LHOST===false&&LROOM&&LROOM.id===data.id&&LROOM.names.includes(from)){ if(!LACC.includes(from)) LACC.push(from); const w=$('ludWait'); if(w) w.innerHTML='✅ '+LACC.join(', ')+' joined. <button class="btn sm green" onclick="ludGo()">Start now</button>'; if(LACC.length===LROOM.names.length) ludGo(); }
+  else if(data.t==='st'&&LROOM&&!LHOST&&from===LROOM.host){ LMYSEAT=data.seat; LUD=data.s; $('ludSetup').style.display='none'; $('ludPlay').style.display=''; ludDraw(); }
+  else if(data.t==='roll'&&LHOST&&LUD&&LUD.types[LUD.turn]==='fr:'+from&&!LUD.rolled&&!LUD.over) ludDo(LUD.turn);
+  else if(data.t==='pick'&&LHOST&&LUD&&LUD.types[LUD.turn]==='fr:'+from&&LUD.rolled&&!LUD.anim_busy) ludPick(data.k);
+  else if(data.t==='end'&&from===(LROOM&&LROOM.host)){ LUD=null; LROOM=null; ludSetup(); toastL(from+' ended the game'); }
+});
+const _omL=openModal; openModal=function(id){ _omL(id); if(id==='ludApp'&&!LUD&&!LROOM) ludSetup(); };
+
+/* ===== Personalize (Settings): dock, widget, icons ===== */
+const PZ=(()=>{ try{ return JSON.parse(localStorage.getItem('pz'))||{}; }catch(e){ return {}; } })();
+const PZD={dock:['Messages','Calls','Friends','Games'],dockCol:'#1c0606',dockA:86,wgCol:'#b71c1c',wgA:100,wgTx:'#ffffff',wgNote:'Hello 👋'};
+const pzg=k=>PZ[k]!==undefined?PZ[k]:PZD[k];
+const pzHex=(h,a)=>{ const n=parseInt(h.slice(1),16); return 'rgba('+(n>>16)+','+(n>>8&255)+','+(n&255)+','+a/100+')'; };
+const pzCss=document.createElement('style'); pzCss.id='pzCss'; document.head.append(pzCss);
+function pzApply(save){
+  if(save){ try{ localStorage.setItem('pz',JSON.stringify(PZ)); }catch(e){} }
+  const dock=pzg('dock'), navs=[...document.querySelectorAll('#side .nav')];
+  navs.forEach(n=>{ const l=(n.querySelector('span')||{}).textContent||''; const i=dock.indexOf(l); n.classList.toggle('dk',i>=0); n.style.order=i>=0?i:99; });
+  const wa=pzg('wgA');
+  pzCss.textContent='@media (max-width:899px){#side .nav{display:none!important}#side .nav.dk{display:flex!important}#side{background:'+pzHex(pzg('dockCol'),pzg('dockA'))+'!important;'+(pzg('dockA')<5?'border-color:transparent!important;box-shadow:none!important;':'')+'}}'
+   +'.wg{background:'+pzHex(pzg('wgCol'),wa)+'!important;'+(wa<5?'border-color:transparent!important;box-shadow:none!important;':'')+'}.wg-time,.wg-date,.wg-hi,.wg-note{color:'+pzg('wgTx')+'!important}.wg-note{margin-top:6px;font-size:14px;opacity:.9}';
+  const w=document.querySelector('.wg'); if(w){ let n=w.querySelector('.wg-note'); if(!n){ n=document.createElement('div'); n.className='wg-note'; w.querySelector('.wg-date').after(n); } n.textContent=pzg('wgNote'); n.style.display=pzg('wgNote')?'':'none'; }
+}
+function pzUI(){
+  const labels=[...document.querySelectorAll('#side .nav')].map(n=>(n.querySelector('span')||{}).textContent).filter(Boolean);
+  const d=document.createElement('div'), dock=pzg('dock').slice();
+  const opt=v=>'<option value="">— none —</option>'+labels.map(l=>'<option'+(l===v?' selected':'')+'>'+l+'</option>').join('');
+  d.innerHTML='<h4>📱 Bottom bar (phone dock)</h4><div style="font-size:12px;color:#aaa;margin-bottom:6px">Pick which apps sit in the bar and in what order (left → right).</div>'
+   +[0,1,2,3,4].map(i=>'<select class="pzDk" style="margin:0 6px 6px 0;max-width:46%">'+opt(dock[i])+'</select>').join('')
+   +'<div class="user-card"><div>Bar colour</div><input type="color" id="pzDc" value="'+pzg('dockCol')+'" style="width:70px;height:34px"></div>'
+   +'<div class="user-card"><div>Bar transparency</div><input type="range" id="pzDa" min="0" max="100" value="'+pzg('dockA')+'"></div>'
+   +'<h4>🧩 Widget (clock card)</h4>'
+   +'<div class="user-card"><div>Widget colour</div><input type="color" id="pzWc" value="'+pzg('wgCol')+'" style="width:70px;height:34px"></div>'
+   +'<div class="user-card"><div>Widget opacity (left = transparent)</div><input type="range" id="pzWa" min="0" max="100" value="'+pzg('wgA')+'"></div>'
+   +'<div class="user-card"><div>Text colour</div><input type="color" id="pzWt" value="'+pzg('wgTx')+'" style="width:70px;height:34px"></div>'
+   +'<input type="text" id="pzWn" maxlength="40" placeholder="Text inside widget" value="'+pzg('wgNote').replace(/"/g,'&quot;')+'" style="width:100%;margin-top:6px">'
+   +'<h4>🎨 Icons</h4><div class="user-card"><div>Icon box colour</div><input type="color" id="pzIc" value="'+(TSX.col||'#2a0b0b')+'" style="width:70px;height:34px"></div>'
+   +'<button class="btn" style="width:100%;margin-top:8px" onclick="tsToggle()">✂️ Transparent icons on / off</button>'
+   +'<button class="btn gray" style="width:100%;margin-top:8px" onclick="pzReset()">Reset all</button>';
+  const h=document.querySelector('#settingsModal .modal-body h4'); h.parentNode.insertBefore(d,h);
+  d.addEventListener('change',e=>{ if(e.target.classList.contains('pzDk')){ PZ.dock=[...d.querySelectorAll('.pzDk')].map(s=>s.value).filter(Boolean); pzApply(1); } });
+  const bind=(id,k,f)=>d.querySelector('#'+id).addEventListener('input',e=>{ PZ[k]=f?f(e.target.value):e.target.value; pzApply(1); });
+  bind('pzDc','dockCol'); bind('pzDa','dockA',Number); bind('pzWc','wgCol'); bind('pzWa','wgA',Number); bind('pzWt','wgTx'); bind('pzWn','wgNote');
+  d.querySelector('#pzIc').addEventListener('input',e=>tsColor(e.target.value));
+}
+window.pzReset=()=>{ Object.keys(PZ).forEach(k=>delete PZ[k]); try{ localStorage.removeItem('pz'); }catch(e){} tsReset(); pzApply(0); const o=document.querySelector('#settingsModal .modal-body h4').previousElementSibling; };
+const _omP=openModal; openModal=function(id){ if(id==='settingsModal'){ const L=[...document.querySelectorAll('#side .nav')].map(n=>(n.querySelector('span')||{}).textContent).filter(Boolean), dk=pzg('dock'); document.querySelectorAll('.pzDk').forEach((sel,i)=>{ sel.innerHTML='<option value="">— none —</option>'+L.map(l=>'<option'+(l===dk[i]?' selected':'')+'>'+l+'</option>').join(''); }); } _omP(id); };
+pzUI(); setTimeout(()=>pzApply(0),300); setTimeout(()=>pzApply(0),1500);
+
 /* ===== Quiz (AI writes the questions) ===== */
 const qzBody=el('div',{});
 qzBody.innerHTML=`<div style="display:flex;gap:6px;margin-bottom:10px"><input id="qzTopic" placeholder="Topic (e.g. India, space, cricket)" maxlength="40" style="flex:1"><button class="btn" onclick="qzStart()">Start</button></div><div id="qzBox"><small style="color:#888">5 questions. 4 coins for each right answer (daily limit 60). Leave the topic empty for general knowledge.</small></div>`;
@@ -2867,7 +2952,7 @@ window.gpDelete=()=>{ if(confirm('Delete this group for everyone?')) socket.emit
 /* ===== open / close / keys for the new apps ===== */
 const _omN=openModal; openModal=function(id){ _omN(id);
   if(id==='snakeApp'&&(!SNK||SNK.over)) snNew(); if(id==='snakeApp'&&SNK&&!SNK.over&&!SNK.t) SNK.t=setInterval(snTick,130);
-  if(id==='g48App'&&!G48) g48New(); if(id==='ludApp'&&!LUD) ludNew();
+  if(id==='g48App'&&!G48) g48New();
   if(id==='groupApp'){ GRP.cur=null; $('gpChat').style.display='none'; $('gpHome').style.display='block'; socket.emit('groups_get'); } };
 const _cmN=closeModal; closeModal=function(id){ if(id==='snakeApp'&&SNK){ clearInterval(SNK.t); SNK.t=0; } _cmN(id); };
 addEventListener('keydown',e=>{
