@@ -1338,7 +1338,7 @@ io.on('connection', (socket) => {
   });
 
   // ---------- Coins & leaderboard ----------
-  const GAME_COINS = { xo: 8, arena: 25, doom: 25, gd: 40, snake: 10, g2048: 30, ludo: 20 }; // coins for a win in the games that run on the player's device
+  const GAME_COINS = { xo: 8, arena: 25, doom: 25, gd: 40, snake: 10, g2048: 30, ludo: 20, memory: 15, c4: 20, flap: 20, snl: 20, race: 20, maze: 20 }; // coins for a win in the games that run on the player's device
   const lastGR = {};
   socket.on('game_reward', ({ game, win, score, lvl } = {}) => {
     if (!me || !hasOwn(GAME_COINS, game)) return;
